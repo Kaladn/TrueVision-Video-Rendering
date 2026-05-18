@@ -615,8 +615,16 @@
         <section class="section">
           <div class="section-title">Local Qwen</div>
           <label>
+            Server Type
+            <select id="qwenProvider">
+              <option value="ollama_native" selected>Ollama native /api/chat</option>
+              <option value="openai_compatible">OpenAI compatible /v1/chat/completions</option>
+            </select>
+          </label>
+          <div style="height:10px"></div>
+          <label>
             Endpoint
-            <input id="qwenEndpoint" type="url" value="http://127.0.0.1:11434/v1/chat/completions" spellcheck="false">
+            <input id="qwenEndpoint" type="url" value="http://127.0.0.1:11434/api/chat" spellcheck="false">
           </label>
           <div style="height:10px"></div>
           <label>
@@ -630,7 +638,7 @@
           </label>
           <div style="height:10px"></div>
           <label class="check"><input id="localQwenStandby" type="checkbox" checked> Use local Qwen when selected</label>
-          <div class="status-line" id="qwenStatus">Local Qwen standby is configured for OpenAI-compatible chat completions.</div>
+          <div class="status-line" id="qwenStatus">Local Qwen standby is configured for Ollama-native chat.</div>
           <div style="height:10px"></div>
           <button class="secondary" id="testQwen">Test Qwen</button>
         </section>
@@ -905,14 +913,36 @@
       }
     }
 
+    function defaultEndpointForProvider(provider) {
+      return provider === "openai_compatible"
+        ? "http://127.0.0.1:11434/v1/chat/completions"
+        : "http://127.0.0.1:11434/api/chat";
+    }
+
+    function isKnownQwenEndpoint(endpoint) {
+      return [
+        "http://127.0.0.1:11434/api/chat",
+        "http://localhost:11434/api/chat",
+        "http://127.0.0.1:11434/v1/chat/completions",
+        "http://localhost:11434/v1/chat/completions"
+      ].includes(endpoint);
+    }
+
     function loadQwenConfig() {
-      $("qwenEndpoint").value = storageGet("truevision.qwen.endpoint", $("qwenEndpoint").value);
+      const storedProvider = storageGet("truevision.qwen.provider", "");
+      $("qwenProvider").value = storedProvider || "ollama_native";
+      const storedEndpoint = storageGet("truevision.qwen.endpoint", "");
+      $("qwenEndpoint").value = storedEndpoint || defaultEndpointForProvider($("qwenProvider").value);
+      if (!storedProvider && $("qwenEndpoint").value.includes("/v1/chat/completions")) {
+        $("qwenEndpoint").value = defaultEndpointForProvider("ollama_native");
+      }
       $("qwenModel").value = storageGet("truevision.qwen.model", $("qwenModel").value);
       $("qwenApiKey").value = storageGet("truevision.qwen.api_key", "");
       $("localQwenStandby").checked = storageGet("truevision.qwen.standby", "true") === "true";
     }
 
     function saveQwenConfig() {
+      storageSet("truevision.qwen.provider", $("qwenProvider").value);
       storageSet("truevision.qwen.endpoint", $("qwenEndpoint").value.trim());
       storageSet("truevision.qwen.model", $("qwenModel").value.trim());
       storageSet("truevision.qwen.api_key", $("qwenApiKey").value);
@@ -943,10 +973,11 @@
         local_llm: {
           adapter: "local-qwen-32b",
           enabled: state.llm === "local-qwen-32b" && checked("localQwenStandby"),
+          provider: $("qwenProvider").value,
           endpoint: $("qwenEndpoint").value.trim(),
           model: $("qwenModel").value.trim(),
           api_key_configured: $("qwenApiKey").value.length > 0,
-          contract: "openai_chat_completions"
+          contract: $("qwenProvider").value === "openai_compatible" ? "openai_chat_completions" : "ollama_api_chat"
         },
         prompt,
         output_contract: {
@@ -1053,23 +1084,48 @@
       };
     }
 
-    async function callLocalQwen(request) {
-      const endpoint = $("qwenEndpoint").value.trim();
-      const model = $("qwenModel").value.trim();
-      const apiKey = $("qwenApiKey").value;
-      const headers = {
-        "Content-Type": "application/json",
-        "Authorization": apiKey ? `Bearer ${apiKey}` : "Bearer local-qwen-32b"
+    function buildQwenMessages(request) {
+      return [
+        { role: "system", content: buildQwenSystemPrompt() },
+        { role: "user", content: JSON.stringify(request, null, 2) }
+      ];
+    }
+
+    function buildOllamaChatBody(model, request) {
+      return {
+        model,
+        stream: false,
+        messages: buildQwenMessages(request),
+        options: {
+          temperature: 0.1
+        }
       };
-      const body = {
+    }
+
+    function buildOpenAiChatBody(model, request) {
+      return {
         model,
         temperature: 0.1,
         stream: false,
-        messages: [
-          { role: "system", content: buildQwenSystemPrompt() },
-          { role: "user", content: JSON.stringify(request, null, 2) }
-        ]
+        messages: buildQwenMessages(request)
       };
+    }
+
+    async function callLocalQwen(request) {
+      const endpoint = $("qwenEndpoint").value.trim();
+      const model = $("qwenModel").value.trim();
+      const provider = $("qwenProvider").value;
+      const apiKey = $("qwenApiKey").value.trim();
+      const headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json"
+      };
+      if (apiKey) {
+        headers.Authorization = `Bearer ${apiKey}`;
+      }
+      const body = provider === "openai_compatible"
+        ? buildOpenAiChatBody(model, request)
+        : buildOllamaChatBody(model, request);
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -1082,7 +1138,7 @@
       const payload = await response.json();
       const content = payload?.choices?.[0]?.message?.content ?? payload?.message?.content ?? payload?.response;
       if (!content) {
-        throw new Error("Local Qwen response did not include message content");
+        throw new Error(`Local Qwen response did not include message content for ${provider}`);
       }
       return parseQwenStateResponse(content);
     }
@@ -1351,6 +1407,9 @@
         update();
       });
       input.addEventListener("change", () => {
+        if (input.id === "qwenProvider" && isKnownQwenEndpoint($("qwenEndpoint").value.trim())) {
+          $("qwenEndpoint").value = defaultEndpointForProvider($("qwenProvider").value);
+        }
         if (input.id.startsWith("qwen") || input.id === "localQwenStandby") {
           saveQwenConfig();
         }
