@@ -1,0 +1,93 @@
+{
+  "schema_version": 1,
+  "kind": "truevision_full_power_single_frame",
+  "run_id": "person_field_clean_frame_full_power",
+  "created_at_utc": "2026-05-18T09:21:57.615Z",
+  "frame_shape": [
+    540,
+    960
+  ],
+  "grid_shape": [
+    90,
+    160
+  ],
+  "cell_shape": [
+    90,
+    160,
+    16
+  ],
+  "feature_names": [
+    "rgb_mean_r",
+    "rgb_mean_g",
+    "rgb_mean_b",
+    "rgb_std_r",
+    "rgb_std_g",
+    "rgb_std_b",
+    "hsv_mean_h",
+    "hsv_mean_s",
+    "hsv_mean_v",
+    "luma_mean",
+    "luma_std",
+    "saturation_mean",
+    "delta_luma_abs",
+    "edge_density",
+    "texture_energy",
+    "motion_energy"
+  ],
+  "used_replay_channels": [
+    "rgb_mean_r/g/b",
+    "rgb_std_r/g/b",
+    "luma_std",
+    "texture_energy",
+    "edge_density",
+    "motion_energy",
+    "delta_luma_abs",
+    "saturation_mean"
+  ],
+  "transition": {
+    "previous_progress": 0.535,
+    "current_progress": 0.56,
+    "delta_luma_abs_used": true,
+    "motion_energy_used": true
+  },
+  "boundary": {
+    "synthetic_state_media": true,
+    "evidence": false,
+    "prompt_generated": false,
+    "raw_observation": false
+  },
+  "hardware": {
+    "python": "3.11.0",
+    "platform": "Windows-10-10.0.26200-SP0",
+    "processor": "AMD64 Family 26 Model 68 Stepping 0, AuthenticAMD",
+    "compute_path": "CPU numpy/OpenCV high-detail source render, cell-state sampling, and full-power state replay",
+    "gpu_acceleration_used": false,
+    "cpu_logical": 32,
+    "cpu_physical": 16,
+    "ram_total_bytes": 66094223360,
+    "ram_available_bytes": 42599968768,
+    "process_rss_bytes": 319016960,
+    "gpu_adapters_detected": [
+      {
+        "Name": "AMD Radeon(TM) Graphics",
+        "AdapterRAM": 2147483648,
+        "DriverVersion": "32.0.21030.2001"
+      },
+      {
+        "Name": "Intel(R) Arc(TM) Pro B70 Graphics",
+        "AdapterRAM": 2147479552,
+        "DriverVersion": "32.0.101.8517"
+      }
+    ]
+  },
+  "timing": {
+    "started_at_utc": "2026-05-18T09:21:57.615Z",
+    "total_seconds": 0.378258
+  },
+  "outputs": {
+    "source_reference_png": "D:\\arc_solver_clean\\cod_616\\data\\truevision_generated\\person_field_clean_frame_full_power\\person_field_clean_frame_full_power_source_reference.png",
+    "state_png": "D:\\arc_solver_clean\\cod_616\\data\\truevision_generated\\person_field_clean_frame_full_power\\person_field_clean_frame_full_power_state_full_power.png",
+    "cell_state_npz": "D:\\arc_solver_clean\\cod_616\\data\\truevision_generated\\person_field_clean_frame_full_power\\person_field_clean_frame_full_power_cell_state.npz",
+    "report_md": "D:\\arc_solver_clean\\cod_616\\data\\truevision_generated\\person_field_clean_frame_full_power\\person_field_clean_frame_full_power_report.md"
+  }
+}

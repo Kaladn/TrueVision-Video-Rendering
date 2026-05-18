@@ -1,0 +1,1196 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrueVision State Media Studio</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #101315;
+      --panel: #171b1f;
+      --panel-2: #1d2227;
+      --line: #303841;
+      --text: #eef2f0;
+      --muted: #a5b0ad;
+      --soft: #d6dfdc;
+      --green: #7ad66d;
+      --gold: #f0c15c;
+      --cyan: #5fc3d9;
+      --red: #df695f;
+      --blue: #86aaf2;
+      --shadow: rgba(0, 0, 0, 0.28);
+      --radius: 6px;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      overflow: hidden;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 280px minmax(480px, 1fr) 360px;
+      height: 100vh;
+      min-width: 1080px;
+    }
+
+    .left,
+    .right,
+    .center {
+      min-height: 0;
+      border-right: 1px solid var(--line);
+      background: var(--panel);
+    }
+
+    .right {
+      border-right: 0;
+      border-left: 1px solid var(--line);
+    }
+
+    .center {
+      display: grid;
+      grid-template-rows: 58px minmax(260px, 1fr) 230px;
+      background: #121619;
+    }
+
+    .pane-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      height: 58px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: #15191d;
+    }
+
+    .title {
+      min-width: 0;
+      font-weight: 700;
+      letter-spacing: 0;
+      line-height: 1.1;
+    }
+
+    .subtitle {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px rgba(122, 214, 109, 0.14);
+      flex: 0 0 auto;
+    }
+
+    .scroll {
+      min-height: 0;
+      overflow: auto;
+      padding: 14px;
+    }
+
+    .section {
+      padding: 12px 0 16px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .section:first-child {
+      padding-top: 0;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .pill-row,
+    .button-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .pill,
+    .tool-button,
+    .seg button {
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      color: var(--text);
+      border-radius: var(--radius);
+      min-height: 34px;
+      padding: 7px 10px;
+      cursor: pointer;
+    }
+
+    .pill {
+      font-size: 12px;
+    }
+
+    .pill.active,
+    .seg button.active {
+      border-color: rgba(95, 195, 217, 0.72);
+      background: rgba(95, 195, 217, 0.14);
+      color: #dcf9ff;
+    }
+
+    .seg {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+
+    .seg.two {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #0e1113;
+      color: var(--text);
+      min-height: 34px;
+      padding: 8px 9px;
+      outline: none;
+    }
+
+    textarea {
+      min-height: 92px;
+      resize: vertical;
+      line-height: 1.35;
+    }
+
+    input[type="range"] {
+      padding: 0;
+      accent-color: var(--cyan);
+    }
+
+    input[type="checkbox"] {
+      width: 17px;
+      height: 17px;
+      min-height: 17px;
+      accent-color: var(--cyan);
+    }
+
+    .field-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .check-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .check {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      min-height: 32px;
+      color: var(--text);
+      font-size: 13px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--line);
+      background: #15191d;
+      min-width: 0;
+    }
+
+    .topbar-main {
+      min-width: 0;
+    }
+
+    .topbar-actions {
+      display: flex;
+      gap: 8px;
+      flex: 0 0 auto;
+    }
+
+    .icon-button,
+    .primary,
+    .secondary {
+      min-height: 36px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      cursor: pointer;
+      color: var(--text);
+    }
+
+    .icon-button {
+      width: 38px;
+      padding: 0;
+      background: var(--panel-2);
+    }
+
+    .primary {
+      background: #2d6f7c;
+      border-color: #3c8492;
+      padding: 0 14px;
+      font-weight: 700;
+    }
+
+    .secondary {
+      background: var(--panel-2);
+      padding: 0 12px;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: minmax(360px, 1fr) 410px;
+      min-height: 0;
+    }
+
+    .preview-wrap {
+      padding: 14px;
+      min-height: 0;
+      border-right: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: minmax(0, 1fr) 132px;
+      gap: 12px;
+    }
+
+    .canvas-band {
+      position: relative;
+      min-height: 0;
+      background: #090b0d;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      overflow: hidden;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 10px 28px var(--shadow);
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .hud {
+      position: absolute;
+      left: 12px;
+      right: 12px;
+      bottom: 12px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .hud-item {
+      background: rgba(10, 12, 14, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius);
+      padding: 8px;
+      min-width: 0;
+    }
+
+    .hud-value {
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .hud-label {
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .state-strip {
+      display: grid;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .state-cell {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      border-radius: var(--radius);
+      padding: 10px;
+      min-width: 0;
+    }
+
+    .state-cell strong {
+      display: block;
+      color: var(--text);
+      font-size: 13px;
+      margin-bottom: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .state-cell span {
+      color: var(--muted);
+      font-size: 12px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: block;
+    }
+
+    .chat {
+      display: grid;
+      grid-template-rows: 42px minmax(0, 1fr);
+      min-height: 0;
+      background: var(--panel);
+    }
+
+    .chat-routes {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .chat-window {
+      min-height: 0;
+      overflow: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .message {
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      background: var(--panel-2);
+      line-height: 1.35;
+      font-size: 13px;
+    }
+
+    .message.operator {
+      border-color: rgba(95, 195, 217, 0.42);
+      background: rgba(95, 195, 217, 0.08);
+    }
+
+    .message .meta {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 5px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .composer {
+      border-top: 1px solid var(--line);
+      padding: 12px 14px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 110px;
+      gap: 10px;
+      background: #15191d;
+    }
+
+    .composer textarea {
+      min-height: 78px;
+    }
+
+    .composer-actions {
+      display: grid;
+      gap: 8px;
+      align-content: start;
+    }
+
+    .file-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .file {
+      display: grid;
+      grid-template-columns: 30px minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      border-radius: var(--radius);
+      padding: 8px;
+    }
+
+    .file-icon {
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      background: #25303a;
+      color: var(--cyan);
+      font-size: 14px;
+    }
+
+    .file-main {
+      min-width: 0;
+    }
+
+    .file-name {
+      font-size: 13px;
+      color: var(--text);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .file-kind {
+      margin-top: 2px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .file-size {
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .meter {
+      height: 8px;
+      border-radius: 999px;
+      background: #0e1113;
+      border: 1px solid var(--line);
+      overflow: hidden;
+    }
+
+    .meter > div {
+      height: 100%;
+      background: linear-gradient(90deg, var(--cyan), var(--green));
+    }
+
+    .json-view {
+      width: 100%;
+      min-height: 170px;
+      background: #090b0d;
+      color: #dbe7df;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px;
+      font-family: "Cascadia Mono", "Consolas", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      resize: vertical;
+    }
+
+    .range-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 48px;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .value {
+      color: var(--soft);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+      font-size: 12px;
+    }
+
+    @media (max-width: 1180px) {
+      body {
+        overflow: auto;
+      }
+
+      .app {
+        min-width: 0;
+        height: auto;
+        min-height: 100vh;
+        grid-template-columns: 1fr;
+      }
+
+      .center {
+        grid-template-rows: 58px auto auto;
+      }
+
+      .workspace {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-wrap {
+        min-height: 620px;
+        border-right: 0;
+      }
+
+      .right,
+      .left {
+        border: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="left">
+      <div class="pane-header">
+        <div>
+          <div class="title">TrueVision Studio</div>
+          <div class="subtitle">state media control surface</div>
+        </div>
+        <span class="status-dot" title="static prototype"></span>
+      </div>
+      <div class="scroll">
+        <section class="section">
+          <div class="section-title">Remote</div>
+          <div class="seg two" data-group="remote">
+            <button class="active" data-value="SecureCore">SecureCore</button>
+            <button data-value="AnchorWorks">AnchorWorks</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">LLM Route</div>
+          <div class="seg" data-group="llm">
+            <button class="active" data-value="api_llm">API</button>
+            <button data-value="local_llm">Local</button>
+            <button data-value="clearspeak">ClearSpeak</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Generation Mode</div>
+          <div class="pill-row" data-group="mode">
+            <button class="pill active" data-value="state_formula">State Formula</button>
+            <button class="pill" data-value="observed_replay">Observed Replay</button>
+            <button class="pill" data-value="hybrid">Hybrid</button>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Generated Files</div>
+          <div class="file-list" id="fileList"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Output Contract</div>
+          <div class="check-grid">
+            <label class="check"><input id="noAudio" type="checkbox" checked> No audio</label>
+            <label class="check"><input id="losslessReplay" type="checkbox" checked> FFV1 replay</label>
+            <label class="check"><input id="jsonlRecords" type="checkbox" checked> JSONL</label>
+            <label class="check"><input id="sidecars" type="checkbox" checked> Sidecars</label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">State Budget</div>
+          <label>
+            Grid
+            <select id="gridShape">
+              <option value="160x90">160x90</option>
+              <option value="320x180">320x180</option>
+              <option value="480x270">480x270</option>
+            </select>
+          </label>
+          <div style="height:10px"></div>
+          <label>
+            FPS
+            <div class="range-row">
+              <input id="fps" type="range" min="6" max="30" step="1" value="15">
+              <span class="value" id="fpsValue">15</span>
+            </div>
+          </label>
+          <div style="height:10px"></div>
+          <label>
+            Duration
+            <div class="range-row">
+              <input id="duration" type="range" min="1" max="60" step="1" value="5">
+              <span class="value" id="durationValue">5s</span>
+            </div>
+          </label>
+        </section>
+      </div>
+    </aside>
+
+    <main class="center">
+      <header class="topbar">
+        <div class="topbar-main">
+          <div class="title">State-Media Prompt Bench</div>
+          <div class="subtitle" id="routeLine">SecureCore / API / State Formula</div>
+        </div>
+        <div class="topbar-actions">
+          <button class="secondary" id="copyConfig">Copy JSON</button>
+          <button class="secondary" id="downloadConfig">Download</button>
+          <button class="primary" id="generateDraft">Generate Draft</button>
+        </div>
+      </header>
+
+      <section class="workspace">
+        <div class="preview-wrap">
+          <div class="canvas-band">
+            <canvas id="preview" width="960" height="540"></canvas>
+            <div class="hud">
+              <div class="hud-item">
+                <div class="hud-value" id="hudGrid">160x90</div>
+                <div class="hud-label">grid</div>
+              </div>
+              <div class="hud-item">
+                <div class="hud-value" id="hudFps">15</div>
+                <div class="hud-label">fps</div>
+              </div>
+              <div class="hud-item">
+                <div class="hud-value" id="hudGeom">0.62</div>
+                <div class="hud-label">geometry</div>
+              </div>
+              <div class="hud-item">
+                <div class="hud-value" id="hudCv">0.74</div>
+                <div class="hud-label">cv pressure</div>
+              </div>
+            </div>
+          </div>
+          <div class="state-strip">
+            <div class="state-cell"><strong>Geometry</strong><span id="geomState">horizon + actor bounds</span></div>
+            <div class="state-cell"><strong>Trig</strong><span id="trigState">sine gait phase</span></div>
+            <div class="state-cell"><strong>Linear</strong><span id="linearState">camera matrix</span></div>
+            <div class="state-cell"><strong>Physics</strong><span id="physicsState">wind + damping</span></div>
+            <div class="state-cell"><strong>Electronics</strong><span id="electronicsState">oscillator drive</span></div>
+            <div class="state-cell"><strong>Path</strong><span id="renderState">4 spp, 3 bounces</span></div>
+            <div class="state-cell"><strong>CV</strong><span id="cvState">edge + flow</span></div>
+          </div>
+        </div>
+
+        <div class="chat">
+          <div class="chat-routes" data-group="chatProfile">
+            <button class="pill active" data-value="director">Director</button>
+            <button class="pill" data-value="forensics">Forensics</button>
+            <button class="pill" data-value="math">Math</button>
+          </div>
+          <div class="chat-window" id="chatWindow">
+            <div class="message">
+              <div class="meta"><span>system</span><span>static page</span></div>
+              Prompt text is converted into a draft state-media request. Backend routes are represented, not invoked.
+            </div>
+            <div class="message">
+              <div class="meta"><span>ClearSpeak</span><span>draft</span></div>
+              Keep the claim narrow: declared state formula, geometry sidecar, deterministic replay, synthetic label.
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="composer">
+        <textarea id="prompt" spellcheck="true">A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.</textarea>
+        <div class="composer-actions">
+          <button class="primary" id="sendPrompt">Send</button>
+          <button class="secondary" id="clearChat">Clear</button>
+          <button class="secondary" id="resetDefaults">Reset</button>
+        </div>
+      </section>
+    </main>
+
+    <aside class="right">
+      <div class="pane-header">
+        <div>
+          <div class="title">Math + CV Controls</div>
+          <div class="subtitle">state language knobs</div>
+        </div>
+      </div>
+      <div class="scroll">
+        <section class="section">
+          <div class="section-title">Geometry</div>
+          <div class="field-grid">
+            <label>FOV<input id="fov" type="number" value="42" min="10" max="120"></label>
+            <label>Horizon<input id="horizon" type="number" value="0.46" min="0" max="1" step="0.01"></label>
+            <label>Depth Scale<input id="depthScale" type="number" value="1.20" min="0" max="10" step="0.05"></label>
+            <label>Occlusion<input id="occlusion" type="number" value="0.72" min="0" max="1" step="0.01"></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Trigonometry</div>
+          <label>Wave Amplitude<div class="range-row"><input id="waveAmp" type="range" min="0" max="1" step="0.01" value="0.44"><span class="value" id="waveAmpValue">0.44</span></div></label>
+          <div style="height:10px"></div>
+          <label>Wave Frequency<div class="range-row"><input id="waveFreq" type="range" min="0.1" max="12" step="0.1" value="3.6"><span class="value" id="waveFreqValue">3.6</span></div></label>
+          <div style="height:10px"></div>
+          <label>Phase Offset<div class="range-row"><input id="phase" type="range" min="0" max="6.28" step="0.01" value="1.72"><span class="value" id="phaseValue">1.72</span></div></label>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Linear Algebra</div>
+          <div class="field-grid">
+            <label>Rotate Z<input id="rotZ" type="number" value="-2" min="-45" max="45" step="0.5"></label>
+            <label>Scale<input id="scale" type="number" value="1.00" min="0.2" max="3" step="0.05"></label>
+            <label>Shear X<input id="shearX" type="number" value="0.04" min="-1" max="1" step="0.01"></label>
+            <label>Parallax<input id="parallax" type="number" value="0.18" min="0" max="1" step="0.01"></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Physics</div>
+          <div class="field-grid">
+            <label>Gravity<input id="gravity" type="number" value="9.81" min="0" max="30" step="0.01"></label>
+            <label>Damping<input id="damping" type="number" value="0.34" min="0" max="1" step="0.01"></label>
+            <label>Wind<input id="wind" type="number" value="0.58" min="-2" max="2" step="0.01"></label>
+            <label>Drag<input id="drag" type="number" value="0.21" min="0" max="2" step="0.01"></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Electronics</div>
+          <div class="field-grid">
+            <label>Oscillator Hz<input id="oscHz" type="number" value="2.40" min="0" max="60" step="0.05"></label>
+            <label>Mod Depth<input id="modDepth" type="number" value="0.37" min="0" max="1" step="0.01"></label>
+            <label>Noise Floor<input id="noiseFloor" type="number" value="0.08" min="0" max="1" step="0.01"></label>
+            <label>Low-pass<input id="lowPass" type="number" value="0.66" min="0" max="1" step="0.01"></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Path Tracing</div>
+          <div class="field-grid">
+            <label>Samples<input id="ptSamples" type="number" value="4" min="1" max="128" step="1"></label>
+            <label>Bounces<input id="ptBounces" type="number" value="3" min="1" max="12" step="1"></label>
+            <label>Roughness<input id="ptRoughness" type="number" value="0.22" min="0" max="1" step="0.01"></label>
+            <label>Exposure<input id="ptExposure" type="number" value="1.00" min="0.1" max="5" step="0.05"></label>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Computer Vision</div>
+          <div class="check-grid">
+            <label class="check"><input id="edgeMap" type="checkbox" checked> Edge map</label>
+            <label class="check"><input id="opticalFlow" type="checkbox" checked> Optical flow</label>
+            <label class="check"><input id="segmentation" type="checkbox" checked> Segmentation</label>
+            <label class="check"><input id="depthHint" type="checkbox" checked> Depth hint</label>
+          </div>
+          <div style="height:10px"></div>
+          <label>
+            CV Model Lane
+            <select id="cvLane">
+              <option value="opencv_cpu">OpenCV CPU</option>
+              <option value="openvino_arc">OpenVINO / Arc</option>
+              <option value="sam2_sidecar">SAM2 sidecar</option>
+              <option value="optical_flow_dense">Dense optical flow</option>
+            </select>
+          </label>
+        </section>
+
+        <section class="section">
+          <div class="section-title">State Request JSON</div>
+          <textarea class="json-view" id="stateJson" readonly></textarea>
+        </section>
+      </div>
+    </aside>
+  </div>
+
+  <script>
+    const state = {
+      remote: "SecureCore",
+      llm: "api_llm",
+      mode: "state_formula",
+      chatProfile: "director",
+      files: [
+        { name: "state_script.json", kind: "state formula", size: "draft" },
+        { name: "geometry_sidecar.json", kind: "geometry", size: "draft" },
+        { name: "path_trace_report.md", kind: "renderer proof", size: "draft" },
+        { name: "cv_state_manifest.json", kind: "cv", size: "draft" },
+        { name: "replay_report.md", kind: "central writer", size: "draft" }
+      ]
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const preview = $("preview");
+    const ctx = preview.getContext("2d");
+
+    function number(id) {
+      return Number($(id).value);
+    }
+
+    function checked(id) {
+      return $(id).checked;
+    }
+
+    function setGroup(group, value) {
+      state[group] = value;
+      document.querySelectorAll(`[data-group="${group}"] button`).forEach((button) => {
+        button.classList.toggle("active", button.dataset.value === value);
+      });
+      update();
+    }
+
+    function buildRequest() {
+      const prompt = $("prompt").value.trim();
+      const [gridX, gridY] = $("gridShape").value.split("x").map(Number);
+      return {
+        schema_version: 1,
+        request_kind: "truevision_state_media_draft",
+        route: {
+          remote: state.remote,
+          llm: state.llm,
+          clear_speak: state.llm === "clearspeak",
+          mode: state.mode,
+          chat_profile: state.chatProfile
+        },
+        prompt,
+        output_contract: {
+          no_audio: checked("noAudio"),
+          lossless_replay: checked("losslessReplay"),
+          jsonl_records: checked("jsonlRecords"),
+          sidecars: checked("sidecars"),
+          synthetic_state_media: true,
+          evidence: false
+        },
+        capture_shape: {
+          frame_width: 960,
+          frame_height: 540,
+          grid_width: gridX,
+          grid_height: gridY,
+          fps: number("fps"),
+          duration_seconds: number("duration")
+        },
+        geometry: {
+          fov_degrees: number("fov"),
+          horizon_y_norm: number("horizon"),
+          depth_scale: number("depthScale"),
+          occlusion_strength: number("occlusion")
+        },
+        trigonometry: {
+          gait_wave: "sin/cos",
+          amplitude: number("waveAmp"),
+          frequency: number("waveFreq"),
+          phase_offset: number("phase")
+        },
+        linear_algebra: {
+          transform_order: ["scale", "rotate_z", "shear_x", "parallax"],
+          rotate_z_degrees: number("rotZ"),
+          scale: number("scale"),
+          shear_x: number("shearX"),
+          parallax: number("parallax")
+        },
+        physics: {
+          gravity: number("gravity"),
+          damping: number("damping"),
+          wind: number("wind"),
+          drag: number("drag")
+        },
+        electronics: {
+          oscillator_hz: number("oscHz"),
+          modulation_depth: number("modDepth"),
+          noise_floor: number("noiseFloor"),
+          low_pass: number("lowPass")
+        },
+        path_tracing: {
+          renderer: "cpu_path_tracer",
+          samples_per_pixel: number("ptSamples"),
+          max_bounces: number("ptBounces"),
+          material_roughness: number("ptRoughness"),
+          exposure: number("ptExposure"),
+          gpu_acceleration_used: false,
+          writes_truevision_cell_state: true
+        },
+        computer_vision: {
+          lane: $("cvLane").value,
+          edge_map: checked("edgeMap"),
+          optical_flow: checked("opticalFlow"),
+          segmentation: checked("segmentation"),
+          depth_hint: checked("depthHint")
+        },
+        generated_files: state.files.map((file) => file.name)
+      };
+    }
+
+    function drawPreview() {
+      const req = buildRequest();
+      const width = preview.width;
+      const height = preview.height;
+      const horizon = Math.round(height * req.geometry.horizon_y_norm);
+      const amp = req.trigonometry.amplitude;
+      const freq = req.trigonometry.frequency;
+      const phase = req.trigonometry.phase_offset;
+      const wind = req.physics.wind;
+      const parallax = req.linear_algebra.parallax;
+      const depth = req.geometry.depth_scale;
+      const exposure = req.path_tracing.exposure;
+      const cvPressure = [
+        req.computer_vision.edge_map,
+        req.computer_vision.optical_flow,
+        req.computer_vision.segmentation,
+        req.computer_vision.depth_hint
+      ].filter(Boolean).length / 4;
+
+      const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+      sky.addColorStop(0, exposure > 1.2 ? "#4272a2" : "#315e93");
+      sky.addColorStop(1, "#b8d2df");
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, width, horizon);
+
+      ctx.globalAlpha = 0.22;
+      ctx.fillStyle = "#f2f5ef";
+      for (let i = 0; i < 18; i++) {
+        const x = (i * 113 + phase * 80) % width;
+        const y = 40 + (i % 5) * 26;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 84, 18, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.globalAlpha = 1;
+
+      const field = ctx.createLinearGradient(0, horizon, 0, height);
+      field.addColorStop(0, "#679f55");
+      field.addColorStop(1, "#0e6c2d");
+      ctx.fillStyle = field;
+      ctx.fillRect(0, horizon, width, height - horizon);
+
+      ctx.strokeStyle = "rgba(12, 46, 23, 0.62)";
+      ctx.lineWidth = 1;
+      for (let x = -20; x < width + 20; x += 9) {
+        const local = Math.sin(x * 0.018 * freq + phase) * 18 * amp;
+        const lean = wind * 14 + local * 0.22;
+        const base = horizon + ((x * 37) % (height - horizon));
+        ctx.beginPath();
+        ctx.moveTo(x, height);
+        ctx.quadraticCurveTo(x + lean, base, x + local, Math.max(horizon, base - 58 * depth));
+        ctx.stroke();
+      }
+
+      if (req.computer_vision.edge_map) {
+        ctx.strokeStyle = "rgba(220, 245, 230, 0.26)";
+        ctx.lineWidth = 1;
+        for (let x = 0; x < width; x += 48) {
+          ctx.beginPath();
+          ctx.moveTo(x, horizon);
+          ctx.lineTo(x + wind * 12, height);
+          ctx.stroke();
+        }
+      }
+
+      const cx = width * (0.45 + parallax * 0.1);
+      const ground = height * 0.79;
+      const gait = Math.sin(phase * 2 + freq);
+      const bodyH = 150 * depth;
+      const headR = 24 * depth;
+      const hipY = ground - 48 * depth;
+      const shoulderY = ground - 118 * depth;
+      const headY = ground - bodyH;
+      const legSwing = 44 * gait;
+      const armSwing = -34 * gait;
+
+      ctx.save();
+      ctx.translate(cx, 0);
+      ctx.rotate((req.linear_algebra.rotate_z_degrees * Math.PI) / 180);
+      ctx.scale(req.linear_algebra.scale, req.linear_algebra.scale);
+      ctx.transform(1, 0, req.linear_algebra.shear_x, 1, 0, 0);
+
+      ctx.fillStyle = `rgba(0,0,0,${Math.max(0.18, 0.46 - req.path_tracing.material_roughness * 0.22)})`;
+      ctx.beginPath();
+      ctx.ellipse(28, ground + 10, 82, 16, -0.08, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.lineCap = "round";
+      ctx.lineJoin = "round";
+      ctx.strokeStyle = "#18212a";
+      ctx.lineWidth = 18;
+      ctx.beginPath();
+      ctx.moveTo(0, shoulderY);
+      ctx.lineTo(0, hipY);
+      ctx.stroke();
+      ctx.lineWidth = 13;
+      ctx.beginPath();
+      ctx.moveTo(0, shoulderY + 10);
+      ctx.lineTo(armSwing, ground - 74 * depth);
+      ctx.moveTo(0, shoulderY + 8);
+      ctx.lineTo(-armSwing, ground - 82 * depth);
+      ctx.moveTo(0, hipY);
+      ctx.lineTo(legSwing, ground);
+      ctx.moveTo(0, hipY);
+      ctx.lineTo(-legSwing, ground);
+      ctx.stroke();
+      ctx.fillStyle = "#523020";
+      ctx.beginPath();
+      ctx.arc(0, headY, headR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      if (req.computer_vision.optical_flow) {
+        ctx.strokeStyle = `rgba(95, 195, 217, ${0.16 + cvPressure * 0.25})`;
+        ctx.lineWidth = 2;
+        for (let i = 0; i < 16; i++) {
+          const y = horizon + 20 + i * 20;
+          ctx.beginPath();
+          ctx.moveTo(width * 0.18, y);
+          ctx.lineTo(width * 0.18 + 70 + wind * 35, y + Math.sin(i + phase) * 12);
+          ctx.stroke();
+        }
+      }
+    }
+
+    function renderFiles() {
+      const list = $("fileList");
+      list.innerHTML = "";
+      state.files.forEach((file, index) => {
+        const row = document.createElement("div");
+        row.className = "file";
+        row.innerHTML = `
+          <div class="file-icon">${index + 1}</div>
+          <div class="file-main">
+            <div class="file-name">${file.name}</div>
+            <div class="file-kind">${file.kind}</div>
+          </div>
+          <div class="file-size">${file.size}</div>
+        `;
+        list.appendChild(row);
+      });
+    }
+
+    function renderJson() {
+      $("stateJson").value = JSON.stringify(buildRequest(), null, 2);
+    }
+
+    function updateLabels() {
+      $("fpsValue").textContent = $("fps").value;
+      $("durationValue").textContent = `${$("duration").value}s`;
+      $("waveAmpValue").textContent = Number($("waveAmp").value).toFixed(2);
+      $("waveFreqValue").textContent = Number($("waveFreq").value).toFixed(1);
+      $("phaseValue").textContent = Number($("phase").value).toFixed(2);
+      $("hudGrid").textContent = $("gridShape").value;
+      $("hudFps").textContent = $("fps").value;
+      const geomScore = (number("depthScale") * number("occlusion") / 1.4).toFixed(2);
+      const cvScore = ([
+        checked("edgeMap"),
+        checked("opticalFlow"),
+        checked("segmentation"),
+        checked("depthHint")
+      ].filter(Boolean).length / 4).toFixed(2);
+      $("hudGeom").textContent = geomScore;
+      $("hudCv").textContent = cvScore;
+      $("routeLine").textContent = `${state.remote} / ${state.llm.replace("_", " ")} / ${state.mode.replace("_", " ")}`;
+      $("geomState").textContent = `FOV ${$("fov").value}, H ${$("horizon").value}`;
+      $("trigState").textContent = `amp ${$("waveAmp").value}, f ${$("waveFreq").value}`;
+      $("linearState").textContent = `Rz ${$("rotZ").value}, S ${$("scale").value}`;
+      $("physicsState").textContent = `wind ${$("wind").value}, drag ${$("drag").value}`;
+      $("electronicsState").textContent = `osc ${$("oscHz").value}Hz`;
+      $("renderState").textContent = `${$("ptSamples").value} spp, ${$("ptBounces").value} bounces`;
+      $("cvState").textContent = $("cvLane").value.replaceAll("_", " ");
+    }
+
+    function update() {
+      updateLabels();
+      renderFiles();
+      renderJson();
+      drawPreview();
+    }
+
+    function addMessage(source, text, operator = false) {
+      const win = $("chatWindow");
+      const node = document.createElement("div");
+      node.className = `message${operator ? " operator" : ""}`;
+      node.innerHTML = `
+        <div class="meta"><span>${source}</span><span>${new Date().toLocaleTimeString()}</span></div>
+        ${text.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]))}
+      `;
+      win.appendChild(node);
+      win.scrollTop = win.scrollHeight;
+    }
+
+    function synthesizeDraft() {
+      const req = buildRequest();
+      state.files = [
+        { name: "truevision_state_script.json", kind: `${req.capture_shape.grid_width}x${req.capture_shape.grid_height} state`, size: `${req.capture_shape.duration_seconds}s` },
+        { name: "geometry_sidecar.json", kind: "camera/actor/depth", size: "required" },
+        { name: "path_trace_report.md", kind: "cpu path tracer", size: `${req.path_tracing.samples_per_pixel}spp/${req.path_tracing.max_bounces}b` },
+        { name: "motion_field_sidecar.npz", kind: "flow + gait phase", size: "planned" },
+        { name: "cv_state_manifest.json", kind: req.computer_vision.lane, size: "planned" },
+        { name: "state_replay_lossless_ffv1.mkv", kind: "video artifact", size: "planned" },
+        { name: "central_writer_report.md", kind: "boundary/report", size: "planned" }
+      ];
+      addMessage("operator", req.prompt, true);
+      addMessage(
+        state.llm,
+        `Draft routed to ${state.remote}. Geometry, trig, linear algebra, physics, electronics, and CV controls are now reflected in the state request.`
+      );
+      update();
+    }
+
+    function downloadJson() {
+      const blob = new Blob([JSON.stringify(buildRequest(), null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "truevision_state_media_request.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+
+    document.querySelectorAll("[data-group] button").forEach((button) => {
+      button.addEventListener("click", () => setGroup(button.parentElement.dataset.group, button.dataset.value));
+    });
+
+    document.querySelectorAll("input, select, textarea").forEach((input) => {
+      input.addEventListener("input", update);
+      input.addEventListener("change", update);
+    });
+
+    $("sendPrompt").addEventListener("click", synthesizeDraft);
+    $("generateDraft").addEventListener("click", synthesizeDraft);
+    $("clearChat").addEventListener("click", () => {
+      $("chatWindow").innerHTML = "";
+      addMessage("system", "Chat cleared. Static route state remains loaded.");
+    });
+    $("resetDefaults").addEventListener("click", () => {
+      $("prompt").value = "A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.";
+      $("fps").value = 15;
+      $("duration").value = 5;
+      $("gridShape").value = "160x90";
+      $("waveAmp").value = 0.44;
+      $("waveFreq").value = 3.6;
+      $("phase").value = 1.72;
+      update();
+    });
+    $("copyConfig").addEventListener("click", async () => {
+      await navigator.clipboard.writeText(JSON.stringify(buildRequest(), null, 2));
+      addMessage("system", "State request JSON copied to clipboard.");
+    });
+    $("downloadConfig").addEventListener("click", downloadJson);
+
+    update();
+  </script>
+</body>
+</html>

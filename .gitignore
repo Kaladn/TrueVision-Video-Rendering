@@ -1,0 +1,17 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.test_tmp/
+
+outputs/**
+!outputs/.gitkeep
+
+connected_artifacts/**
+!connected_artifacts/.gitkeep
+
+presets/*.json
+!presets/.gitkeep
+
+*.log

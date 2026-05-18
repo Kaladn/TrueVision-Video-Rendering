@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "kind": "compucogvision_state_replay_report",
+  "created_at_utc": "2026-05-18T08:51:44.076Z",
+  "run_id": "music_video_30s_cell_vectors_20260518",
+  "source_manifest": "D:\\arc_solver_clean\\cod_616\\data\\truevision_full\\music_video_30s_cell_vectors_20260518\\music_video_30s_cell_vectors_20260518_manifest.json",
+  "source_records": "D:\\arc_solver_clean\\cod_616\\data\\truevision_full\\music_video_30s_cell_vectors_20260518\\music_video_30s_cell_vectors_20260518_records.jsonl",
+  "source_cell_chunks": 9,
+  "frame_count": 243,
+  "frame_shape": [
+    540,
+    960
+  ],
+  "cell_grid_shape": [
+    90,
+    160
+  ],
+  "feature_names": [
+    "rgb_mean_r",
+    "rgb_mean_g",
+    "rgb_mean_b",
+    "rgb_std_r",
+    "rgb_std_g",
+    "rgb_std_b",
+    "hsv_mean_h",
+    "hsv_mean_s",
+    "hsv_mean_v",
+    "luma_mean",
+    "luma_std",
+    "saturation_mean",
+    "delta_luma_abs",
+    "edge_density",
+    "texture_energy",
+    "motion_energy"
+  ],
+  "replay_fps": 8.112864840205942,
+  "boundary": {
+    "replay_source": "stored 16:9 cell-state vectors",
+    "not_original_video": true,
+    "raw_original_frames_available": false,
+    "accuracy_scope": "cell RGB replay fidelity against stored rgb_mean vectors"
+  },
+  "pre_encode_accuracy_samples": [
+    {
+      "frame_index": 0,
+      "frame_number": 1,
+      "elapsed_seconds": 0.0,
+      "screen_energy": 0.0,
+      "cell_count": 14400,
+      "mean_abs_error": 0.1729108840227127,
+      "max_abs_error": 0.5,
+      "rmse": 0.2426697252465836
+    },
+    {
+      "frame_index": 118,
+      "frame_number": 119,
+      "elapsed_seconds": 14.555929,
+      "screen_energy": 7170.695317236707,
+      "cell_count": 14400,
+      "mean_abs_error": 0.0811111107468605,
+      "max_abs_error": 0.5,
+      "rmse": 0.16629728098465554
+    },
+    {
+      "frame_index": 121,
+      "frame_number": 122,
+      "elapsed_seconds": 15.328888,
+      "screen_energy": 1084.8205404100008,
+      "cell_count": 14400,
+      "mean_abs_error": 0.1560526043176651,
+      "max_abs_error": 0.5,
+      "rmse": 0.22803495668041518
+    },
+    {
+      "frame_index": 242,
+      "frame_number": 243,
+      "elapsed_seconds": 29.952428,
+      "screen_energy": 406.6155545471702,
+      "cell_count": 14400,
+      "mean_abs_error": 0.16234375536441803,
+      "max_abs_error": 0.5,
+      "rmse": 0.23205699649370065
+    }
+  ],
+  "outputs": {
+    "lossless_ffv1_mkv": {
+      "path": "D:\\arc_solver_clean\\cod_616\\data\\truevision_full\\music_video_30s_cell_vectors_20260518\\replay\\music_video_30s_cell_vectors_20260518_cell_rgb_replay_lossless_ffv1.mkv",
+      "written": true,
+      "sha256": "sha256:924e15b28341832df05e24a2eb3d1675f76ab59ee839be3b3f737dbedde13ad6"
+    },
+    "preview_mp4v": {
+      "path": "D:\\arc_solver_clean\\cod_616\\data\\truevision_full\\music_video_30s_cell_vectors_20260518\\replay\\music_video_30s_cell_vectors_20260518_cell_rgb_replay_preview_mp4v.mp4",
+      "written": true,
+      "sha256": "sha256:34de6790bcf88ff4cd992379742abe6285dc78869f7da358881041c0e83108ff"
+    }
+  }
+}

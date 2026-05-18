@@ -1,0 +1,98 @@
+{
+  "schema_version": 1,
+  "record_kind": "compucogvision_capture_summary",
+  "frame_count": 45,
+  "duration_seconds": 4.888889,
+  "geometry": {
+    "source_shape": [
+      540,
+      960
+    ],
+    "frame_shape": [
+      540,
+      960
+    ],
+    "frame_aspect_ratio": 1.777778,
+    "grid_shape": [
+      90,
+      160
+    ],
+    "grid_aspect_ratio": 1.777778,
+    "block_shape": [
+      9,
+      16
+    ],
+    "block_aspect_ratio": 1.777778,
+    "capture_region": null
+  },
+  "screen_energy": {
+    "count": 45,
+    "min": 19.25,
+    "max": 132.9093092828989,
+    "mean": 111.28558093673654
+  },
+  "fps": {
+    "count": 45,
+    "min": 9.0,
+    "max": 9.0,
+    "mean": 9.0
+  },
+  "visual_resonance": {
+    "vis_center_energy_ratio": {
+      "count": 45,
+      "min": 0.0,
+      "max": 0.3502489924430847,
+      "mean": 0.15567884345849356
+    },
+    "vis_energy_mean": {
+      "count": 45,
+      "min": 0.1336805522441864,
+      "max": 0.9229813814163208,
+      "mean": 0.7728165381484562
+    },
+    "vis_energy_std": {
+      "count": 45,
+      "min": 0.8423023819923401,
+      "max": 5.006033420562744,
+      "mean": 3.8427426828278435
+    },
+    "vis_energy_total": {
+      "count": 45,
+      "min": 19.25,
+      "max": 132.90931701660156,
+      "mean": 111.28558129204644
+    },
+    "vis_flash_intensity": {
+      "count": 45,
+      "min": 0.7606353163719177,
+      "max": 0.7606353163719177,
+      "mean": 0.7606353163719177
+    },
+    "vis_highfreq_energy": {
+      "count": 45,
+      "min": 276.7999572753906,
+      "max": 323.7999572753906,
+      "mean": 305.04774169921876
+    },
+    "vis_lowfreq_energy": {
+      "count": 45,
+      "min": 0.09765002131462097,
+      "max": 0.09941252321004868,
+      "mean": 0.09871835294697019
+    },
+    "vis_static_ratio": {
+      "count": 45,
+      "min": 0.6642361111111111,
+      "max": 0.9961805555555555,
+      "mean": 0.6780015432098765
+    },
+    "vis_stutter_score": {
+      "count": 45,
+      "min": 6.86631965637207,
+      "max": 47.4089469909668,
+      "mean": 33.30387077331543
+    }
+  },
+  "raw_frame_saved": false,
+  "raw_grid_saved": false
+}
