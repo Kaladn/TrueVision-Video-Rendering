@@ -14,4 +14,25 @@ connected_artifacts/**
 presets/*.json
 !presets/.gitkeep
 
+storage/inbox/**
+!storage/inbox/.gitkeep
+storage/outbox/**
+!storage/outbox/.gitkeep
+storage/events/**
+!storage/events/.gitkeep
+storage/state_chunks/**
+!storage/state_chunks/.gitkeep
+storage/artifacts/**
+!storage/artifacts/.gitkeep
+storage/manifests/**
+!storage/manifests/.gitkeep
+storage/reports/**
+!storage/reports/.gitkeep
+storage/receipts/**
+!storage/receipts/.gitkeep
+storage/presets/**
+!storage/presets/.gitkeep
+storage/tmp/**
+!storage/tmp/.gitkeep
+
 *.log

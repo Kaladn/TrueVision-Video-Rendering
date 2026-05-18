@@ -349,7 +349,7 @@
 
     .state-strip {
       display: grid;
-      grid-template-columns: repeat(6, minmax(0, 1fr));
+      grid-template-columns: repeat(7, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -537,6 +537,21 @@
       font-size: 12px;
     }
 
+    .status-line {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .status-line.ok {
+      color: var(--green);
+    }
+
+    .status-line.warn {
+      color: var(--gold);
+    }
+
     @media (max-width: 1180px) {
       body {
         overflow: auto;
@@ -592,9 +607,32 @@
           <div class="section-title">LLM Route</div>
           <div class="seg" data-group="llm">
             <button class="active" data-value="api_llm">API</button>
-            <button data-value="local_llm">Local</button>
+            <button data-value="local-qwen-32b">Qwen 32B</button>
             <button data-value="clearspeak">ClearSpeak</button>
           </div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Local Qwen</div>
+          <label>
+            Endpoint
+            <input id="qwenEndpoint" type="url" value="http://127.0.0.1:11434/v1/chat/completions" spellcheck="false">
+          </label>
+          <div style="height:10px"></div>
+          <label>
+            Model
+            <input id="qwenModel" type="text" value="qwen2.5-coder:32b" spellcheck="false">
+          </label>
+          <div style="height:10px"></div>
+          <label>
+            API Key / Token
+            <input id="qwenApiKey" type="password" value="" placeholder="optional for local servers" spellcheck="false">
+          </label>
+          <div style="height:10px"></div>
+          <label class="check"><input id="localQwenStandby" type="checkbox" checked> Use local Qwen when selected</label>
+          <div class="status-line" id="qwenStatus">Local Qwen standby is configured for OpenAI-compatible chat completions.</div>
+          <div style="height:10px"></div>
+          <button class="secondary" id="testQwen">Test Qwen</button>
         </section>
 
         <section class="section">
@@ -707,7 +745,7 @@
           <div class="chat-window" id="chatWindow">
             <div class="message">
               <div class="meta"><span>system</span><span>static page</span></div>
-              Prompt text is converted into a draft state-media request. Backend routes are represented, not invoked.
+              Prompt text is converted into a draft state-media request. Local Qwen 32B can translate prompt intent into state JSON when selected.
             </div>
             <div class="message">
               <div class="meta"><span>ClearSpeak</span><span>draft</span></div>
@@ -828,6 +866,7 @@
       llm: "api_llm",
       mode: "state_formula",
       chatProfile: "director",
+      lastQwenState: null,
       files: [
         { name: "state_script.json", kind: "state formula", size: "draft" },
         { name: "geometry_sidecar.json", kind: "geometry", size: "draft" },
@@ -847,6 +886,37 @@
 
     function checked(id) {
       return $(id).checked;
+    }
+
+    function storageGet(key, fallback) {
+      try {
+        const value = localStorage.getItem(key);
+        return value === null ? fallback : value;
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    function storageSet(key, value) {
+      try {
+        localStorage.setItem(key, value);
+      } catch (_) {
+        /* Local file contexts can deny storage; the page still works without it. */
+      }
+    }
+
+    function loadQwenConfig() {
+      $("qwenEndpoint").value = storageGet("truevision.qwen.endpoint", $("qwenEndpoint").value);
+      $("qwenModel").value = storageGet("truevision.qwen.model", $("qwenModel").value);
+      $("qwenApiKey").value = storageGet("truevision.qwen.api_key", "");
+      $("localQwenStandby").checked = storageGet("truevision.qwen.standby", "true") === "true";
+    }
+
+    function saveQwenConfig() {
+      storageSet("truevision.qwen.endpoint", $("qwenEndpoint").value.trim());
+      storageSet("truevision.qwen.model", $("qwenModel").value.trim());
+      storageSet("truevision.qwen.api_key", $("qwenApiKey").value);
+      storageSet("truevision.qwen.standby", String($("localQwenStandby").checked));
     }
 
     function setGroup(group, value) {
@@ -869,6 +939,14 @@
           clear_speak: state.llm === "clearspeak",
           mode: state.mode,
           chat_profile: state.chatProfile
+        },
+        local_llm: {
+          adapter: "local-qwen-32b",
+          enabled: state.llm === "local-qwen-32b" && checked("localQwenStandby"),
+          endpoint: $("qwenEndpoint").value.trim(),
+          model: $("qwenModel").value.trim(),
+          api_key_configured: $("qwenApiKey").value.length > 0,
+          contract: "openai_chat_completions"
         },
         prompt,
         output_contract: {
@@ -934,8 +1012,79 @@
           segmentation: checked("segmentation"),
           depth_hint: checked("depthHint")
         },
+        qwen_state_plan: state.lastQwenState,
         generated_files: state.files.map((file) => file.name)
       };
+    }
+
+    function buildQwenSystemPrompt() {
+      return [
+        "You are the local Qwen 32B adapter for TrueVision State Media Studio.",
+        "Translate a human visual prompt and UI control JSON into strict state-transition JSON.",
+        "Return only JSON. No markdown. No prose.",
+        "Generated state media is synthetic, not evidence.",
+        "Do not claim raw-frame capture, forensic proof, or original reconstruction.",
+        "Preserve the request_kind value truevision_state_media_draft.",
+        "Use these top-level keys: request_kind, scene, camera, entities, motion, materials, lighting, physics, computer_vision, render_constraints, artifact_plan, safety_boundary.",
+        "Each numeric field should be deterministic and bounded when possible."
+      ].join("\\n");
+    }
+
+    function stripJsonFence(text) {
+      return text
+        .trim()
+        .replace(/^```(?:json)?/i, "")
+        .replace(/```$/i, "")
+        .trim();
+    }
+
+    function parseQwenStateResponse(text) {
+      const clean = stripJsonFence(text);
+      const parsed = JSON.parse(clean);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        if (!parsed.request_kind) {
+          parsed.request_kind = "truevision_state_media_draft";
+        }
+        return parsed;
+      }
+      return {
+        request_kind: "truevision_state_media_draft",
+        qwen_state_plan: parsed
+      };
+    }
+
+    async function callLocalQwen(request) {
+      const endpoint = $("qwenEndpoint").value.trim();
+      const model = $("qwenModel").value.trim();
+      const apiKey = $("qwenApiKey").value;
+      const headers = {
+        "Content-Type": "application/json",
+        "Authorization": apiKey ? `Bearer ${apiKey}` : "Bearer local-qwen-32b"
+      };
+      const body = {
+        model,
+        temperature: 0.1,
+        stream: false,
+        messages: [
+          { role: "system", content: buildQwenSystemPrompt() },
+          { role: "user", content: JSON.stringify(request, null, 2) }
+        ]
+      };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body)
+      });
+      if (!response.ok) {
+        throw new Error(`Local Qwen HTTP ${response.status}`);
+      }
+      const payload = await response.json();
+      const content = payload?.choices?.[0]?.message?.content ?? payload?.message?.content ?? payload?.response;
+      if (!content) {
+        throw new Error("Local Qwen response did not include message content");
+      }
+      return parseQwenStateResponse(content);
     }
 
     function drawPreview() {
@@ -1102,7 +1251,7 @@
       ].filter(Boolean).length / 4).toFixed(2);
       $("hudGeom").textContent = geomScore;
       $("hudCv").textContent = cvScore;
-      $("routeLine").textContent = `${state.remote} / ${state.llm.replace("_", " ")} / ${state.mode.replace("_", " ")}`;
+      $("routeLine").textContent = `${state.remote} / ${state.llm.replaceAll("_", " ")} / ${state.mode.replaceAll("_", " ")}`;
       $("geomState").textContent = `FOV ${$("fov").value}, H ${$("horizon").value}`;
       $("trigState").textContent = `amp ${$("waveAmp").value}, f ${$("waveFreq").value}`;
       $("linearState").textContent = `Rz ${$("rotZ").value}, S ${$("scale").value}`;
@@ -1131,7 +1280,22 @@
       win.scrollTop = win.scrollHeight;
     }
 
-    function synthesizeDraft() {
+    function applyQwenStatePlan(plan) {
+      state.lastQwenState = plan;
+      const planName = plan?.scene?.name || plan?.scene?.description || "qwen_state_plan";
+      state.files = [
+        { name: "qwen_state_transition.json", kind: "local Qwen 32B", size: "validated draft" },
+        { name: "truevision_state_script.json", kind: "state formula", size: "planned" },
+        { name: "geometry_sidecar.json", kind: "camera/entities/depth", size: "planned" },
+        { name: "cv_state_manifest.json", kind: "cv sidecars", size: "planned" },
+        { name: "state_replay_manifest.json", kind: "synthetic boundary", size: "planned" }
+      ];
+      addMessage("local Qwen 32B", `State plan accepted: ${String(planName).slice(0, 140)}`);
+      $("qwenStatus").textContent = "Local Qwen returned a state-transition plan.";
+      $("qwenStatus").className = "status-line ok";
+    }
+
+    async function synthesizeDraft() {
       const req = buildRequest();
       state.files = [
         { name: "truevision_state_script.json", kind: `${req.capture_shape.grid_width}x${req.capture_shape.grid_height} state`, size: `${req.capture_shape.duration_seconds}s` },
@@ -1143,6 +1307,22 @@
         { name: "central_writer_report.md", kind: "boundary/report", size: "planned" }
       ];
       addMessage("operator", req.prompt, true);
+      if (state.llm === "local-qwen-32b" && checked("localQwenStandby")) {
+        saveQwenConfig();
+        $("qwenStatus").textContent = "Calling local Qwen 32B...";
+        $("qwenStatus").className = "status-line warn";
+        update();
+        try {
+          const plan = await callLocalQwen(req);
+          applyQwenStatePlan(plan);
+          update();
+          return;
+        } catch (error) {
+          $("qwenStatus").textContent = `${error.message}. Falling back to deterministic local draft.`;
+          $("qwenStatus").className = "status-line warn";
+          addMessage("local Qwen 32B", `${error.message}. Fallback draft kept local and schema-shaped.`);
+        }
+      }
       addMessage(
         state.llm,
         `Draft routed to ${state.remote}. Geometry, trig, linear algebra, physics, electronics, and CV controls are now reflected in the state request.`
@@ -1164,12 +1344,38 @@
     });
 
     document.querySelectorAll("input, select, textarea").forEach((input) => {
-      input.addEventListener("input", update);
-      input.addEventListener("change", update);
+      input.addEventListener("input", () => {
+        if (input.id.startsWith("qwen") || input.id === "localQwenStandby") {
+          saveQwenConfig();
+        }
+        update();
+      });
+      input.addEventListener("change", () => {
+        if (input.id.startsWith("qwen") || input.id === "localQwenStandby") {
+          saveQwenConfig();
+        }
+        update();
+      });
     });
 
     $("sendPrompt").addEventListener("click", synthesizeDraft);
     $("generateDraft").addEventListener("click", synthesizeDraft);
+    $("testQwen").addEventListener("click", async () => {
+      saveQwenConfig();
+      $("qwenStatus").textContent = "Testing local Qwen endpoint...";
+      $("qwenStatus").className = "status-line warn";
+      try {
+        const testRequest = buildRequest();
+        testRequest.prompt = "Return a tiny valid TrueVision state transition for a green field test.";
+        const plan = await callLocalQwen(testRequest);
+        applyQwenStatePlan(plan);
+        update();
+      } catch (error) {
+        $("qwenStatus").textContent = `${error.message}. Check local server, endpoint, model, or CORS.`;
+        $("qwenStatus").className = "status-line warn";
+        addMessage("local Qwen 32B", $("qwenStatus").textContent);
+      }
+    });
     $("clearChat").addEventListener("click", () => {
       $("chatWindow").innerHTML = "";
       addMessage("system", "Chat cleared. Static route state remains loaded.");
@@ -1190,6 +1396,7 @@
     });
     $("downloadConfig").addEventListener("click", downloadJson);
 
+    loadQwenConfig();
     update();
   </script>
 </body>

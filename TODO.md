@@ -1,272 +1,229 @@
 # TrueVision Generation Lab TODO
 
-This project is now a standalone generation lab, separate from SecureCore and AnchorWorks.
-
-Core split:
-
-```text
-SecureCore = guard, log, approve, preserve.
-AnchorWorks = shape/count/routing language.
-TrueVision Generation Lab = state-media capture, replay, generation, and visual-language experiments.
-```
-
 Hard boundary:
 
 ```text
 Forward TrueVision witnesses.
 Reverse TrueVision replays or demonstrates state.
 Generated state media is synthetic, not evidence.
-Raw frames are not implied unless explicitly saved.
+SecureCore guards later.
+AnchorWorks routes later.
+The lab proves the visual-state language first.
 ```
 
-## Base Build Status
+## Layer 0: In-Repo Storage
 
-Done:
+- [ ] Use `storage/` as the local runtime root.
+- [ ] Keep generated runtime data ignored by default.
+- [ ] Keep only directory structure in git.
+- [ ] Store local runtime data by lane:
 
 ```text
-standalone project root at D:\TrueVision_Generation_Lab
-static studio HTML copied into ui/
-state recorder/replay/generator scripts copied into scripts/
-path tracing lane copied into scripts/
-still image state capture copied into scripts/
-grid mapper and resonance state copied into modules/root
-unit tests copied into tests/
-region snip tool added as scripts/truevision_region_snip.py
-Rust compiled capture lane documented in docs/
-outputs, presets, and connected_artifacts isolated/ignored by default
+storage/
+  inbox/
+  outbox/
+  events/
+  state_chunks/
+  artifacts/
+  manifests/
+  reports/
+  receipts/
+  presets/
+  tmp/
 ```
 
-Do not let this repo become another all-purpose system. It exists to prove the visual-state language.
+## Layer 1: Storage Contracts
 
-## Immediate Verification
+- [ ] Define `storage_manifest_v1`.
+- [ ] Define `state_chunk_manifest_v1`.
+- [ ] Define `artifact_manifest_v1`.
+- [ ] Define `writer_receipt_v1`.
+- [ ] Define `tip_event_v1`.
+- [ ] Hash every stored payload.
+- [ ] Keep raw frames disabled unless explicitly requested.
 
-- [ ] Run all standalone tests:
+## Layer 2: SecureCore-Shaped Backend Ports
 
-```powershell
-cd D:\TrueVision_Generation_Lab
-$env:PYTHONPATH="D:\TrueVision_Generation_Lab\scripts;D:\TrueVision_Generation_Lab\modules;D:\TrueVision_Generation_Lab"
-python -m unittest discover -s tests -v
-```
+- [ ] Add writer port.
+- [ ] Add artifact port.
+- [ ] Add policy port.
+- [ ] Add notification port.
+- [ ] Require all writes to pass through ports.
+- [ ] Forbid services from writing directly to final storage.
 
-- [ ] Run the snip tool dry path:
-
-```powershell
-python scripts\truevision_region_snip.py `
-  --region 640,360,1280,720 `
-  --preset-id center_video `
-  --print-command
-```
-
-- [ ] Open the static studio:
-
-```powershell
-Invoke-Item D:\TrueVision_Generation_Lab\ui\truevision_state_media_studio.html
-```
-
-## Snip Tool Base
-
-Purpose:
+Target shape:
 
 ```text
-Let the operator select a screen/video area once.
-Snap that region into TrueVision's 16:9 grid discipline.
-Save a preset.
-Feed the existing recorder without inventing a new capture system.
+truevision_runtime/
+  ports/
+    writer_port.py
+    artifact_port.py
+    policy_port.py
+    notification_port.py
 ```
 
-Rules:
+## Layer 3: Local Adapters
+
+- [ ] Add local writer adapter.
+- [ ] Add local artifact adapter.
+- [ ] Add local policy adapter.
+- [ ] Add local notification adapter.
+- [ ] Write local events to `storage/outbox/`.
+- [ ] Write receipts to `storage/receipts/`.
+- [ ] Keep this mode independent of SecureCore.
+
+Target shape:
 
 ```text
-rough selection -> 16:9 snapped region -> clamped bounds -> preset hash -> recorder command
+truevision_runtime/
+  adapters/
+    local_writer_adapter.py
+    local_artifact_adapter.py
+    local_policy_adapter.py
+    local_notification_adapter.py
 ```
 
-Next:
+## Layer 4: Capture And Snip
 
-- [ ] Test interactive selector on the real desktop.
-- [ ] Add multi-monitor metadata to preset reports.
-- [ ] Add visible overlay preview before capture.
-- [ ] Add preset list/delete/rename commands.
-- [ ] Add "watch this window" mode using top-level window bounds later.
-- [ ] Keep raw frame saving off unless explicitly requested.
+- [ ] Finish region snip/watch workflow.
+- [ ] Add interactive selector verification.
+- [ ] Add multi-monitor metadata.
+- [ ] Add overlay preview before capture.
+- [ ] Add preset list/delete/rename.
+- [ ] Add window-bound watch mode later.
+- [ ] Store presets under `storage/presets/`.
+- [ ] Store state chunks under `storage/state_chunks/`.
 
-## Focus Reconstruction
+## Layer 5: State Interpreter
 
-The data-only photo reconstruction proved the shape but came out blurry. That is expected with a coarse cell tensor.
+- [ ] Add state interpreter service.
+- [ ] Detect idle loops.
+- [ ] Detect repeated failures.
+- [ ] Detect covered/active window mismatch.
+- [ ] Detect motion spikes.
+- [ ] Detect visual flash spikes.
+- [ ] Detect stable stuck-screen state.
 
-Next focus stack:
+Target shape:
 
 ```text
-Lanczos state upsample
-CLAHE/local luma contrast
+truevision_runtime/
+  services/
+    capture_service.py
+    state_interpreter.py
+```
+
+## Layer 6: Tip Engine
+
+- [ ] Add rule-first tip engine.
+- [ ] Add local LLM wording adapter only after schemas validate.
+- [ ] Add ClearSpeak-style wording layer.
+- [ ] Add confidence thresholds.
+- [ ] Add user feedback: useful, wrong, silence.
+- [ ] Store tips as events, not direct UI commands.
+
+Target shape:
+
+```text
+truevision_runtime/
+  services/
+    tip_engine.py
+    avatar_event_router.py
+```
+
+## Layer 7: Avatar Overlay
+
+- [ ] Build overlay shell only after tip events exist.
+- [ ] Consume approved tip events only.
+- [ ] Move away from cursor/text-entry areas.
+- [ ] Add visible pause/on/off state.
+- [ ] Add local-only mode indicator.
+- [ ] No autonomous clicking.
+- [ ] No autonomous typing.
+
+## Layer 8: Prompt-To-State Compiler
+
+- [ ] Define strict prompt-to-state JSON schema.
+- [ ] Add compiler service.
+- [ ] Validate generated state before rendering.
+- [ ] Reject prompt output that bypasses state contracts.
+- [ ] Route valid state into existing generators.
+
+Target shape:
+
+```text
+truevision_runtime/
+  services/
+    prompt_to_state_compiler.py
+```
+
+## Layer 9: Focus Reconstruction
+
+- [ ] Add `scripts/truevision_focus_reconstruct.py`.
+- [ ] Use stored state only.
+- [ ] Do not reread original photo/video.
+- [ ] Apply deterministic focus math:
+
+```text
+Lanczos upsample
+CLAHE/local contrast
 edge-gated unsharp mask
 bilateral cleanup
 chroma-safe saturation restore
 cell-boundary deblocking
-optional edge-directed interpolation
 ```
 
-Rules:
+## Layer 10: Learning Twin
+
+- [ ] Add observer twin records.
+- [ ] Add renderer twin records.
+- [ ] Log failures.
+- [ ] Log successes.
+- [ ] Log which channels improved output.
+- [ ] Propose next render rules from evidence.
+- [ ] Store learning records under `storage/events/`.
+
+## Layer 11: SecureCore Adapter
+
+- [ ] Add SecureCore writer adapter only after local contracts are stable.
+- [ ] Map local event envelopes to SecureCore Central Writer envelopes.
+- [ ] Map artifact manifests to SecureCore Artifact Engine manifests.
+- [ ] Map local policy decisions to SecureCore Policy Gate later.
+- [ ] Keep SecureCore import optional.
+
+Target shape:
 
 ```text
-Input must be stored state only.
-Do not read the source photo/video again.
-Report every filter, parameter, hash, and output.
-Never call it original reconstruction.
+truevision_runtime/
+  adapters/
+    securecore_writer_adapter.py
+    securecore_artifact_adapter.py
 ```
 
-Target script:
+## Layer 12: Rust / Compiled Capture Worker
 
-```text
-scripts/truevision_focus_reconstruct.py
-```
+- [ ] Build Rust only after Python contracts are stable.
+- [ ] First target: `truevision-capture-worker.exe`.
+- [ ] Rust handles capture speed, timing, ring buffer, chunk writing, hashing.
+- [ ] Python keeps state language, reports, learning rules, compiler prototypes.
 
-## Prompt-To-State Compiler
+## Existing Base To Preserve
 
-This is the bridge from human language to state media.
-
-Contract:
-
-```text
-Input: human visual prompt
-Output: state transition JSON
-Then pass JSON to existing generator/replay lanes.
-```
-
-Do not:
-
-```text
-build a new renderer
-invent a new UI
-rewrite TrueVision
-let prompt text bypass state contracts
-```
-
-First language objects:
-
-```text
-scene
-camera
-entity
-material
-light
-motion
-force
-constraint
-beat
-transition
-style fingerprint
-render budget
-artifact manifest
-```
-
-## Visual Math Stack
-
-Bring in the math as state language, not as vague effects.
-
-Needed lanes:
-
-```text
-geometry: transforms, projection, primitive composition
-trigonometry: oscillation, gait, wave, pulse, orbit
-linear algebra: matrices, basis vectors, camera transforms
-physics: velocity, acceleration, spring, drag, collision hints
-electronics/signal: noise, waveform, scanline, pulse, resonance
-computer vision: edges, gradients, motion, optical flow, segmentation hints
-path tracing: rays, bounces, materials, lighting samples
-```
-
-Principle:
-
-```text
-Math should produce addressable state, not decorative noise.
-```
-
-## Learning Twin
-
-The learning system needs two coordinated halves:
-
-```text
-Observer twin:
-  studies real captures
-  records what channels matter
-  logs failures and successes
-
-Renderer twin:
-  consumes lessons
-  updates state formulas
-  improves replay/generation from known contracts
-```
-
-Every lesson needs:
-
-```text
-input artifact hash
-state artifact hash
-render output hash
-what improved
-what failed
-which channels mattered
-next rule proposal
-```
-
-## Rust / Compiled Lane
-
-Rust is worth it, but only where Python is wasting time.
-
-First compiled target:
-
-```text
-truevision-capture-worker.exe
-```
-
-Responsibilities:
-
-```text
-screen/window region capture
-frame timing
-ring buffer
-chunk writing
-hashing
-minimal IPC status
-```
-
-Keep in Python for now:
-
-```text
-state language
-prompt-to-state compiler
-renderer experiments
-reports
-learning rules
-```
-
-Rust comes after:
-
-```text
-region preset contract is stable
-state tensor schema is stable
-chunk manifest schema is stable
-writer handoff is stable
-```
-
-## Parking Lot
-
-- [ ] Add one-hour capture profile math.
-- [ ] Estimate disk use by fps/grid/channel/compression settings.
-- [ ] Add sample capture corpus with small fixtures only.
-- [ ] Add style/videograph fingerprint schema.
-- [ ] Add image/pictorial generation language lane.
-- [ ] Add local LLM adapter only after strict JSON schema validation exists.
-- [ ] Add import/export contract for SecureCore artifact engine.
-- [ ] Add import/export contract for AnchorWorks route/count maps.
+- [x] Standalone project root at `D:\TrueVision_Generation_Lab`.
+- [x] Static studio HTML copied into `ui/`.
+- [x] Recorder/replay/generator scripts copied into `scripts/`.
+- [x] Path tracing lane copied into `scripts/`.
+- [x] Still image state capture copied into `scripts/`.
+- [x] Grid mapper and resonance state copied into modules/root.
+- [x] Region snip tool added.
+- [x] Rust compiled capture lane documented.
 
 Tiny law:
 
 ```text
-Capture teaches.
-State remembers.
-Math shapes.
-Renderer demonstrates.
-SecureCore preserves.
-AnchorWorks routes.
+Storage first.
+Ports second.
+Local adapters third.
+SecureCore later.
+No rewiring.
 ```
