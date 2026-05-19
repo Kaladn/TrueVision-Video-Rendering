@@ -31,6 +31,7 @@ The lab proves the audio/video state-media language first.
 - [x] Still-image TrueVision capture exists.
 - [x] Path tracing lane exists.
 - [x] Edge audio river visualizer exists.
+- [x] The Basement stick-figure narrative renderer exists.
 - [x] AV-only tool registry exists.
 - [x] AV-only policy validation exists.
 - [x] AV tool receipts exist.
@@ -41,7 +42,7 @@ The lab proves the audio/video state-media language first.
 - [x] WAV feature extraction AV tool exists.
 - [x] ffmpeg audio level analysis AV tool exists.
 - [x] Initial state-pattern library exists.
-- [x] Test suite was green at last commit: `66 tests`.
+- [x] Test suite was green after Basement renderer addition: `70 tests`.
 
 ## Morning Re-Entry
 
@@ -291,6 +292,39 @@ no glyphs
 - [ ] Add full-song render job preparation.
 - [ ] Add full render execution behind approval.
 - [ ] Save every visualizer setup as a reusable template.
+
+## Layer 5B: Stick-Figure Narrative Video
+
+- [x] Add `scripts/truevision_basement_stick_narrative.py`.
+- [x] Read the operator-supplied story file.
+- [x] Read the operator-supplied album lyrics file.
+- [x] Render a full-song arc from `The Basement.mp3`.
+- [x] Keep the story literal instead of abstract-only:
+
+```text
+storm
+basement door
+hallway window creature
+Frank falling
+dragged descent
+red rift
+Nether World
+mirror warning
+sword awakening
+demon battle
+mother rescue
+rift escape
+seal and ascend
+```
+
+- [x] Keep lyric text and dialogue cards off-screen.
+- [x] Drive lighting and pressure from audio features.
+- [x] Write frame-state JSONL.
+- [x] Write manifest, report, thumbnail, visual-only video, and audio-muxed video.
+- [ ] Add this renderer behind an AV tool call.
+- [ ] Add template controls for scene beat percentages.
+- [ ] Add Qwen template compiler examples for narrative state sequencing.
+- [ ] Add operator time-marker recalibration for story beats.
 
 ## Layer 6: Recalibration Workflow
 

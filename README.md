@@ -53,6 +53,8 @@ scripts/
   truevision_path_tracer.py
   truevision_still_image_capture.py
   truevision_region_snip.py
+  truevision_edge_audio_river.py
+  truevision_basement_stick_narrative.py
 
 modules/
   screen_grid_mapper.py
@@ -173,6 +175,21 @@ audio_analyze_levels
 -> state pattern library
 -> geometry/color/motion template
 ```
+
+Story-and-song narrative videos can be rendered through the Basement stick renderer:
+
+```powershell
+python scripts\truevision_basement_stick_narrative.py `
+  --audio "C:\Users\mydyi\Downloads\The Basement.mp3" `
+  --story "C:\Users\mydyi\OneDrive\Documents\Desktop\The Basement.txt" `
+  --lyrics "C:\Users\mydyi\OneDrive\Documents\Desktop\Full Album Lyrics_sound.txt" `
+  --run-id "the_basement_full_arc_v1" `
+  --width 1280 `
+  --height 720 `
+  --fps 12
+```
+
+That renderer keeps the output literal to the story scenery: storm, basement door, hallway window creature, Frank falling, dragging descent, red rift, Nether World, sword awakening, rescue, sealing, and ascension. It does not render lyric text or dialogue cards.
 
 ## Run Tests
 
