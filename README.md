@@ -101,6 +101,12 @@ POST /api/state/plan
 POST /api/record/prepare
 POST /api/local-llm/chat
 POST /api/assistant/message
+GET  /api/chat/today
+POST /api/chat/log
+GET  /api/templates
+POST /api/templates/save
+POST /api/templates/delete
+POST /api/media/probe
 ```
 
 Catbot action words:
@@ -112,6 +118,15 @@ save / persist / write / store -> save current request
 prepare / record / capture / command -> save request and prepare recorder command
 files / list / refresh -> refresh storage file list
 ```
+
+Qwen chat and generation templates:
+
+```text
+storage/chats/YYYY-MM-DD.jsonl
+storage/templates/*.json
+```
+
+Plain chat stays plain chat. Templates preserve generation setup, media timing, renderer target, and validated state plan. When an audio path has a known duration, template timelines can match the song duration exactly.
 
 ## Run Tests
 

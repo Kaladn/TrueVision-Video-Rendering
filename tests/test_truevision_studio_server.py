@@ -3,12 +3,18 @@ import unittest
 from pathlib import Path
 
 from truevision_studio_server import (
+    append_chat_message,
+    build_generation_template_from_request,
     build_recording_command_from_request,
     build_downstream_payload,
+    delete_template,
     handle_assistant_message,
     list_storage_files,
+    list_templates,
     normalize_provider,
+    read_chat_log,
     resolve_assistant_actions,
+    save_template,
     validate_local_endpoint,
     write_json_artifact,
 )
@@ -70,6 +76,71 @@ class TrueVisionStudioServerTests(unittest.TestCase):
             self.assertEqual(artifact["lane"], "outbox")
             self.assertTrue(Path(artifact["path"]).exists())
             self.assertTrue(artifact["sha256"].startswith("sha256:"))
+
+    def test_append_chat_message_uses_one_flat_file_per_day(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            first = append_chat_message(
+                storage_root=Path(tmpdir),
+                message={"source": "operator", "text": "talk before build"},
+                day="2026-05-19",
+            )
+            second = append_chat_message(
+                storage_root=Path(tmpdir),
+                message={"source": "Qwen", "text": "plan first"},
+                day="2026-05-19",
+            )
+
+            self.assertEqual(first["path"], second["path"])
+            self.assertEqual(Path(first["path"]).name, "2026-05-19.jsonl")
+            entries = read_chat_log(storage_root=Path(tmpdir), day="2026-05-19")
+            self.assertEqual([entry["source"] for entry in entries], ["operator", "Qwen"])
+            self.assertEqual(entries[0]["text"], "talk before build")
+
+    def test_save_list_and_delete_templates_are_flat(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            saved = save_template(
+                storage_root=Path(tmpdir),
+                template={
+                    "name": "Edge River",
+                    "renderer": "edge_audio_river",
+                    "timeline": {"duration_seconds": 278.32},
+                },
+            )
+
+            self.assertEqual(saved["lane"], "templates")
+            self.assertTrue(saved["name"].endswith(".json"))
+            templates = list_templates(Path(tmpdir))
+            self.assertEqual(len(templates), 1)
+            self.assertEqual(templates[0]["template"]["name"], "Edge River")
+
+            deleted = delete_template(storage_root=Path(tmpdir), name=saved["name"])
+
+            self.assertTrue(deleted["deleted"])
+            self.assertEqual(list_templates(Path(tmpdir)), [])
+
+    def test_build_generation_template_matches_audio_duration_when_present(self):
+        request = {
+            "prompt": "river of colors in black",
+            "renderer": {"name": "edge_audio_river"},
+            "media": {
+                "audio_path": "D:/music/edge.mp3",
+                "audio_duration_seconds": 278.32,
+                "sync_to_audio": True,
+            },
+            "capture_shape": {
+                "fps": 30,
+                "duration_seconds": 120,
+            },
+            "qwen_state_plan": {"scene": {"name": "wake river"}},
+        }
+
+        template = build_generation_template_from_request(request)
+
+        self.assertEqual(template["renderer"], "edge_audio_river")
+        self.assertEqual(template["timeline"]["duration_seconds"], 278.32)
+        self.assertEqual(template["timeline"]["frame_count"], 8350)
+        self.assertEqual(template["time_distance"]["source"], "audio_duration")
+        self.assertEqual(template["state_plan"]["scene"]["name"], "wake river")
 
     def test_list_storage_files_reports_saved_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:

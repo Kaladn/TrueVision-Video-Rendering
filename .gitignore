@@ -24,6 +24,8 @@ storage/state_chunks/**
 !storage/state_chunks/.gitkeep
 storage/artifacts/**
 !storage/artifacts/.gitkeep
+storage/chats/**
+!storage/chats/.gitkeep
 storage/manifests/**
 !storage/manifests/.gitkeep
 storage/reports/**
@@ -32,6 +34,8 @@ storage/receipts/**
 !storage/receipts/.gitkeep
 storage/presets/**
 !storage/presets/.gitkeep
+storage/templates/**
+!storage/templates/.gitkeep
 storage/tmp/**
 !storage/tmp/.gitkeep
 

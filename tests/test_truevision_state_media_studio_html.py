@@ -70,15 +70,16 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("buildCatbotSystemPrompt", html)
         self.assertIn('action === "qwen_chat"', html)
         self.assertIn("callCatbotQwen", html)
-        self.assertIn("Talk with Catbot", html)
+        self.assertIn("Qwen Project Chat", html)
+        self.assertIn("Talk with Qwen", html)
         self.assertIn("available_tools", html)
 
     def test_center_panel_is_an_operations_log_not_generic_chat(self):
         html = HTML.read_text(encoding="utf-8")
 
-        self.assertIn("Run Log", html)
-        self.assertIn("Catbot", html)
-        self.assertIn("Tell Catbot", html)
+        self.assertIn("Qwen Project Chat", html)
+        self.assertIn("Daily chat log", html)
+        self.assertIn("Talk with Qwen", html)
         self.assertIn("Compile", html)
         self.assertIn("Clear Log", html)
         self.assertIn("server-backed", html)
@@ -113,6 +114,30 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("contrast_mode_used", html)
         self.assertIn("record_start_time", html)
         self.assertIn("chooseCountdownContrastMode", html)
+
+    def test_html_has_daily_chat_and_template_workspace(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("/api/chat/today", html)
+        self.assertIn("/api/chat/log", html)
+        self.assertIn("loadDailyChat", html)
+        self.assertIn("logChatMessage", html)
+        self.assertIn("Daily chat log", html)
+        self.assertIn("templateJson", html)
+        self.assertIn("Render Template", html)
+
+    def test_html_exposes_template_crud_and_song_duration_match(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("/api/templates", html)
+        self.assertIn("/api/templates/save", html)
+        self.assertIn("/api/templates/delete", html)
+        self.assertIn("/api/media/probe", html)
+        self.assertIn("audioPath", html)
+        self.assertIn("syncDurationToAudio", html)
+        self.assertIn("saveTemplate", html)
+        self.assertIn("deleteTemplate", html)
+        self.assertIn("duration_source", html)
 
 
 if __name__ == "__main__":

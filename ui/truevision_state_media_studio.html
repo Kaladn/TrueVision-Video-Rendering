@@ -443,7 +443,7 @@
 
     .chat {
       display: grid;
-      grid-template-rows: 42px minmax(0, 1fr);
+      grid-template-rows: 42px minmax(170px, 1fr) minmax(220px, 0.78fr);
       min-height: 0;
       background: var(--panel);
     }
@@ -463,6 +463,44 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
+    }
+
+    .render-window {
+      min-height: 0;
+      border-top: 1px solid var(--line);
+      display: grid;
+      grid-template-rows: 42px minmax(0, 1fr) auto;
+      background: #101417;
+    }
+
+    .render-window-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 8px;
+      border-bottom: 1px solid var(--line);
+      color: var(--soft);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .render-window .json-view {
+      min-height: 0;
+      height: 100%;
+      border: 0;
+      border-radius: 0;
+      resize: none;
+    }
+
+    .render-window-foot {
+      padding: 8px;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
     }
 
     .message {
@@ -512,6 +550,13 @@
       gap: 8px;
     }
 
+    .template-list {
+      display: grid;
+      gap: 8px;
+      max-height: 220px;
+      overflow: auto;
+    }
+
     .file {
       display: grid;
       grid-template-columns: 30px minmax(0, 1fr) auto;
@@ -555,6 +600,19 @@
     .file-size {
       font-size: 11px;
       color: var(--muted);
+    }
+
+    .template-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: end;
+    }
+
+    .template-actions .secondary {
+      min-height: 30px;
+      padding: 0 9px;
+      font-size: 12px;
     }
 
     .meter {
@@ -711,6 +769,34 @@
         </section>
 
         <section class="section">
+          <div class="section-title">Render Templates <button class="secondary" id="refreshTemplates">Refresh</button></div>
+          <label>
+            Template Name
+            <input id="templateName" type="text" value="Edge audio river" spellcheck="false">
+          </label>
+          <div style="height:10px"></div>
+          <label>
+            Audio Path
+            <input id="audioPath" type="text" value="C:\Users\mydyi\OneDrive\Documents\Desktop\Album_Builds\Machine_Dread_Album_Sequenced\01_ordered_audio\01 - Edge Of The World (I Am Your Nightmare).mp3" spellcheck="false">
+          </label>
+          <div style="height:10px"></div>
+          <label class="check"><input id="syncDurationToAudio" type="checkbox" checked> Match timeline to song duration</label>
+          <div style="height:10px"></div>
+          <label>
+            Song Duration Seconds
+            <input id="audioDurationSeconds" type="number" min="0" step="0.001" value="278.32">
+          </label>
+          <div style="height:10px"></div>
+          <div class="button-row">
+            <button class="secondary" id="probeAudio">Probe Song</button>
+            <button class="secondary" id="saveTemplate">Save Template</button>
+          </div>
+          <div class="status-line" id="templateStatus">Templates preserve generation data; renderer executes validated state.</div>
+          <div style="height:10px"></div>
+          <div class="template-list" id="templateList"></div>
+        </section>
+
+        <section class="section">
           <div class="section-title">Generated Files <button class="secondary" id="refreshFiles">Refresh</button></div>
           <div class="file-list" id="fileList"></div>
         </section>
@@ -785,7 +871,7 @@
     <main class="center">
       <header class="topbar">
         <div class="topbar-main">
-          <div class="title">Catbot Workbench</div>
+          <div class="title">Qwen Project Chat</div>
           <div class="subtitle" id="routeLine">SecureCore / local Qwen 32B / State Formula</div>
         </div>
         <div class="topbar-actions">
@@ -843,8 +929,16 @@
           <div class="chat-window" id="chatWindow">
             <div class="message">
               <div class="meta"><span>Catbot Run Log</span><span>server-backed</span></div>
-              Talk with Catbot, or ask it to Compile, save, prepare record, or refresh files. It answers through local Qwen and calls real studio endpoints for tools.
+              Daily chat log. Talk with Qwen about the project first; ask it to Compile only when you want a state template or render plan.
             </div>
+          </div>
+          <div class="render-window">
+            <div class="render-window-head">
+              <span>Render Template</span>
+              <button class="secondary" id="saveTemplateFromPane">Save</button>
+            </div>
+            <textarea class="json-view" id="templateJson" readonly></textarea>
+            <div class="render-window-foot" id="templateFoot">Chat thinks. Templates preserve. Renderer executes.</div>
           </div>
         </div>
       </section>
@@ -852,7 +946,7 @@
       <section class="composer">
         <textarea id="prompt" spellcheck="true">A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.</textarea>
         <div class="composer-actions">
-          <button class="primary" id="sendPrompt">Tell Catbot</button>
+          <button class="primary" id="sendPrompt">Talk with Qwen</button>
           <button class="secondary" id="clearChat">Clear Log</button>
           <button class="secondary" id="resetDefaults">Reset</button>
         </div>
@@ -962,7 +1056,9 @@
       chatProfile: "director",
       lastQwenState: null,
       busy: false,
-      files: []
+      files: [],
+      templates: [],
+      chatLogReady: false
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1014,6 +1110,16 @@
         return `${(value / 1024).toFixed(1)} KB`;
       }
       return `${(value / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    function escapeHtml(value) {
+      return String(value).replace(/[&<>"']/g, (m) => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      }[m]));
     }
 
     async function apiJson(path, payload = null) {
@@ -1111,6 +1217,18 @@
           contract: $("qwenProvider").value === "openai_compatible" ? "openai_chat_completions" : "ollama_api_chat"
         },
         prompt,
+        template_name: $("templateName").value.trim(),
+        renderer: {
+          name: "edge_audio_river",
+          execution_target: "scripts/truevision_edge_audio_river.py",
+          status: "template_only_until_validated"
+        },
+        media: {
+          audio_path: $("audioPath").value.trim(),
+          audio_duration_seconds: Number($("audioDurationSeconds").value) || null,
+          sync_to_audio: checked("syncDurationToAudio"),
+          duration_source: checked("syncDurationToAudio") ? "audio_duration" : "manual_duration"
+        },
         output_contract: {
           no_audio: checked("noAudio"),
           lossless_replay: checked("losslessReplay"),
@@ -1201,6 +1319,49 @@
       };
     }
 
+    function buildRenderTemplate(request = buildRequest()) {
+      const fps = Number(request.capture_shape?.fps) || 30;
+      const audioSeconds = Number(request.media?.audio_duration_seconds);
+      const manualSeconds = Number(request.capture_shape?.duration_seconds) || 60;
+      const useAudio = Boolean(request.media?.sync_to_audio && Number.isFinite(audioSeconds) && audioSeconds > 0);
+      const duration = useAudio ? audioSeconds : manualSeconds;
+      return {
+        schema_version: 1,
+        name: request.template_name || "TrueVision render template",
+        renderer: request.renderer?.name || "state_formula",
+        prompt: request.prompt,
+        media: request.media,
+        timeline: {
+          duration_seconds: Number(duration.toFixed(6)),
+          fps,
+          frame_count: Math.max(1, Math.round(duration * fps)),
+          start_seconds: 0,
+          end_seconds: Number(duration.toFixed(6))
+        },
+        time_distance: {
+          source: useAudio ? "audio_duration" : "manual_duration",
+          seconds_per_frame: Number((1 / fps).toFixed(9)),
+          frames_per_second: fps,
+          total_frames: Math.max(1, Math.round(duration * fps))
+        },
+        visual_parameters: {
+          geometry: request.geometry,
+          trigonometry: request.trigonometry,
+          linear_algebra: request.linear_algebra,
+          physics: request.physics,
+          electronics: request.electronics,
+          path_tracing: request.path_tracing,
+          computer_vision: request.computer_vision
+        },
+        state_plan: request.qwen_state_plan || {},
+        boundary: {
+          synthetic_state_media: true,
+          evidence: false,
+          renderer_executes_validated_state: true
+        }
+      };
+    }
+
     function buildQwenSystemPrompt() {
       return [
         "You are the local Qwen 32B adapter for TrueVision State Media Studio.",
@@ -1216,13 +1377,14 @@
 
     function buildCatbotSystemPrompt() {
       return [
-        "You are Catbot, the local TrueVision State Media Studio helper.",
-        "Talk naturally and briefly with the operator.",
-        "You can explain the current studio settings and what the available tools will do.",
+        "You are Qwen working as the regular TrueVision project chat helper.",
+        "Talk naturally with the operator before building anything.",
+        "You can discuss project ideas, explain current studio settings, and say what tools are available.",
         "Available tools are save_request, qwen_compile, qwen_chat, prepare_record, and refresh_files.",
         "Never pretend a tool ran unless the supplied tool_results say it ran.",
         "Generated state media is synthetic, not evidence.",
-        "When the operator wants a video or image plan, steer them toward compile/generate so qwen_compile can create state JSON."
+        "When the operator wants to build, steer them toward compile/generate so qwen_compile can create state JSON.",
+        "Do not auto-build from plain chat. Conversation is allowed to stay conversation."
       ].join("\\n");
     }
 
@@ -1525,6 +1687,53 @@
       });
     }
 
+    function renderTemplates() {
+      const list = $("templateList");
+      list.innerHTML = "";
+      if (!state.templates.length) {
+        const empty = document.createElement("div");
+        empty.className = "message";
+        empty.textContent = "No templates saved yet.";
+        list.appendChild(empty);
+        return;
+      }
+      state.templates.forEach((item, index) => {
+        const template = item.template || {};
+        const row = document.createElement("div");
+        row.className = "file";
+        const icon = document.createElement("div");
+        icon.className = "file-icon";
+        icon.textContent = String(index + 1);
+        const main = document.createElement("div");
+        main.className = "file-main";
+        const name = document.createElement("div");
+        name.className = "file-name";
+        name.textContent = template.name || item.name || "template";
+        const kind = document.createElement("div");
+        kind.className = "file-kind";
+        const seconds = template.timeline?.duration_seconds;
+        kind.textContent = `${template.renderer || "renderer"}${seconds ? ` / ${Number(seconds).toFixed(2)}s` : ""}`;
+        main.appendChild(name);
+        main.appendChild(kind);
+        const actions = document.createElement("div");
+        actions.className = "template-actions";
+        const load = document.createElement("button");
+        load.className = "secondary";
+        load.textContent = "Load";
+        load.addEventListener("click", () => loadTemplate(item));
+        const del = document.createElement("button");
+        del.className = "secondary";
+        del.textContent = "Delete";
+        del.addEventListener("click", () => deleteTemplate(item.name));
+        actions.appendChild(load);
+        actions.appendChild(del);
+        row.appendChild(icon);
+        row.appendChild(main);
+        row.appendChild(actions);
+        list.appendChild(row);
+      });
+    }
+
     function syncFilesFromServer(files) {
       if (!Array.isArray(files)) {
         return;
@@ -1537,11 +1746,81 @@
       renderFiles();
     }
 
+    function syncTemplatesFromServer(templates) {
+      if (!Array.isArray(templates)) {
+        return;
+      }
+      state.templates = templates;
+      renderTemplates();
+    }
+
     async function refreshServerFiles() {
       const payload = await apiJson("/api/files");
       syncFilesFromServer(payload.files);
       addMessage("storage", `Loaded ${payload.files.length} server file${payload.files.length === 1 ? "" : "s"} from storage.`);
       return payload.files;
+    }
+
+    async function refreshTemplates() {
+      const payload = await apiJson("/api/templates");
+      syncTemplatesFromServer(payload.templates);
+      $("templateStatus").textContent = `Loaded ${payload.templates.length} template${payload.templates.length === 1 ? "" : "s"}.`;
+      return payload.templates;
+    }
+
+    async function saveCurrentTemplate() {
+      const payload = await apiJson("/api/templates/save", { request: buildRequest() });
+      syncTemplatesFromServer(payload.templates);
+      syncFilesFromServer(payload.files);
+      $("templateStatus").textContent = `Template saved: ${payload.artifact.name}`;
+      addMessage("templates", `Template saved: ${payload.artifact.name}`);
+      return payload;
+    }
+
+    async function deleteTemplate(name) {
+      const payload = await apiJson("/api/templates/delete", { name });
+      syncTemplatesFromServer(payload.templates);
+      $("templateStatus").textContent = payload.result.deleted
+        ? `Deleted template: ${payload.result.name}`
+        : `Template was already gone: ${payload.result.name}`;
+      addMessage("templates", $("templateStatus").textContent);
+      return payload;
+    }
+
+    function loadTemplate(item) {
+      const template = item.template || {};
+      $("templateName").value = template.name || item.name || "Loaded template";
+      $("prompt").value = template.prompt || $("prompt").value;
+      $("audioPath").value = template.media?.audio_path || "";
+      $("syncDurationToAudio").checked = template.media?.sync_to_audio !== false;
+      const duration = template.media?.audio_duration_seconds || template.timeline?.duration_seconds;
+      if (duration) {
+        $("audioDurationSeconds").value = Number(duration).toFixed(3);
+      }
+      if (template.timeline?.fps) {
+        $("fps").value = template.timeline.fps;
+      }
+      state.lastQwenState = template.state_plan || null;
+      $("templateStatus").textContent = `Loaded template: ${template.name || item.name}`;
+      addMessage("templates", $("templateStatus").textContent);
+      update();
+    }
+
+    async function probeAudioDuration() {
+      const path = $("audioPath").value.trim();
+      if (!path) {
+        throw new Error("Audio path is empty");
+      }
+      const payload = await apiJson("/api/media/probe", { path });
+      if (!payload.duration_seconds) {
+        throw new Error("Could not read duration with ffprobe");
+      }
+      $("audioDurationSeconds").value = Number(payload.duration_seconds).toFixed(3);
+      $("durationMinutes").value = (Number(payload.duration_seconds) / 60).toFixed(3);
+      $("templateStatus").textContent = `Song duration locked: ${Number(payload.duration_seconds).toFixed(3)}s.`;
+      addMessage("templates", $("templateStatus").textContent);
+      update();
+      return payload;
     }
 
     async function saveRequestToServer(request = buildRequest()) {
@@ -1569,7 +1848,11 @@
     }
 
     function renderJson() {
-      $("stateJson").value = JSON.stringify(buildRequest(), null, 2);
+      const request = buildRequest();
+      const template = buildRenderTemplate(request);
+      $("stateJson").value = JSON.stringify(request, null, 2);
+      $("templateJson").value = JSON.stringify(template, null, 2);
+      $("templateFoot").textContent = `${template.time_distance.source}: ${template.timeline.duration_seconds}s / ${template.timeline.frame_count} frames @ ${template.timeline.fps}fps.`;
     }
 
     function updateLabels() {
@@ -1610,21 +1893,51 @@
       renderJson();
     }
 
-    function addMessage(source, text, operator = false) {
+    async function logChatMessage(source, text, operator = false) {
+      try {
+        await apiJson("/api/chat/log", {
+          message: {
+            source,
+            text,
+            operator,
+            kind: "studio_chat"
+          }
+        });
+      } catch (_) {
+        /* Chat logging must never block the studio controls. */
+      }
+    }
+
+    function addMessage(source, text, operator = false, persist = true) {
       const win = $("chatWindow");
       const node = document.createElement("div");
       node.className = `message${operator ? " operator" : ""}`;
       node.innerHTML = `
-        <div class="meta"><span>${source}</span><span>${new Date().toLocaleTimeString()}</span></div>
-        ${text.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;" }[m]))}
+        <div class="meta"><span>${escapeHtml(source)}</span><span>${new Date().toLocaleTimeString()}</span></div>
+        ${escapeHtml(text)}
       `;
       win.appendChild(node);
       win.scrollTop = win.scrollHeight;
+      if (persist) {
+        logChatMessage(source, text, operator);
+      }
+    }
+
+    async function loadDailyChat() {
+      const payload = await apiJson("/api/chat/today");
+      if (payload.messages?.length) {
+        $("chatWindow").innerHTML = "";
+        payload.messages.forEach((entry) => {
+          addMessage(entry.source || "chat", entry.text || "", Boolean(entry.operator), false);
+        });
+      }
+      state.chatLogReady = true;
+      return payload.messages || [];
     }
 
     function setBusy(isBusy, label = "Catbot is working") {
       state.busy = isBusy;
-      ["sendPrompt", "generateDraft", "saveRequest", "prepareRecord", "refreshFiles", "testQwen"].forEach((id) => {
+      ["sendPrompt", "generateDraft", "saveRequest", "prepareRecord", "refreshFiles", "testQwen", "refreshTemplates", "saveTemplate", "saveTemplateFromPane", "probeAudio"].forEach((id) => {
         const node = $(id);
         if (node) {
           node.disabled = isBusy;
@@ -1783,6 +2096,35 @@
         addMessage("storage", `Refresh failed: ${error.message}`);
       }
     });
+    $("refreshTemplates").addEventListener("click", async () => {
+      try {
+        await runBusy("Refreshing templates...", refreshTemplates);
+      } catch (error) {
+        addMessage("templates", `Refresh failed: ${error.message}`);
+      }
+    });
+    $("saveTemplate").addEventListener("click", async () => {
+      try {
+        await runBusy("Saving render template...", saveCurrentTemplate);
+      } catch (error) {
+        addMessage("templates", `Save failed: ${error.message}`);
+      }
+    });
+    $("saveTemplateFromPane").addEventListener("click", async () => {
+      try {
+        await runBusy("Saving render template...", saveCurrentTemplate);
+      } catch (error) {
+        addMessage("templates", `Save failed: ${error.message}`);
+      }
+    });
+    $("probeAudio").addEventListener("click", async () => {
+      try {
+        await runBusy("Reading song duration...", probeAudioDuration);
+      } catch (error) {
+        $("templateStatus").textContent = `Probe failed: ${error.message}`;
+        addMessage("templates", $("templateStatus").textContent);
+      }
+    });
     $("testQwen").addEventListener("click", async () => {
       saveQwenConfig();
       try {
@@ -1801,10 +2143,14 @@
     });
     $("clearChat").addEventListener("click", () => {
       $("chatWindow").innerHTML = "";
-      addMessage("system", "Run log cleared. Server-backed route state remains loaded.");
+      addMessage("system", "Chat window cleared locally. The daily chat file remains saved on disk.");
     });
     $("resetDefaults").addEventListener("click", () => {
       $("prompt").value = "A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.";
+      $("templateName").value = "Edge audio river";
+      $("audioPath").value = "C:\\Users\\mydyi\\OneDrive\\Documents\\Desktop\\Album_Builds\\Machine_Dread_Album_Sequenced\\01_ordered_audio\\01 - Edge Of The World (I Am Your Nightmare).mp3";
+      $("audioDurationSeconds").value = "278.320";
+      $("syncDurationToAudio").checked = true;
       $("fps").value = 15;
       $("durationMinutes").value = 5;
       $("startDelayMinutes").value = 0;
@@ -1833,6 +2179,8 @@
 
     loadQwenConfig();
     update();
+    loadDailyChat().catch((error) => addMessage("storage", `Daily chat log load failed: ${error.message}`, false, false));
+    refreshTemplates().catch((error) => addMessage("templates", `Template refresh failed: ${error.message}`, false, false));
     refreshServerFiles().catch((error) => addMessage("storage", `Initial file refresh failed: ${error.message}`));
   </script>
 </body>
