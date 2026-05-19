@@ -139,6 +139,16 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("deleteTemplate", html)
         self.assertIn("duration_source", html)
 
+    def test_html_tells_qwen_about_av_only_tool_calls(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("/api/av-tools", html)
+        self.assertIn("/api/av-tools/call", html)
+        self.assertIn("AV-only validated tools", html)
+        self.assertIn("video_render_preview", html)
+        self.assertIn("template_patch", html)
+        self.assertIn("AI cannot execute directly", html)
+
 
 if __name__ == "__main__":
     unittest.main()

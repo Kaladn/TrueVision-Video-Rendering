@@ -107,6 +107,8 @@ GET  /api/templates
 POST /api/templates/save
 POST /api/templates/delete
 POST /api/media/probe
+GET  /api/av-tools
+POST /api/av-tools/call
 ```
 
 Catbot action words:
@@ -127,6 +129,17 @@ storage/templates/*.json
 ```
 
 Plain chat stays plain chat. Templates preserve generation setup, media timing, renderer target, and validated state plan. When an audio path has a known duration, template timelines can match the song duration exactly.
+
+AV tool calls are audio/video only:
+
+```text
+audio_probe_duration
+template_create / template_load / template_save / template_patch
+time_marker_add / recalibration_add_note
+video_render_preview / video_prepare_full_render
+```
+
+Qwen may request these tools as JSON, but the local server validates the tool name, arguments, confirmation state, and flat filenames before anything runs. Every accepted or rejected call writes a receipt under `storage/receipts/`.
 
 ## Run Tests
 

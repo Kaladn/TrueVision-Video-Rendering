@@ -14,6 +14,7 @@ from truevision_studio_server import (
     normalize_provider,
     read_chat_log,
     resolve_assistant_actions,
+    run_av_tool_call,
     save_template,
     validate_local_endpoint,
     write_json_artifact,
@@ -141,6 +142,25 @@ class TrueVisionStudioServerTests(unittest.TestCase):
         self.assertEqual(template["timeline"]["frame_count"], 8350)
         self.assertEqual(template["time_distance"]["source"], "audio_duration")
         self.assertEqual(template["state_plan"]["scene"]["name"], "wake river")
+
+    def test_av_tool_call_endpoint_runner_writes_receipt(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = run_av_tool_call(
+                {
+                    "tool": "template_create",
+                    "args": {
+                        "name": "Edge River",
+                        "prompt": "thin sound river",
+                        "duration_seconds": 10,
+                        "fps": 10,
+                    },
+                },
+                storage_root=Path(tmpdir),
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["result"]["template"]["timeline"]["frame_count"], 100)
+            self.assertTrue(Path(result["receipt"]["path"]).exists())
 
     def test_list_storage_files_reports_saved_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:

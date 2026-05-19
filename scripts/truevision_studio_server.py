@@ -13,10 +13,15 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from truevision_runtime.av_tools.av_tool_registry import list_av_tools
+from truevision_runtime.av_tools.av_tool_runner import run_av_tool_call
 from truevision_region_snip import build_recorder_command
 
 
-ROOT = Path(__file__).resolve().parents[1]
 HTML_PATH = ROOT / "ui" / "truevision_state_media_studio.html"
 STORAGE_ROOT = ROOT / "storage"
 DEFAULT_HOST = "127.0.0.1"
@@ -614,6 +619,9 @@ class StudioHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/templates":
             self._send_json({"ok": True, "templates": list_templates(STORAGE_ROOT)})
             return
+        if parsed.path == "/api/av-tools":
+            self._send_json({"ok": True, "tools": list_av_tools()})
+            return
         self.send_error(404, "Not found")
 
     def do_POST(self) -> None:
@@ -644,6 +652,9 @@ class StudioHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/media/probe":
             self._handle_media_probe()
+            return
+        if parsed.path == "/api/av-tools/call":
+            self._handle_av_tool_call()
             return
         self.send_error(404, "Not found")
 
@@ -803,6 +814,18 @@ class StudioHandler(BaseHTTPRequestHandler):
             path = str(payload.get("path") or "")
             duration = probe_media_duration(path)
             self._send_json({"ok": True, "path": path, "duration_seconds": duration})
+        except (ValueError, TypeError, json.JSONDecodeError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, 400)
+
+    def _handle_av_tool_call(self) -> None:
+        try:
+            payload = self._read_json()
+            call = payload.get("call", payload)
+            if not isinstance(call, dict):
+                raise ValueError("call must be an object")
+            result = run_av_tool_call(call, storage_root=STORAGE_ROOT)
+            status = 200 if result.get("ok") else 400
+            self._send_json(result, status)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._send_json({"ok": False, "error": str(exc)}, 400)
 
