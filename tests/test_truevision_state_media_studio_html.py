@@ -22,6 +22,23 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("ollama_native", html)
         self.assertIn("openai_compatible", html)
 
+    def test_html_defaults_to_working_local_qwen_route_only(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn('llm: "local-qwen-32b"', html)
+        self.assertIn('class="active" data-value="local-qwen-32b">Qwen 32B</button>', html)
+        self.assertNotIn('data-value="api_llm"', html)
+        self.assertNotIn('data-value="clearspeak"', html)
+        self.assertNotIn('data-group="remote"', html)
+
+    def test_html_redirects_file_protocol_to_local_server(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn('window.location.protocol === "file:"', html)
+        self.assertIn('http://127.0.0.1:8765/', html)
+        self.assertIn("setBusy", html)
+        self.assertIn("Catbot is working", html)
+
     def test_html_uses_backend_wiring_for_state_operations(self):
         html = HTML.read_text(encoding="utf-8")
 

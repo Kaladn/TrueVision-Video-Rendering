@@ -122,6 +122,14 @@ class TrueVisionStudioServerTests(unittest.TestCase):
         self.assertIn("qwen_compile", actions)
         self.assertIn("prepare_record", actions)
 
+    def test_resolve_assistant_actions_treats_visual_prompt_as_compile_work(self):
+        request = {"local_llm": {"enabled": True}}
+
+        actions = resolve_assistant_actions("A person walks through a field at sunset", request)
+
+        self.assertIn("save_request", actions)
+        self.assertIn("qwen_compile", actions)
+
     def test_handle_assistant_message_executes_storage_and_record_actions(self):
         request = {
             "request_kind": "truevision_state_media_draft",

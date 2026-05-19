@@ -4,6 +4,11 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>TrueVision State Media Studio</title>
+  <script>
+    if (window.location.protocol === "file:") {
+      window.location.href = "http://127.0.0.1:8765/";
+    }
+  </script>
   <style>
     :root {
       color-scheme: dark;
@@ -648,23 +653,13 @@
           <div class="title">TrueVision Studio</div>
           <div class="subtitle">state media control surface</div>
         </div>
-        <span class="status-dot" title="static prototype"></span>
+        <span class="status-dot" title="server-backed"></span>
       </div>
       <div class="scroll">
         <section class="section">
-          <div class="section-title">Remote</div>
-          <div class="seg two" data-group="remote">
-            <button class="active" data-value="SecureCore">SecureCore</button>
-            <button data-value="AnchorWorks">AnchorWorks</button>
-          </div>
-        </section>
-
-        <section class="section">
           <div class="section-title">LLM Route</div>
           <div class="seg" data-group="llm">
-            <button class="active" data-value="api_llm">API</button>
-            <button data-value="local-qwen-32b">Qwen 32B</button>
-            <button data-value="clearspeak">ClearSpeak</button>
+            <button class="active" data-value="local-qwen-32b">Qwen 32B</button>
           </div>
         </section>
 
@@ -962,10 +957,11 @@
   <script>
     const state = {
       remote: "SecureCore",
-      llm: "api_llm",
+      llm: "local-qwen-32b",
       mode: "state_formula",
       chatProfile: "director",
       lastQwenState: null,
+      busy: false,
       files: []
     };
 
@@ -1099,7 +1095,7 @@
         route: {
           remote: state.remote,
           llm: state.llm,
-          clear_speak: state.llm === "clearspeak",
+          clear_speak: false,
           mode: state.mode,
           chat_profile: state.chatProfile
         },
@@ -1609,6 +1605,29 @@
       win.scrollTop = win.scrollHeight;
     }
 
+    function setBusy(isBusy, label = "Catbot is working") {
+      state.busy = isBusy;
+      ["sendPrompt", "generateDraft", "saveRequest", "prepareRecord", "refreshFiles", "testQwen"].forEach((id) => {
+        const node = $(id);
+        if (node) {
+          node.disabled = isBusy;
+        }
+      });
+      if (isBusy) {
+        $("qwenStatus").textContent = label;
+        $("qwenStatus").className = "status-line warn";
+      }
+    }
+
+    async function runBusy(label, task) {
+      setBusy(true, label);
+      try {
+        return await task();
+      } finally {
+        setBusy(false);
+      }
+    }
+
     async function applyQwenStatePlan(plan) {
       state.lastQwenState = plan;
       const planName = plan?.scene?.name || plan?.scene?.description || "qwen_state_plan";
@@ -1686,43 +1705,49 @@
 
     $("sendPrompt").addEventListener("click", async () => {
       try {
-        await sendAssistantMessage();
+        await runBusy("Catbot is working through the prompt...", () => sendAssistantMessage());
       } catch (error) {
         addMessage("Catbot", `Action failed: ${error.message}`);
       }
     });
-    $("generateDraft").addEventListener("click", synthesizeDraft);
+    $("generateDraft").addEventListener("click", async () => {
+      try {
+        await runBusy("Catbot is working on the state draft...", synthesizeDraft);
+      } catch (error) {
+        addMessage("Catbot", `Draft failed: ${error.message}`);
+      }
+    });
     $("saveRequest").addEventListener("click", async () => {
       try {
-        await saveRequestToServer(buildRequest());
+        await runBusy("Catbot is saving the request...", () => saveRequestToServer(buildRequest()));
       } catch (error) {
         addMessage("storage", `Save failed: ${error.message}`);
       }
     });
     $("prepareRecord").addEventListener("click", async () => {
       try {
-        await prepareRecordCommand();
+        await runBusy("Catbot is preparing the recorder command...", prepareRecordCommand);
       } catch (error) {
         addMessage("record", `Prepare failed: ${error.message}`);
       }
     });
     $("refreshFiles").addEventListener("click", async () => {
       try {
-        await refreshServerFiles();
+        await runBusy("Catbot is refreshing storage...", refreshServerFiles);
       } catch (error) {
         addMessage("storage", `Refresh failed: ${error.message}`);
       }
     });
     $("testQwen").addEventListener("click", async () => {
       saveQwenConfig();
-      $("qwenStatus").textContent = "Testing local Qwen endpoint...";
-      $("qwenStatus").className = "status-line warn";
       try {
-        const testRequest = buildRequest();
-        testRequest.prompt = "Return a tiny valid TrueVision state transition for a green field test.";
-        const plan = await callLocalQwen(testRequest);
-        await applyQwenStatePlan(plan);
-        update();
+        await runBusy("Testing local Qwen endpoint...", async () => {
+          const testRequest = buildRequest();
+          testRequest.prompt = "Return a tiny valid TrueVision state transition for a green field test.";
+          const plan = await callLocalQwen(testRequest);
+          await applyQwenStatePlan(plan);
+          update();
+        });
       } catch (error) {
         $("qwenStatus").textContent = `${error.message}. Check local server, endpoint, model, or CORS.`;
         $("qwenStatus").className = "status-line warn";

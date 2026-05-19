@@ -178,7 +178,31 @@ def resolve_assistant_actions(message: str, request: dict[str, Any]) -> list[str
     wants_files = any(word in text for word in ["files", "list", "refresh", "show artifacts", "what exists"])
     wants_save = any(word in text for word in ["save", "persist", "write", "store"])
     wants_record = any(word in text for word in ["prepare", "record", "capture", "recorder", "command"])
+    looks_like_visual_prompt = any(
+        word in text
+        for word in [
+            "animate",
+            "camera",
+            "clip",
+            "field",
+            "frame",
+            "generate",
+            "image",
+            "lighting",
+            "motion",
+            "person",
+            "photo",
+            "render",
+            "scene",
+            "shot",
+            "sunset",
+            "video",
+            "visual",
+            "walk",
+        ]
+    )
     wants_compile = any(word in text for word in ["compile", "generate", "draft", "state", "qwen", "catbot", "do it"])
+    wants_compile = wants_compile or looks_like_visual_prompt
 
     if wants_files:
         _append_action(actions, "refresh_files")
