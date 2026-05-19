@@ -46,6 +46,19 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("start_delay_minutes", html)
         self.assertNotIn('id="duration" type="range"', html)
 
+    def test_countdown_overlay_is_state_aware_and_manifested(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("Countdown Overlay", html)
+        self.assertIn('id="countdownEnabled"', html)
+        self.assertIn('id="countdownSeconds"', html)
+        self.assertIn("countdown_enabled", html)
+        self.assertIn("countdown_seconds", html)
+        self.assertIn("overlay_position", html)
+        self.assertIn("contrast_mode_used", html)
+        self.assertIn("record_start_time", html)
+        self.assertIn("chooseCountdownContrastMode", html)
+
 
 if __name__ == "__main__":
     unittest.main()
