@@ -1,0 +1,79 @@
+{
+  "template_id": "hard_has_no_meaning_here_mirror_made",
+  "run_id": "hard_has_no_meaning_here_mirror_made_power_preview_v2",
+  "title": "Hard Has No Meaning Here / Mirror Made",
+  "audio": {
+    "path": "C:/Users/mydyi/OneDrive/Documents/Desktop/Album_Builds/Machine_Dread_Album_Sequenced/01_ordered_audio/10 - Burn The Sky.mp3",
+    "sample_rate": 44100
+  },
+  "render": {
+    "visual_mode": "mirror_maze_realism"
+  },
+  "output": {
+    "root": "outputs/template_renders",
+    "width": 1920,
+    "height": 1080,
+    "fps": 30,
+    "max_seconds": 24,
+    "encoder": "h264_qsv",
+    "program_stamp": "TrueVision Generation Lab / mirror_maze_realism"
+  },
+  "style": {
+    "palette": "black_glass_red_livewire",
+    "bloom_strength": 0.82,
+    "vignette_strength": 1.72,
+    "camera": "heavy_push_mirror_maze",
+    "motifs": [
+      "maze_of_mirrors",
+      "shattered_reflections",
+      "wires",
+      "smoke",
+      "live_wire_pyre",
+      "builder_silhouette"
+    ],
+    "meaning": "pressure becomes structure; broken selves become tools"
+  },
+  "scenes": [
+    {
+      "scene_id": "exhausted_mirror_maze",
+      "start_norm": 0.0,
+      "end_norm": 0.18,
+      "meaning": "low spoken exhaustion, trapped in reflective corridors"
+    },
+    {
+      "scene_id": "self_confrontation",
+      "start_norm": 0.18,
+      "end_norm": 0.38,
+      "meaning": "the mirror shows every damaged version"
+    },
+    {
+      "scene_id": "no_escape_build_from_fear",
+      "start_norm": 0.38,
+      "end_norm": 0.58,
+      "meaning": "doors vanish; fear becomes construction material"
+    },
+    {
+      "scene_id": "static_torn_away",
+      "start_norm": 0.58,
+      "end_norm": 0.76,
+      "meaning": "static breaks; night is pulled apart"
+    },
+    {
+      "scene_id": "live_wire_rebuild",
+      "start_norm": 0.76,
+      "end_norm": 0.92,
+      "meaning": "mind rebuilt on a live-wire pyre"
+    },
+    {
+      "scene_id": "earned_calm_dangerous",
+      "start_norm": 0.92,
+      "end_norm": 1.0,
+      "meaning": "the maze is owned, not escaped"
+    }
+  ],
+  "boundary": {
+    "generated_state_media": "synthetic_not_evidence",
+    "no_lyric_overlay": true,
+    "template_driven": true
+  }
+}

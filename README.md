@@ -57,6 +57,14 @@ scripts/
   truevision_edge_world_v3.py
   truevision_basement_stick_narrative.py
   truevision_signature_profile_extract.py
+  truevision_render_template.py
+
+templates/
+  hard_has_no_meaning_here_mirror_made.json
+
+truevision_runtime/
+  rendering/
+    template_renderer.py
 
 modules/
   screen_grid_mapper.py
@@ -76,6 +84,18 @@ connected_artifacts/
 outputs/
   ad hoc render/capture outputs, ignored by default
 ```
+
+## Template Rendering
+
+Reusable renderers live under `truevision_runtime/rendering/`. New videos should usually be JSON templates, not new song-specific Python files.
+
+Example:
+
+```powershell
+python scripts\truevision_render_template.py templates\hard_has_no_meaning_here_mirror_made.json
+```
+
+The first high-power template lane is `mirror_maze_realism`: mirror corridors, cracked glass, smoke, shards, live-wire motion, silhouette blocking, bloom/grain finishing, and manifest-backed CPU/RAM/encoder stats.
 
 ## Open The Studio
 

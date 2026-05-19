@@ -33,6 +33,9 @@ The lab proves the audio/video state-media language first.
 - [x] Edge audio river visualizer exists.
 - [x] Edge Of The World v3 edge/smoke/river renderer exists.
 - [x] The Basement stick-figure narrative renderer exists.
+- [x] Reusable template renderer exists under `truevision_runtime/rendering/`.
+- [x] `mirror_maze_realism` visual mode exists for higher-power template-driven previews.
+- [x] `Hard Has No Meaning Here / Mirror Made` template exists.
 - [x] Signature profile extractor exists.
 - [x] Basement renderer can consume a signature profile bundle.
 - [x] AV-only tool registry exists.
@@ -50,6 +53,7 @@ The lab proves the audio/video state-media language first.
 - [x] COD signature profiles were extracted.
 - [x] Basement full arc was rendered with COD motion/look signature.
 - [x] Edge Of The World v3 was rendered with COD motion/look signature.
+- [x] `Hard Has No Meaning Here / Mirror Made` 1080p QSV preview rendered from template.
 
 ## Morning Re-Entry
 
@@ -155,6 +159,20 @@ storage/
 - [ ] Add `video_color_grade`.
 - [ ] Add `variant_compare`.
 - [ ] Add a policy test for every tool.
+
+## Layer 2.5: Template-Driven Rendering
+
+- [x] Add a generic template render runner.
+- [x] Add reusable `mirror_maze_realism` renderer.
+- [x] Render `Hard Has No Meaning Here / Mirror Made` as a template, not a one-off script.
+- [x] Use `h264_qsv` hardware encode when requested and available.
+- [x] Log encoder choice, component timing, CPU cost, and RAM cost.
+- [ ] Move Edge river and Edge v3 into reusable template renderer modes.
+- [ ] Move Basement narrative into reusable template renderer modes.
+- [ ] Add a template registry that Catbot/Qwen can list and patch.
+- [ ] Add a renderer capability registry: visual modes, required inputs, supported effects.
+- [ ] Add GPU/render profile presets: `preview_fast`, `preview_quality`, `full_quality`.
+- [ ] Add a true 3D/material lane for mirror glass, smoke, camera, and depth lighting.
 
 ## Layer 3: Qwen Transformation Helper
 
