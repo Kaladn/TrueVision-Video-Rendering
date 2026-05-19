@@ -9,6 +9,8 @@ from typing import Any
 
 import numpy as np
 
+from truevision_runtime.state_patterns.audio_video_patterns import choose_patterns_for_signal
+
 from .av_recalibration import append_recalibration_event, list_recalibration_events
 from .av_tool_policy import AVToolPolicyError, safe_flat_json_name, validate_tool_call
 from .av_tool_receipts import stable_hash, utc_now, write_tool_receipt
@@ -117,6 +119,17 @@ def _read_wav_mono(path: Path, *, max_seconds: float | None = None) -> tuple[np.
     return np.clip(samples.astype(np.float32), -1.0, 1.0), sample_rate
 
 
+def _decode_audio_mono_ffmpeg(path: Path, *, sample_rate: int, max_seconds: float | None = None) -> np.ndarray:
+    command = ["ffmpeg", "-v", "error", "-i", str(path)]
+    if max_seconds is not None:
+        command.extend(["-t", f"{max_seconds:.6f}"])
+    command.extend(["-f", "f32le", "-acodec", "pcm_f32le", "-ac", "1", "-ar", str(sample_rate), "-"])
+    completed = subprocess.run(command, check=True, capture_output=True, timeout=120)
+    if not completed.stdout:
+        return np.zeros(0, dtype=np.float32)
+    return np.clip(np.frombuffer(completed.stdout, dtype="<f4").astype(np.float32), -1.0, 1.0)
+
+
 def _normalize_series(values: np.ndarray) -> np.ndarray:
     if values.size == 0:
         return values
@@ -221,6 +234,204 @@ def _write_audio_features(storage_root: Path, args: dict[str, Any]) -> dict[str,
         "features_returned": payload["features_returned"],
         "summary": payload["summary"],
     }
+
+
+def _classify_section(average_level: float, peak_count: int, valley_count: int) -> str:
+    if average_level >= 0.72 or peak_count >= 3:
+        return "high_energy"
+    if average_level <= 0.22 or valley_count >= 3:
+        return "quiet_valley"
+    if average_level >= 0.48:
+        return "building"
+    return "steady"
+
+
+def _extract_audio_level_signals(
+    audio_path: Path,
+    *,
+    fps: int,
+    sample_rate: int,
+    max_seconds: float | None,
+    section_seconds: float,
+    peak_threshold: float,
+    valley_threshold: float,
+    max_signal_frames: int,
+) -> dict[str, Any]:
+    samples = _decode_audio_mono_ffmpeg(audio_path, sample_rate=sample_rate, max_seconds=max_seconds)
+    duration = samples.size / float(sample_rate) if sample_rate else 0.0
+    frame_count = max(1, int(np.ceil(duration * fps))) if duration > 0 else 0
+    rms = np.zeros(frame_count, dtype=np.float32)
+    peak_abs = np.zeros(frame_count, dtype=np.float32)
+    for frame_index in range(frame_count):
+        start = int(round((frame_index / fps) * sample_rate))
+        end = int(round(((frame_index + 1) / fps) * sample_rate))
+        segment = samples[start:min(end, samples.size)]
+        if segment.size:
+            rms[frame_index] = float(np.sqrt(np.mean(segment * segment)))
+            peak_abs[frame_index] = float(np.max(np.abs(segment)))
+    level = _normalize_series(rms)
+    delta = level - np.roll(level, 1) if frame_count else np.zeros(0, dtype=np.float32)
+    if frame_count:
+        delta[0] = 0.0
+    dbfs = 20.0 * np.log10(np.maximum(rms, 1.0e-6))
+
+    events: list[dict[str, Any]] = []
+    signal_frames: list[dict[str, Any]] = []
+    for frame_index in range(frame_count):
+        previous_level = float(level[frame_index - 1]) if frame_index > 0 else float(level[frame_index])
+        next_level = float(level[frame_index + 1]) if frame_index + 1 < frame_count else float(level[frame_index])
+        current_level = float(level[frame_index])
+        is_peak = current_level >= peak_threshold and current_level >= previous_level and current_level >= next_level
+        is_valley = current_level <= valley_threshold and current_level <= previous_level and current_level <= next_level
+        event_kind = "peak" if is_peak else "valley" if is_valley else "rising" if float(delta[frame_index]) > 0.12 else "falling" if float(delta[frame_index]) < -0.12 else "steady"
+        if event_kind in {"peak", "valley", "rising", "falling"}:
+            events.append(
+                {
+                    "event_kind": event_kind,
+                    "frame_index": frame_index,
+                    "time_seconds": round(frame_index / fps, 6),
+                    "level": round(current_level, 6),
+                    "delta": round(float(delta[frame_index]), 6),
+                    "state_trigger": {
+                        "peak": "pulse_or_flash",
+                        "valley": "slow_drift_or_hold",
+                        "rising": "expand_geometry",
+                        "falling": "contract_geometry",
+                    }[event_kind],
+                }
+            )
+        if len(signal_frames) < max_signal_frames:
+            signal_frames.append(
+                {
+                    "frame_index": frame_index,
+                    "time_seconds": round(frame_index / fps, 6),
+                    "level": round(current_level, 6),
+                    "peak_abs": round(float(peak_abs[frame_index]), 6),
+                    "dbfs": round(float(dbfs[frame_index]), 3),
+                    "delta": round(float(delta[frame_index]), 6),
+                    "event_kind": event_kind,
+                }
+            )
+
+    frames_per_section = max(1, int(round(section_seconds * fps)))
+    sections: list[dict[str, Any]] = []
+    for start in range(0, frame_count, frames_per_section):
+        end = min(frame_count, start + frames_per_section)
+        section_levels = level[start:end]
+        section_events = [event for event in events if start <= int(event["frame_index"]) < end]
+        peak_count = sum(1 for event in section_events if event["event_kind"] == "peak")
+        valley_count = sum(1 for event in section_events if event["event_kind"] == "valley")
+        average_level = float(np.mean(section_levels)) if section_levels.size else 0.0
+        sections.append(
+            {
+                "section_index": len(sections),
+                "start_seconds": round(start / fps, 6),
+                "end_seconds": round(end / fps, 6),
+                "average_level": round(average_level, 6),
+                "peak_count": peak_count,
+                "valley_count": valley_count,
+                "section_energy": _classify_section(average_level, peak_count, valley_count),
+            }
+        )
+
+    summary = {
+        "duration_seconds": round(duration, 6),
+        "fps": fps,
+        "frame_count": frame_count,
+        "average_level": round(float(np.mean(level)) if frame_count else 0.0, 6),
+        "max_level": round(float(np.max(level)) if frame_count else 0.0, 6),
+        "peak_count": sum(1 for event in events if event["event_kind"] == "peak"),
+        "valley_count": sum(1 for event in events if event["event_kind"] == "valley"),
+        "rising_count": sum(1 for event in events if event["event_kind"] == "rising"),
+        "falling_count": sum(1 for event in events if event["event_kind"] == "falling"),
+    }
+    return {
+        "signal_kind": "ffmpeg_audio_level_signals_v1",
+        "audio_path": str(audio_path),
+        "ffmpeg_observer": True,
+        "sample_rate": sample_rate,
+        "summary": summary,
+        "signals_returned": len(signal_frames),
+        "signal_frames": signal_frames,
+        "events": events[: max_signal_frames * 2],
+        "sections": sections,
+        "state_mappings": {
+            "peak": ["pulse_rings", "random_geometry_shards", "flash_pressure"],
+            "valley": ["quiet_valley_drift", "slow_motion"],
+            "rising": ["rising_energy_expansion", "camera_push"],
+            "falling": ["geometry_contraction", "color_cooling"],
+        },
+        "recommended_patterns": choose_patterns_for_signal(summary),
+    }
+
+
+def _write_audio_level_signals(storage_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    audio_path = Path(str(args.get("path") or args.get("audio_path") or ""))
+    if not audio_path.exists():
+        raise FileNotFoundError(str(audio_path))
+    fps = int(args.get("fps") or 12)
+    if fps < 1 or fps > 120:
+        raise ValueError("fps must be between 1 and 120")
+    payload = _extract_audio_level_signals(
+        audio_path,
+        fps=fps,
+        sample_rate=int(args.get("sample_rate") or 44100),
+        max_seconds=float(args["max_seconds"]) if args.get("max_seconds") not in {None, ""} else None,
+        section_seconds=float(args.get("section_seconds") or 8.0),
+        peak_threshold=float(args.get("peak_threshold") or 0.72),
+        valley_threshold=float(args.get("valley_threshold") or 0.18),
+        max_signal_frames=int(args.get("max_signal_frames") or 900),
+    )
+    artifacts = storage_root / "artifacts"
+    artifacts.mkdir(parents=True, exist_ok=True)
+    safe_stem = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in audio_path.stem).strip("_") or "audio"
+    path = artifacts / f"{safe_stem}_level_signals_{utc_now().replace(':', '').replace('.', '_')}.json"
+    path.write_text(json.dumps(payload, indent=2, allow_nan=False), encoding="utf-8")
+    return {
+        "signal_path": str(path),
+        "signal_sha256": stable_hash(payload),
+        "summary": payload["summary"],
+        "signals_returned": payload["signals_returned"],
+        "event_count": len(payload["events"]),
+        "section_count": len(payload["sections"]),
+        "recommended_patterns": payload["recommended_patterns"],
+    }
+
+
+def _template_from_audio_signals(storage_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    signal_path = Path(str(args.get("signal_path") or ""))
+    if not signal_path.exists():
+        raise FileNotFoundError(str(signal_path))
+    signal_payload = json.loads(signal_path.read_text(encoding="utf-8"))
+    summary = signal_payload.get("summary") or {}
+    duration = float(args.get("duration_seconds") or summary.get("duration_seconds") or 60.0)
+    fps = int(args.get("fps") or summary.get("fps") or 12)
+    patterns = choose_patterns_for_signal(summary)
+    template = _create_template(
+        {
+            "name": str(args.get("name") or "audio geometry template"),
+            "renderer": str(args.get("renderer") or "audio_geometry_field"),
+            "prompt": str(args.get("prompt") or "audio levels drive geometry"),
+            "audio_path": signal_payload.get("audio_path", ""),
+            "audio_duration_seconds": duration,
+            "duration_seconds": duration,
+            "duration_source": "ffmpeg_audio_signal",
+            "fps": fps,
+            "visual_parameters": {
+                "pattern_library": patterns,
+                "state_mappings": signal_payload.get("state_mappings", {}),
+                "sections": signal_payload.get("sections", []),
+                "event_preview": signal_payload.get("events", [])[:120],
+                "geometry_mode": str(args.get("geometry_mode") or "deterministic_random_geometry"),
+            },
+        }
+    )
+    template["signal_source"] = {
+        "signal_path": str(signal_path),
+        "signal_sha256": stable_hash(signal_payload),
+        "signal_kind": signal_payload.get("signal_kind"),
+    }
+    return _write_template(storage_root, str(args.get("name") or f"{template['name']}.json"), template)
 
 
 def _create_template(args: dict[str, Any]) -> dict[str, Any]:
@@ -329,8 +540,12 @@ def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> di
     if tool == "audio_probe_duration":
         duration = _probe_duration(str(args.get("path") or args.get("audio_path") or ""))
         return {"duration_seconds": duration, "path": str(args.get("path") or args.get("audio_path") or "")}
+    if tool == "audio_analyze_levels":
+        return _write_audio_level_signals(storage_root, args)
     if tool == "audio_extract_features":
         return _write_audio_features(storage_root, args)
+    if tool == "template_from_audio_signals":
+        return _template_from_audio_signals(storage_root, args)
     if tool == "template_create":
         return {"template": _create_template(args)}
     if tool == "template_save":

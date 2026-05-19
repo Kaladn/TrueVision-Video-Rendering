@@ -12,7 +12,7 @@ class ValidationResult:
     normalized: dict[str, Any]
 
 
-ALLOWED_RENDERERS = {"edge_audio_river", "state_scene_generator", "path_tracer"}
+ALLOWED_RENDERERS = {"audio_geometry_field", "edge_audio_river", "state_scene_generator", "path_tracer"}
 
 
 def _as_object(value: Any, field: str, errors: list[str]) -> dict[str, Any]:

@@ -134,7 +134,9 @@ AV tool calls are audio/video only:
 
 ```text
 audio_probe_duration
+audio_analyze_levels
 audio_extract_features
+template_from_audio_signals
 template_create / template_load / template_save / template_patch
 time_marker_add / recalibration_add_note
 video_render_preview / video_prepare_full_render
@@ -161,6 +163,15 @@ python scripts\truevision_edge_audio_river.py `
   --output-root "outputs\wav_river" `
   --run-id "song_river" `
   --fps 12
+```
+
+WAV files can also produce state signals first:
+
+```text
+audio_analyze_levels
+-> levels, peaks, valleys, rising/falling energy, section energy
+-> state pattern library
+-> geometry/color/motion template
 ```
 
 ## Run Tests

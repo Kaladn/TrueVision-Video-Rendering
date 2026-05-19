@@ -56,9 +56,12 @@ WAV files are first-class inputs for audio-reactive video generation.
 ```text
 WAV file
 -> audio_probe_duration
+-> audio_analyze_levels
 -> audio_extract_features
+-> state pattern library
 -> PromptToStateAdapter draft
 -> schema validation
+-> template_from_audio_signals when geometry is signal-driven
 -> template_create/template_save
 -> video_render_preview
 -> video_prepare_full_render
@@ -66,6 +69,8 @@ WAV file
 ```
 
 The current renderer target for WAV-driven visuals is `edge_audio_river`. It can produce simple black-field color-river visuals from audio bands and lyric/theme hints.
+
+For random geometry and richer visual language, the adapter should prefer `audio_geometry_field` templates that reference named state patterns. The pattern library starts with pulse rings, deterministic random shards, quiet valley drift, rising energy expansion, and high-energy edge shimmer.
 
 ## Runtime Files
 

@@ -16,7 +16,9 @@ class AVToolLayerTests(unittest.TestCase):
         names = {tool["name"] for tool in tools}
 
         self.assertIn("audio_probe_duration", names)
+        self.assertIn("audio_analyze_levels", names)
         self.assertIn("audio_extract_features", names)
+        self.assertIn("template_from_audio_signals", names)
         self.assertIn("video_render_preview", names)
         self.assertIn("template_patch", names)
         self.assertNotIn("filesystem_delete", names)
@@ -188,6 +190,64 @@ class AVToolLayerTests(unittest.TestCase):
             self.assertEqual(result["result"]["features_returned"], 3)
             self.assertTrue(Path(result["result"]["feature_path"]).exists())
             self.assertGreater(result["result"]["summary"]["max_rms"], 0)
+
+    def test_audio_analyze_levels_uses_ffmpeg_and_template_library(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = Path(tmpdir)
+            wav_path = storage / "peaks_and_valleys.wav"
+            sample_rate = 8000
+            samples = bytearray()
+            for index in range(sample_rate * 2):
+                second = index / sample_rate
+                amp = 0.02 if second < 0.5 else 0.9 if second < 1.0 else 0.08 if second < 1.5 else 0.65
+                value = int(math.sin(index / sample_rate * math.tau * 110) * amp * 30000)
+                samples.extend(value.to_bytes(2, "little", signed=True))
+            with wave.open(str(wav_path), "wb") as handle:
+                handle.setnchannels(1)
+                handle.setsampwidth(2)
+                handle.setframerate(sample_rate)
+                handle.writeframes(bytes(samples))
+
+            signals = run_av_tool_call(
+                {
+                    "tool": "audio_analyze_levels",
+                    "args": {
+                        "audio_path": str(wav_path),
+                        "fps": 10,
+                        "sample_rate": sample_rate,
+                        "section_seconds": 0.5,
+                        "max_signal_frames": 20,
+                    },
+                },
+                storage_root=storage,
+            )
+
+            self.assertTrue(signals["ok"])
+            self.assertTrue(Path(signals["result"]["signal_path"]).exists())
+            self.assertGreater(signals["result"]["summary"]["peak_count"], 0)
+            self.assertGreater(signals["result"]["summary"]["valley_count"], 0)
+            self.assertGreater(signals["result"]["section_count"], 1)
+            pattern_ids = {pattern["pattern_id"] for pattern in signals["result"]["recommended_patterns"]}
+            self.assertIn("random_geometry_shards", pattern_ids)
+            self.assertIn("quiet_valley_drift", pattern_ids)
+
+            template = run_av_tool_call(
+                {
+                    "tool": "template_from_audio_signals",
+                    "args": {
+                        "name": "signal_template.json",
+                        "signal_path": signals["result"]["signal_path"],
+                        "prompt": "peaks make random geometry",
+                    },
+                },
+                storage_root=storage,
+            )
+
+            self.assertTrue(template["ok"])
+            self.assertEqual(template["result"]["template"]["renderer"], "audio_geometry_field")
+            self.assertEqual(template["result"]["template"]["time_distance"]["source"], "ffmpeg_audio_signal")
+            self.assertIn("signal_source", template["result"]["template"])
+            self.assertTrue(Path(template["result"]["path"]).exists())
 
 
 if __name__ == "__main__":

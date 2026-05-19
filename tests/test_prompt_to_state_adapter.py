@@ -16,7 +16,10 @@ class PromptToStateAdapterTests(unittest.TestCase):
         self.assertIn("model_endpoint", context)
         self.assertIn("schema", context)
         self.assertIn("allowed_av_tools", context)
+        self.assertIn("state_pattern_library", context)
         self.assertIn("audio_extract_features", context["allowed_av_tools"])
+        self.assertIn("audio_analyze_levels", context["allowed_av_tools"])
+        self.assertIn("random_geometry_shards", {pattern["pattern_id"] for pattern in context["state_pattern_library"]})
         self.assertIn(".wav", "\n".join(context["runtime_notes"]))
         self.assertFalse(context["trust_boundary"]["model_output_is_trusted"])
 

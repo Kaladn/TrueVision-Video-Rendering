@@ -39,7 +39,9 @@ The lab proves the audio/video state-media language first.
 - [x] Delete and full render execution are gated.
 - [x] Model-neutral PromptToStateAdapter base exists.
 - [x] WAV feature extraction AV tool exists.
-- [x] Test suite was green at last commit: `60 tests`.
+- [x] ffmpeg audio level analysis AV tool exists.
+- [x] Initial state-pattern library exists.
+- [x] Test suite was green at last commit: `66 tests`.
 
 ## Morning Re-Entry
 
@@ -136,6 +138,8 @@ storage/
 - [ ] Add tool argument examples under `docs/av_tools/examples/`.
 - [ ] Add `render_job_status`.
 - [x] Add `audio_extract_features`.
+- [x] Add `audio_analyze_levels`.
+- [x] Add `template_from_audio_signals`.
 - [ ] Add `video_render_score`.
 - [ ] Add `video_extract_keyframes`.
 - [ ] Add `video_composite_layers`.
@@ -194,6 +198,7 @@ docs/qwen/RENDER_FAILURE_EXAMPLES.md
 ```text
 docs/qwen/TRUEVISION_PROMPT_TO_STATE_CONTRACT.md
 docs/qwen/WAV_TO_VIDEO_WORKFLOW.md
+docs/qwen/STATE_PATTERN_LIBRARY.md
 ```
 
 ## Layer 4: Prompt-To-State Language
@@ -202,6 +207,7 @@ docs/qwen/WAV_TO_VIDEO_WORKFLOW.md
 - [x] Add minimal prompt-to-state validator.
 - [x] Add minimal repair loop.
 - [x] Add model-neutral prompt context builder.
+- [x] Add initial state-pattern library context.
 - [ ] Define required template fields:
 
 ```text
@@ -273,6 +279,9 @@ no glyphs
 ```
 
 - [ ] Add audio feature cache.
+- [x] Add ffmpeg level/peak/valley observer.
+- [x] Add section energy extraction.
+- [x] Add signal-to-pattern template creation.
 - [ ] Add amplitude band mapping.
 - [ ] Add low/mid/high color lane mapping.
 - [ ] Add beat bloom mapping.

@@ -15,6 +15,7 @@ SAFE_TEMPLATE_TOOLS = {
     "template_save",
     "template_patch",
     "template_create_variant",
+    "template_from_audio_signals",
     "template_delete",
 }
 SAFE_MEDIA_LANES = {"artifacts", "manifests", "reports", "templates", "receipts", "events"}

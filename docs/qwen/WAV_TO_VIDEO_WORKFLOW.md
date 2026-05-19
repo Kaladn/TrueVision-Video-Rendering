@@ -19,13 +19,14 @@ python scripts\truevision_edge_audio_river.py `
 
 ```text
 1. audio_probe_duration
-2. audio_extract_features
-3. prompt_to_state_adapter
-4. template_create
-5. template_save
-6. video_render_preview
-7. video_prepare_full_render
-8. video_execute_full_render after human confirmation
+2. audio_analyze_levels
+3. audio_extract_features when band features are needed
+4. template_from_audio_signals for geometry-driven visuals
+5. prompt_to_state_adapter for human style/theme intent
+6. template_create or template_save
+7. video_render_preview
+8. video_prepare_full_render
+9. video_execute_full_render after human confirmation
 ```
 
 ## Recommended Visual Language
@@ -41,4 +42,14 @@ beat blooms intensity
 no lettering
 no glyphs
 program stamp in letterbox band only when requested
+```
+
+## Signal Mapping
+
+```text
+peaks -> pulses, flashes, rings, random geometry spawn
+valleys -> slow drift, dimming, holds, calmer camera
+rising energy -> expansion, camera push, brighter color pressure
+falling energy -> contraction, cooling, less motion
+section energy -> scene intensity and transition pressure
 ```

@@ -50,7 +50,9 @@ For WAV-driven videos, prefer:
 renderer=edge_audio_river
 sync_to_audio=true
 use audio_probe_duration when duration is unknown
+use audio_analyze_levels to find peaks, valleys, rising energy, and section energy
 use audio_extract_features before preview/full render when feature data is needed
+use template_from_audio_signals when the output should be random geometry or pattern-library driven
 ```
 
 ## Repair Rule

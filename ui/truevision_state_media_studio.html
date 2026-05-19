@@ -1374,7 +1374,7 @@
         "Each numeric field should be deterministic and bounded when possible.",
         "AV-only validated tools are available through /api/av-tools and /api/av-tools/call.",
         "AI cannot execute directly; it may request tools only as JSON proposals.",
-        "Allowed Phase 1 examples: audio_probe_duration, audio_extract_features, template_create, template_save, template_load, template_patch, time_marker_add, recalibration_add_note, video_render_preview, video_prepare_full_render.",
+        "Allowed Phase 1 examples: audio_probe_duration, audio_analyze_levels, audio_extract_features, template_create, template_from_audio_signals, template_save, template_load, template_patch, time_marker_add, recalibration_add_note, video_render_preview, video_prepare_full_render.",
         "Never request non-audio/video tools, desktop automation, network browsing, security enforcement, autonomous clicking, or autonomous typing."
       ].join("\\n");
     }
@@ -1386,7 +1386,7 @@
         "You can discuss project ideas, explain current studio settings, and say what tools are available.",
         "Available tools are save_request, qwen_compile, qwen_chat, prepare_record, and refresh_files.",
         "AV-only validated tools are exposed separately through /api/av-tools and /api/av-tools/call.",
-        "Important AV tool names include audio_extract_features, video_render_preview, template_patch, time_marker_add, recalibration_add_note, and video_prepare_full_render.",
+        "Important AV tool names include audio_analyze_levels, audio_extract_features, template_from_audio_signals, video_render_preview, template_patch, time_marker_add, recalibration_add_note, and video_prepare_full_render.",
         "When AV work should run, return exactly one JSON object shaped like {\"tool\":\"video_render_preview\",\"args\":{...}} with no prose.",
         "For normal conversation, return prose and no tool JSON.",
         "Never pretend a tool ran unless the supplied tool_results say it ran.",
@@ -2024,7 +2024,9 @@
         available_tools: ["save_request", "qwen_compile", "qwen_chat", "prepare_record", "refresh_files"],
         available_av_tools: [
           "audio_probe_duration",
+          "audio_analyze_levels",
           "audio_extract_features",
+          "template_from_audio_signals",
           "template_create",
           "template_save",
           "template_load",
