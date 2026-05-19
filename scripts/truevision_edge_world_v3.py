@@ -467,7 +467,52 @@ def _machine_cost(start_wall: float, start_cpu: float, memory_start: dict[str, A
     }
 
 
+def _format_bytes(value: Any) -> str:
+    if not isinstance(value, (int, float)):
+        return "unknown"
+    mib = float(value) / (1024.0 * 1024.0)
+    return f"{int(value)} bytes ({mib:.2f} MiB)"
+
+
+def capture_gpu_entries() -> list[dict[str, Any]]:
+    if os.name != "nt":
+        return []
+    try:
+        completed = subprocess.run(
+            [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Get-CimInstance Win32_VideoController | Select-Object Name,AdapterRAM,DriverVersion | ConvertTo-Json -Depth 3",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        raw = json.loads(completed.stdout or "[]")
+    except Exception:
+        return []
+    entries = raw if isinstance(raw, list) else [raw]
+    normalized = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        normalized.append(
+            {
+                "name": entry.get("Name"),
+                "adapter_ram_bytes": entry.get("AdapterRAM"),
+                "driver_version": entry.get("DriverVersion"),
+            }
+        )
+    return normalized
+
+
 def _write_report(path: Path, manifest: dict[str, Any]) -> None:
+    machine = manifest["machine_cost"]
+    memory_start = machine.get("memory_start", {})
+    memory_end = machine.get("memory_end", {})
+    timing = manifest.get("component_timing_seconds", {})
+    gpu_entries = manifest.get("hardware", {}).get("gpu", [])
     lines = [
         f"# {manifest['run_id']} Report",
         "",
@@ -488,10 +533,38 @@ def _write_report(path: Path, manifest: dict[str, Any]) -> None:
         "",
         "## Machine Cost",
         "",
-        f"- Wall seconds: `{manifest['machine_cost']['wall_seconds']}`",
-        f"- Process CPU seconds: `{manifest['machine_cost']['process_cpu_seconds']}`",
-        f"- Avg logical CPU percent: `{manifest['machine_cost']['avg_process_logical_cpu_percent']}`",
+        f"- Started: `{manifest['started_at_utc']}`",
+        f"- Completed: `{manifest['completed_at_utc']}`",
+        f"- Wall seconds: `{machine['wall_seconds']}`",
+        f"- Process CPU seconds: `{machine['process_cpu_seconds']}`",
+        f"- Avg CPU core equivalent: `{machine['avg_cpu_core_equivalent']}`",
+        f"- Avg logical CPU percent: `{machine['avg_process_logical_cpu_percent']}`",
+        f"- Logical CPU count: `{machine['logical_cpu_count']}`",
+        f"- Working set start: `{_format_bytes(memory_start.get('working_set_bytes'))}`",
+        f"- Working set end: `{_format_bytes(memory_end.get('working_set_bytes'))}`",
+        f"- Peak working set: `{_format_bytes(memory_end.get('peak_working_set_bytes'))}`",
+        f"- Private/pagefile start: `{_format_bytes(memory_start.get('private_usage_bytes'))}`",
+        f"- Private/pagefile end: `{_format_bytes(memory_end.get('private_usage_bytes'))}`",
+        "",
+        "## Component Timing",
+        "",
+        *[f"- {key}: `{value}` seconds" for key, value in timing.items()],
+        "",
+        "## System Components",
+        "",
+        f"- CPU logical count: `{manifest['hardware'].get('cpu_logical_count')}`",
+        f"- Processor: `{manifest['hardware'].get('processor')}`",
+        f"- RAM total: `{_format_bytes(manifest['hardware'].get('ram', {}).get('total_physical_bytes'))}`",
+        f"- RAM available at capture: `{_format_bytes(manifest['hardware'].get('ram', {}).get('available_physical_bytes'))}`",
+        "- GPU acceleration used: `false`",
+        "- Render path: `Python + OpenCV/Numpy frame synthesis -> ffmpeg libx264 CPU encode -> ffmpeg AAC mux`",
     ]
+    if gpu_entries:
+        lines.extend(["", "## Detected GPU Entries", ""])
+        for gpu in gpu_entries:
+            lines.append(
+                f"- `{gpu.get('name')}` | RAM `{_format_bytes(gpu.get('adapter_ram_bytes'))}` | Driver `{gpu.get('driver_version')}`"
+            )
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -513,7 +586,13 @@ def generate_edge_world_v3(
     start_wall = time.perf_counter()
     start_cpu = time.process_time()
     memory_start = memory_snapshot()
+    component_timing: dict[str, float] = {}
+
+    def mark_component(name: str, phase_start: float) -> None:
+        component_timing[name] = round(time.perf_counter() - phase_start, 6)
+
     started_at = utc_now()
+    phase_start = time.perf_counter()
     audio_path = audio_path.resolve()
     if not audio_path.exists():
         raise FileNotFoundError(audio_path)
@@ -522,15 +601,7 @@ def generate_edge_world_v3(
     run_id = slug(run_id)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
-
-    samples = decode_audio_mono(audio_path, sample_rate=sample_rate, max_seconds=max_seconds)
-    features = measure_audio_features(samples, sample_rate=sample_rate, fps=fps)
-    if max_seconds is not None:
-        features = [feature for feature in features if feature["time_seconds"] < max_seconds]
-    if not features:
-        raise ValueError("Audio produced no renderable features")
-    duration_seconds = len(features) / fps
-    theme = build_edge_theme(lyrics_path)
+    mark_component("setup_resolve_paths_signature_seconds", phase_start)
 
     visual_path = run_dir / f"{run_id}_visual_only.mp4"
     final_path = run_dir / f"{run_id}_full_audio.mp4" if mux_audio else visual_path
@@ -539,6 +610,7 @@ def generate_edge_world_v3(
     manifest_path = run_dir / f"{run_id}_manifest.json"
     report_path = run_dir / f"{run_id}_report.md"
 
+    phase_start = time.perf_counter()
     ffmpeg_cmd = [
         "ffmpeg",
         "-y",
@@ -565,6 +637,23 @@ def generate_edge_world_v3(
         "yuv420p",
         str(visual_path),
     ]
+    mark_component("video_encoder_command_build_seconds", phase_start)
+
+    phase_start = time.perf_counter()
+    samples = decode_audio_mono(audio_path, sample_rate=sample_rate, max_seconds=max_seconds)
+    features = measure_audio_features(samples, sample_rate=sample_rate, fps=fps)
+    if max_seconds is not None:
+        features = [feature for feature in features if feature["time_seconds"] < max_seconds]
+    if not features:
+        raise ValueError("Audio produced no renderable features")
+    duration_seconds = len(features) / fps
+    mark_component("audio_decode_feature_extract_seconds", phase_start)
+
+    phase_start = time.perf_counter()
+    theme = build_edge_theme(lyrics_path)
+    mark_component("lyric_theme_compile_seconds", phase_start)
+
+    phase_start = time.perf_counter()
     proc = subprocess.Popen(ffmpeg_cmd, stdin=subprocess.PIPE)
     if proc.stdin is None:
         raise RuntimeError("ffmpeg stdin was not opened")
@@ -594,6 +683,7 @@ def generate_edge_world_v3(
         proc.stdin.close()
         if proc.wait() != 0:
             raise RuntimeError("ffmpeg video encoder failed")
+        mark_component("frame_synthesis_and_video_encode_seconds", phase_start)
     except Exception:
         if proc.stdin and not proc.stdin.closed:
             proc.stdin.close()
@@ -602,6 +692,7 @@ def generate_edge_world_v3(
             proc.wait()
         raise
 
+    phase_start = time.perf_counter()
     if thumbnail_frame is None:
         thumbnail_frame = render_edge_world_v3_frame(
             width=width,
@@ -613,9 +704,11 @@ def generate_edge_world_v3(
             program_stamp=program_stamp,
         )[0]
     cv2.imwrite(str(thumb_path), thumbnail_frame)
+    mark_component("thumbnail_write_seconds", phase_start)
 
     audio_muxed = False
     if mux_audio:
+        phase_start = time.perf_counter()
         subprocess.run(
             [
                 "ffmpeg",
@@ -642,9 +735,13 @@ def generate_edge_world_v3(
             check=True,
         )
         audio_muxed = True
+        mark_component("audio_mux_seconds", phase_start)
 
+    phase_start = time.perf_counter()
     feature_arrays = {key: np.asarray([feature[key] for feature in features], dtype=np.float32) for key in ["rms", "bass", "mid", "high", "beat"]}
     machine_cost = _machine_cost(start_wall, start_cpu, memory_start)
+    hardware = capture_hardware()
+    hardware["gpu"] = capture_gpu_entries()
     manifest = {
         "run_id": run_id,
         "started_at_utc": started_at,
@@ -686,8 +783,9 @@ def generate_edge_world_v3(
             for key, values in feature_arrays.items()
         },
         "sampled_frame_states": sampled_states[:360],
-        "hardware": capture_hardware(),
+        "hardware": hardware,
         "machine_cost": machine_cost,
+        "component_timing_seconds": component_timing,
         "outputs": {
             "run_dir": str(run_dir),
             "video_mp4": str(final_path),
@@ -703,7 +801,10 @@ def generate_edge_world_v3(
     _write_report(report_path, manifest)
     manifest["outputs"]["video_sha256"] = sha256_file(final_path)
     manifest["outputs"]["manifest_sha256"] = sha256_file(manifest_path)
+    mark_component("manifest_report_hash_seconds", phase_start)
+    manifest["component_timing_seconds"] = component_timing
     _write_json(manifest_path, manifest)
+    _write_report(report_path, manifest)
     return {
         "run_id": run_id,
         "video_mp4": str(final_path),

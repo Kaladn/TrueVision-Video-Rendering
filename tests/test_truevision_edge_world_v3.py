@@ -158,6 +158,15 @@ class TrueVisionEdgeWorldV3Tests(unittest.TestCase):
             self.assertIn("memory_start", manifest["machine_cost"])
             self.assertIn("memory_end", manifest["machine_cost"])
             self.assertIn("working_set_bytes", manifest["machine_cost"]["memory_end"])
+            self.assertIn("component_timing_seconds", manifest)
+            self.assertIn("audio_decode_feature_extract_seconds", manifest["component_timing_seconds"])
+            self.assertIn("frame_synthesis_and_video_encode_seconds", manifest["component_timing_seconds"])
+            self.assertIn("manifest_report_hash_seconds", manifest["component_timing_seconds"])
+            self.assertIn("gpu", manifest["hardware"])
+            report_text = Path(result["report_md"]).read_text(encoding="utf-8")
+            self.assertIn("## Component Timing", report_text)
+            self.assertIn("## System Components", report_text)
+            self.assertIn("GPU acceleration used", report_text)
 
 
 if __name__ == "__main__":
