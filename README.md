@@ -45,6 +45,7 @@ ui/
   truevision_state_media_studio.html
 
 scripts/
+  truevision_studio_server.py
   truevision_resonance_recorder.py
   truevision_state_replay.py
   truevision_state_scene_generator.py
@@ -74,10 +75,21 @@ outputs/
 
 ## Open The Studio
 
-The current studio is static HTML. It has no backend wiring yet.
+Start the local studio proxy, then open the browser route:
 
 ```powershell
-Invoke-Item D:\TrueVision_Generation_Lab\ui\truevision_state_media_studio.html
+cd D:\TrueVision_Generation_Lab
+python scripts\truevision_studio_server.py
+```
+
+```text
+http://127.0.0.1:8765/
+```
+
+The proxy forwards local Qwen/Ollama requests to:
+
+```text
+http://127.0.0.1:11434/api/chat
 ```
 
 ## Run Tests

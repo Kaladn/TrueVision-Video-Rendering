@@ -683,9 +683,16 @@
             <input id="qwenEndpoint" type="url" value="http://127.0.0.1:11434/api/chat" spellcheck="false">
           </label>
           <div style="height:10px"></div>
+          <label class="check"><input id="qwenUseProxy" type="checkbox" checked> Use Studio proxy</label>
+          <div style="height:10px"></div>
+          <label>
+            Proxy Endpoint
+            <input id="qwenProxyEndpoint" type="url" value="http://127.0.0.1:8765/api/local-llm/chat" spellcheck="false">
+          </label>
+          <div style="height:10px"></div>
           <label>
             Model
-            <input id="qwenModel" type="text" value="qwen2.5-coder:32b" spellcheck="false">
+            <input id="qwenModel" type="text" value="qwen3-coder:30b" spellcheck="false">
           </label>
           <div style="height:10px"></div>
           <label>
@@ -694,7 +701,7 @@
           </label>
           <div style="height:10px"></div>
           <label class="check"><input id="localQwenStandby" type="checkbox" checked> Use local Qwen when selected</label>
-          <div class="status-line" id="qwenStatus">Local Qwen standby is configured for Ollama-native chat.</div>
+          <div class="status-line" id="qwenStatus">Local Qwen standby uses the Studio proxy to avoid browser CORS.</div>
           <div style="height:10px"></div>
           <button class="secondary" id="testQwen">Test Qwen</button>
         </section>
@@ -968,6 +975,9 @@
     const $ = (id) => document.getElementById(id);
     const preview = $("preview");
     const ctx = preview.getContext("2d");
+    const DEFAULT_QWEN_MODEL = "qwen3-coder:30b";
+    const LEGACY_QWEN_MODELS = new Set(["qwen2.5-coder:32b"]);
+    const DEFAULT_QWEN_PROXY_ENDPOINT = "http://127.0.0.1:8765/api/local-llm/chat";
 
     function number(id) {
       return Number($(id).value);
@@ -1017,7 +1027,12 @@
       if (!storedProvider && $("qwenEndpoint").value.includes("/v1/chat/completions")) {
         $("qwenEndpoint").value = defaultEndpointForProvider("ollama_native");
       }
-      $("qwenModel").value = storageGet("truevision.qwen.model", $("qwenModel").value);
+      const storedModel = storageGet("truevision.qwen.model", "");
+      $("qwenModel").value = storedModel && !LEGACY_QWEN_MODELS.has(storedModel)
+        ? storedModel
+        : DEFAULT_QWEN_MODEL;
+      $("qwenUseProxy").checked = storageGet("truevision.qwen.use_proxy", "true") === "true";
+      $("qwenProxyEndpoint").value = storageGet("truevision.qwen.proxy_endpoint", DEFAULT_QWEN_PROXY_ENDPOINT);
       $("qwenApiKey").value = storageGet("truevision.qwen.api_key", "");
       $("localQwenStandby").checked = storageGet("truevision.qwen.standby", "true") === "true";
     }
@@ -1026,6 +1041,8 @@
       storageSet("truevision.qwen.provider", $("qwenProvider").value);
       storageSet("truevision.qwen.endpoint", $("qwenEndpoint").value.trim());
       storageSet("truevision.qwen.model", $("qwenModel").value.trim());
+      storageSet("truevision.qwen.use_proxy", String($("qwenUseProxy").checked));
+      storageSet("truevision.qwen.proxy_endpoint", $("qwenProxyEndpoint").value.trim());
       storageSet("truevision.qwen.api_key", $("qwenApiKey").value);
       storageSet("truevision.qwen.standby", String($("localQwenStandby").checked));
     }
@@ -1056,6 +1073,8 @@
           enabled: state.llm === "local-qwen-32b" && checked("localQwenStandby"),
           provider: $("qwenProvider").value,
           endpoint: $("qwenEndpoint").value.trim(),
+          use_proxy: checked("qwenUseProxy"),
+          proxy_endpoint: $("qwenProxyEndpoint").value.trim(),
           model: $("qwenModel").value.trim(),
           api_key_configured: $("qwenApiKey").value.length > 0,
           contract: $("qwenProvider").value === "openai_compatible" ? "openai_chat_completions" : "ollama_api_chat"
@@ -1262,7 +1281,8 @@
     }
 
     async function callLocalQwen(request) {
-      const endpoint = $("qwenEndpoint").value.trim();
+      const useProxy = checked("qwenUseProxy");
+      const endpoint = useProxy ? $("qwenProxyEndpoint").value.trim() : $("qwenEndpoint").value.trim();
       const model = $("qwenModel").value.trim();
       const provider = $("qwenProvider").value;
       const apiKey = $("qwenApiKey").value.trim();
@@ -1270,12 +1290,21 @@
         "Accept": "application/json",
         "Content-Type": "application/json"
       };
-      if (apiKey) {
+      if (apiKey && !useProxy) {
         headers.Authorization = `Bearer ${apiKey}`;
       }
-      const body = provider === "openai_compatible"
-        ? buildOpenAiChatBody(model, request)
-        : buildOllamaChatBody(model, request);
+      const body = useProxy
+        ? {
+            provider,
+            endpoint: $("qwenEndpoint").value.trim(),
+            model,
+            api_key: apiKey,
+            system_prompt: buildQwenSystemPrompt(),
+            request
+          }
+        : provider === "openai_compatible"
+          ? buildOpenAiChatBody(model, request)
+          : buildOllamaChatBody(model, request);
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -1286,7 +1315,10 @@
         throw new Error(`Local Qwen HTTP ${response.status}`);
       }
       const payload = await response.json();
-      const content = payload?.choices?.[0]?.message?.content ?? payload?.message?.content ?? payload?.response;
+      if (payload?.ok === false) {
+        throw new Error(payload.error || "Local Qwen proxy returned an error");
+      }
+      const content = payload?.content ?? payload?.choices?.[0]?.message?.content ?? payload?.message?.content ?? payload?.response;
       if (!content) {
         throw new Error(`Local Qwen response did not include message content for ${provider}`);
       }
@@ -1601,6 +1633,13 @@
       $("countdownEnabled").checked = true;
       $("countdownSeconds").value = 10;
       $("overlayPosition").value = "center";
+      $("qwenProvider").value = "ollama_native";
+      $("qwenEndpoint").value = defaultEndpointForProvider("ollama_native");
+      $("qwenUseProxy").checked = true;
+      $("qwenProxyEndpoint").value = DEFAULT_QWEN_PROXY_ENDPOINT;
+      $("qwenModel").value = DEFAULT_QWEN_MODEL;
+      $("localQwenStandby").checked = true;
+      saveQwenConfig();
       $("gridShape").value = "160x90";
       $("waveAmp").value = 0.44;
       $("waveFreq").value = 3.6;
