@@ -22,7 +22,18 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("ollama_native", html)
         self.assertIn("openai_compatible", html)
 
-    def test_html_can_call_local_qwen_without_backend_wiring(self):
+    def test_html_uses_backend_wiring_for_state_operations(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("/api/state/request", html)
+        self.assertIn("/api/state/plan", html)
+        self.assertIn("/api/record/prepare", html)
+        self.assertIn("/api/files", html)
+        self.assertIn("saveRequestToServer", html)
+        self.assertIn("prepareRecordCommand", html)
+        self.assertIn("refreshServerFiles", html)
+
+    def test_html_can_call_local_qwen_through_studio_proxy(self):
         html = HTML.read_text(encoding="utf-8")
 
         self.assertIn("async function callLocalQwen", html)
@@ -31,6 +42,14 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("buildOllamaChatBody", html)
         self.assertIn("buildOpenAiChatBody", html)
         self.assertIn("parseQwenStateResponse", html)
+
+    def test_center_panel_is_an_operations_log_not_generic_chat(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("Run Log", html)
+        self.assertIn("Compile", html)
+        self.assertIn("Clear Log", html)
+        self.assertIn("server-backed", html)
 
     def test_local_qwen_prompt_preserves_securecore_boundary(self):
         html = HTML.read_text(encoding="utf-8")

@@ -92,6 +92,16 @@ The proxy forwards local Qwen/Ollama requests to:
 http://127.0.0.1:11434/api/chat
 ```
 
+Server-backed studio operations:
+
+```text
+GET  /api/files
+POST /api/state/request
+POST /api/state/plan
+POST /api/record/prepare
+POST /api/local-llm/chat
+```
+
 ## Run Tests
 
 ```powershell

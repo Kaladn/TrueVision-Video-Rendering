@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import sys
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -9,12 +12,158 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlparse
 from urllib.request import Request, urlopen
 
+from truevision_region_snip import build_recorder_command
+
 
 ROOT = Path(__file__).resolve().parents[1]
 HTML_PATH = ROOT / "ui" / "truevision_state_media_studio.html"
+STORAGE_ROOT = ROOT / "storage"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_MODEL = "qwen3-coder:30b"
+STORAGE_LANES = {
+    "inbox",
+    "outbox",
+    "events",
+    "state_chunks",
+    "artifacts",
+    "manifests",
+    "reports",
+    "receipts",
+    "presets",
+    "tmp",
+}
+
+
+def utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
+
+
+def slug(value: str) -> str:
+    clean = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in value.strip())
+    return clean.strip("_")[:80] or "artifact"
+
+
+def sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return "sha256:" + digest.hexdigest()
+
+
+def ensure_storage_layout(storage_root: Path = STORAGE_ROOT) -> None:
+    for lane in STORAGE_LANES:
+        path = storage_root / lane
+        path.mkdir(parents=True, exist_ok=True)
+        keep = path / ".gitkeep"
+        if not keep.exists():
+            keep.write_text("", encoding="utf-8")
+
+
+def write_json_artifact(
+    *,
+    storage_root: Path,
+    lane: str,
+    prefix: str,
+    payload: dict[str, Any],
+) -> dict[str, Any]:
+    if lane not in STORAGE_LANES:
+        raise ValueError(f"Unknown storage lane: {lane}")
+    ensure_storage_layout(storage_root)
+    now = utc_now()
+    filename = f"{now.replace(':', '').replace('.', '_')}_{slug(prefix)}.json"
+    path = storage_root / lane / filename
+    envelope = {
+        "written_at_utc": now,
+        "storage_lane": lane,
+        "payload": payload,
+    }
+    path.write_text(json.dumps(envelope, indent=2, allow_nan=False), encoding="utf-8")
+    return {
+        "name": path.name,
+        "path": str(path),
+        "lane": lane,
+        "kind": "json",
+        "size_bytes": path.stat().st_size,
+        "sha256": sha256_file(path),
+        "written_at_utc": now,
+    }
+
+
+def list_storage_files(storage_root: Path = STORAGE_ROOT) -> list[dict[str, Any]]:
+    ensure_storage_layout(storage_root)
+    files: list[dict[str, Any]] = []
+    for path in storage_root.rglob("*"):
+        if not path.is_file() or path.name == ".gitkeep":
+            continue
+        relative = path.relative_to(storage_root)
+        lane = relative.parts[0] if relative.parts else "storage"
+        files.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "relative_path": str(relative),
+                "lane": lane,
+                "kind": path.suffix.lstrip(".") or "file",
+                "size_bytes": path.stat().st_size,
+                "modified_at_utc": datetime.fromtimestamp(path.stat().st_mtime, timezone.utc)
+                .isoformat(timespec="milliseconds")
+                .replace("+00:00", "Z"),
+            }
+        )
+    return sorted(files, key=lambda item: item["modified_at_utc"], reverse=True)
+
+
+def build_recording_command_from_request(
+    request: dict[str, Any],
+    *,
+    storage_root: Path = STORAGE_ROOT,
+) -> dict[str, Any]:
+    capture = request.get("capture_shape", {})
+    record_zone = request.get("record_start_zone", {})
+    duration_seconds = int(round(float(capture.get("duration_minutes", 1)) * 60))
+    fps = int(capture.get("fps", 9))
+    resolution = [
+        int(capture.get("resolution_width", 960)),
+        int(capture.get("resolution_height", 540)),
+    ]
+    grid = [
+        int(capture.get("grid_width", 160)),
+        int(capture.get("grid_height", 90)),
+    ]
+    snapped_region = record_zone.get("snapped_region") or [0, 0, resolution[0], resolution[1]]
+    selected_region = record_zone.get("selected_region") or snapped_region
+    preset = {
+        "preset_id": request.get("run_id", "studio_region"),
+        "selected_region": [int(value) for value in selected_region],
+        "snapped_region": [int(value) for value in snapped_region],
+        "capture_resolution": resolution,
+        "grid": grid,
+        "blocks": [16, 9],
+        "monitor": int(record_zone.get("monitor", 0)),
+    }
+    run_id = slug(str(request.get("run_id") or f"studio_{utc_now()}"))
+    command = build_recorder_command(
+        preset,
+        duration=duration_seconds,
+        fps=fps,
+        output_root=storage_root / "artifacts",
+        run_id=run_id,
+        python_exe=sys.executable,
+    )
+    start_delay_seconds = int(round(float(record_zone.get("start_delay_minutes", 0)) * 60))
+    countdown_seconds = int(record_zone.get("countdown_seconds", 0))
+    return {
+        "run_id": run_id,
+        "duration_seconds": duration_seconds,
+        "fps": fps,
+        "start_delay_seconds": start_delay_seconds,
+        "countdown_seconds": countdown_seconds,
+        "preset": preset,
+        "command": command,
+        "command_text": " ".join(f'"{part}"' if " " in part else part for part in command),
+    }
 
 
 def normalize_provider(provider: str | None) -> str:
@@ -124,13 +273,28 @@ class StudioHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/local-llm/models":
             self._handle_models(parsed.query)
             return
+        if parsed.path == "/api/files":
+            self._send_json({"ok": True, "files": list_storage_files(STORAGE_ROOT)})
+            return
         self.send_error(404, "Not found")
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path != "/api/local-llm/chat":
-            self.send_error(404, "Not found")
+        if parsed.path == "/api/local-llm/chat":
+            self._handle_local_llm_chat()
             return
+        if parsed.path == "/api/state/request":
+            self._handle_state_request()
+            return
+        if parsed.path == "/api/state/plan":
+            self._handle_state_plan()
+            return
+        if parsed.path == "/api/record/prepare":
+            self._handle_record_prepare()
+            return
+        self.send_error(404, "Not found")
+
+    def _handle_local_llm_chat(self) -> None:
         try:
             payload = self._read_json()
             endpoint = validate_local_endpoint(str(payload.get("endpoint", "")))
@@ -156,6 +320,68 @@ class StudioHandler(BaseHTTPRequestHandler):
             detail = exc.read().decode("utf-8", errors="replace")
             self._send_json({"ok": False, "error": detail or str(exc), "status": exc.code}, exc.code)
         except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, 400)
+
+    def _handle_state_request(self) -> None:
+        try:
+            payload = self._read_json()
+            request = payload.get("request", payload)
+            if not isinstance(request, dict):
+                raise ValueError("request must be an object")
+            artifact = write_json_artifact(
+                storage_root=STORAGE_ROOT,
+                lane="outbox",
+                prefix="state_request",
+                payload=request,
+            )
+            event = write_json_artifact(
+                storage_root=STORAGE_ROOT,
+                lane="events",
+                prefix="state_request_saved",
+                payload={"event": "state_request_saved", "artifact": artifact},
+            )
+            self._send_json({"ok": True, "artifact": artifact, "event": event, "files": list_storage_files(STORAGE_ROOT)})
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, 400)
+
+    def _handle_state_plan(self) -> None:
+        try:
+            payload = self._read_json()
+            plan = payload.get("plan", payload)
+            if not isinstance(plan, dict):
+                raise ValueError("plan must be an object")
+            artifact = write_json_artifact(
+                storage_root=STORAGE_ROOT,
+                lane="manifests",
+                prefix="state_plan",
+                payload=plan,
+            )
+            self._send_json({"ok": True, "artifact": artifact, "files": list_storage_files(STORAGE_ROOT)})
+        except (ValueError, json.JSONDecodeError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, 400)
+
+    def _handle_record_prepare(self) -> None:
+        try:
+            payload = self._read_json()
+            request = payload.get("request", payload)
+            if not isinstance(request, dict):
+                raise ValueError("request must be an object")
+            prepared = build_recording_command_from_request(request, storage_root=STORAGE_ROOT)
+            artifact = write_json_artifact(
+                storage_root=STORAGE_ROOT,
+                lane="manifests",
+                prefix="record_command",
+                payload=prepared,
+            )
+            self._send_json(
+                {
+                    "ok": True,
+                    "recording": prepared,
+                    "artifact": artifact,
+                    "files": list_storage_files(STORAGE_ROOT),
+                }
+            )
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self._send_json({"ok": False, "error": str(exc)}, 400)
 
     def _handle_models(self, query: str) -> None:

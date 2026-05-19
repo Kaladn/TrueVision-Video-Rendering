@@ -716,7 +716,7 @@
         </section>
 
         <section class="section">
-          <div class="section-title">Generated Files</div>
+          <div class="section-title">Generated Files <button class="secondary" id="refreshFiles">Refresh</button></div>
           <div class="file-list" id="fileList"></div>
         </section>
 
@@ -777,6 +777,11 @@
               <option value="top_right">top right</option>
             </select>
           </label>
+          <div style="height:10px"></div>
+          <label>
+            Watch Region
+            <input id="captureRegion" type="text" value="0,0,960,540" spellcheck="false">
+          </label>
           <div class="status-line" id="recordStatus">Manual record limit: 5 minutes, start immediately.</div>
         </section>
       </div>
@@ -789,6 +794,8 @@
           <div class="subtitle" id="routeLine">SecureCore / API / State Formula</div>
         </div>
         <div class="topbar-actions">
+          <button class="secondary" id="saveRequest">Save Request</button>
+          <button class="secondary" id="prepareRecord">Prepare Record</button>
           <button class="secondary" id="copyConfig">Copy JSON</button>
           <button class="secondary" id="downloadConfig">Download</button>
           <button class="primary" id="generateDraft">Generate Draft</button>
@@ -840,8 +847,8 @@
           </div>
           <div class="chat-window" id="chatWindow">
             <div class="message">
-              <div class="meta"><span>system</span><span>static page</span></div>
-              Prompt text is converted into a draft state-media request. Local Qwen 32B can translate prompt intent into state JSON when selected.
+              <div class="meta"><span>Run Log</span><span>server-backed</span></div>
+              Prompt text is compiled into state-media JSON, saved through the local Studio server, and listed from storage.
             </div>
             <div class="message">
               <div class="meta"><span>ClearSpeak</span><span>draft</span></div>
@@ -854,8 +861,8 @@
       <section class="composer">
         <textarea id="prompt" spellcheck="true">A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.</textarea>
         <div class="composer-actions">
-          <button class="primary" id="sendPrompt">Send</button>
-          <button class="secondary" id="clearChat">Clear</button>
+          <button class="primary" id="sendPrompt">Compile</button>
+          <button class="secondary" id="clearChat">Clear Log</button>
           <button class="secondary" id="resetDefaults">Reset</button>
         </div>
       </section>
@@ -1004,6 +1011,44 @@
       }
     }
 
+    function parseRegionInput() {
+      const parts = $("captureRegion").value.split(",").map((part) => Number(part.trim()));
+      if (parts.length !== 4 || parts.some((value) => !Number.isFinite(value))) {
+        return [0, 0, 960, 540];
+      }
+      return parts.map((value) => Math.max(0, Math.round(value)));
+    }
+
+    function formatBytes(bytes) {
+      const value = Number(bytes) || 0;
+      if (value < 1024) {
+        return `${value} B`;
+      }
+      if (value < 1024 * 1024) {
+        return `${(value / 1024).toFixed(1)} KB`;
+      }
+      return `${(value / 1024 / 1024).toFixed(1)} MB`;
+    }
+
+    async function apiJson(path, payload = null) {
+      const options = {
+        method: payload === null ? "GET" : "POST",
+        headers: {
+          "Accept": "application/json"
+        }
+      };
+      if (payload !== null) {
+        options.headers["Content-Type"] = "application/json";
+        options.body = JSON.stringify(payload);
+      }
+      const response = await fetch(path, options);
+      const body = await response.json();
+      if (!response.ok || body?.ok === false) {
+        throw new Error(body?.error || `Studio API HTTP ${response.status}`);
+      }
+      return body;
+    }
+
     function defaultEndpointForProvider(provider) {
       return provider === "openai_compatible"
         ? "http://127.0.0.1:11434/v1/chat/completions"
@@ -1091,6 +1136,8 @@
         capture_shape: {
           frame_width: 960,
           frame_height: 540,
+          resolution_width: 960,
+          resolution_height: 540,
           grid_width: gridX,
           grid_height: gridY,
           fps: number("fps"),
@@ -1108,6 +1155,13 @@
           record_start_time: "computed_at_runtime_after_countdown",
           state_aware: true,
           final_pre_roll_only: true
+        },
+        record_start_zone: {
+          selected_region: parseRegionInput(),
+          snapped_region: parseRegionInput(),
+          monitor: 0,
+          start_delay_minutes: number("startDelayMinutes"),
+          countdown_seconds: number("countdownSeconds")
         },
         geometry: {
           fov_degrees: number("fov"),
@@ -1468,6 +1522,49 @@
       });
     }
 
+    function syncFilesFromServer(files) {
+      if (!Array.isArray(files)) {
+        return;
+      }
+      state.files = files.slice(0, 24).map((file) => ({
+        name: file.name || file.relative_path || "artifact",
+        kind: `${file.lane || "storage"} ${file.kind || "file"}`,
+        size: formatBytes(file.size_bytes)
+      }));
+      renderFiles();
+    }
+
+    async function refreshServerFiles() {
+      const payload = await apiJson("/api/files");
+      syncFilesFromServer(payload.files);
+      addMessage("storage", `Loaded ${payload.files.length} server file${payload.files.length === 1 ? "" : "s"} from storage.`);
+      return payload.files;
+    }
+
+    async function saveRequestToServer(request = buildRequest()) {
+      const payload = await apiJson("/api/state/request", { request });
+      syncFilesFromServer(payload.files);
+      addMessage("storage", `Request saved: ${payload.artifact.name}`);
+      return payload;
+    }
+
+    async function savePlanToServer(plan) {
+      const payload = await apiJson("/api/state/plan", { plan });
+      syncFilesFromServer(payload.files);
+      addMessage("storage", `State plan saved: ${payload.artifact.name}`);
+      return payload;
+    }
+
+    async function prepareRecordCommand() {
+      const request = buildRequest();
+      const payload = await apiJson("/api/record/prepare", { request });
+      syncFilesFromServer(payload.files);
+      const recording = payload.recording;
+      $("recordStatus").textContent = `Prepared ${recording.duration_seconds}s @ ${recording.fps}fps command for ${recording.preset.snapped_region.join(",")}.`;
+      addMessage("record", recording.command_text);
+      return payload;
+    }
+
     function renderJson() {
       $("stateJson").value = JSON.stringify(buildRequest(), null, 2);
     }
@@ -1522,7 +1619,7 @@
       win.scrollTop = win.scrollHeight;
     }
 
-    function applyQwenStatePlan(plan) {
+    async function applyQwenStatePlan(plan) {
       state.lastQwenState = plan;
       const planName = plan?.scene?.name || plan?.scene?.description || "qwen_state_plan";
       state.files = [
@@ -1535,6 +1632,7 @@
       addMessage("local Qwen 32B", `State plan accepted: ${String(planName).slice(0, 140)}`);
       $("qwenStatus").textContent = "Local Qwen returned a state-transition plan.";
       $("qwenStatus").className = "status-line ok";
+      await savePlanToServer(plan);
     }
 
     async function synthesizeDraft() {
@@ -1549,6 +1647,11 @@
         { name: "central_writer_report.md", kind: "boundary/report", size: "planned" }
       ];
       addMessage("operator", req.prompt, true);
+      try {
+        await saveRequestToServer(req);
+      } catch (error) {
+        addMessage("storage", `Save failed: ${error.message}`);
+      }
       if (state.llm === "local-qwen-32b" && checked("localQwenStandby")) {
         saveQwenConfig();
         $("qwenStatus").textContent = "Calling local Qwen 32B...";
@@ -1556,7 +1659,7 @@
         update();
         try {
           const plan = await callLocalQwen(req);
-          applyQwenStatePlan(plan);
+          await applyQwenStatePlan(plan);
           update();
           return;
         } catch (error) {
@@ -1605,6 +1708,27 @@
 
     $("sendPrompt").addEventListener("click", synthesizeDraft);
     $("generateDraft").addEventListener("click", synthesizeDraft);
+    $("saveRequest").addEventListener("click", async () => {
+      try {
+        await saveRequestToServer(buildRequest());
+      } catch (error) {
+        addMessage("storage", `Save failed: ${error.message}`);
+      }
+    });
+    $("prepareRecord").addEventListener("click", async () => {
+      try {
+        await prepareRecordCommand();
+      } catch (error) {
+        addMessage("record", `Prepare failed: ${error.message}`);
+      }
+    });
+    $("refreshFiles").addEventListener("click", async () => {
+      try {
+        await refreshServerFiles();
+      } catch (error) {
+        addMessage("storage", `Refresh failed: ${error.message}`);
+      }
+    });
     $("testQwen").addEventListener("click", async () => {
       saveQwenConfig();
       $("qwenStatus").textContent = "Testing local Qwen endpoint...";
@@ -1613,7 +1737,7 @@
         const testRequest = buildRequest();
         testRequest.prompt = "Return a tiny valid TrueVision state transition for a green field test.";
         const plan = await callLocalQwen(testRequest);
-        applyQwenStatePlan(plan);
+        await applyQwenStatePlan(plan);
         update();
       } catch (error) {
         $("qwenStatus").textContent = `${error.message}. Check local server, endpoint, model, or CORS.`;
@@ -1623,7 +1747,7 @@
     });
     $("clearChat").addEventListener("click", () => {
       $("chatWindow").innerHTML = "";
-      addMessage("system", "Chat cleared. Static route state remains loaded.");
+      addMessage("system", "Run log cleared. Server-backed route state remains loaded.");
     });
     $("resetDefaults").addEventListener("click", () => {
       $("prompt").value = "A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.";
@@ -1633,6 +1757,7 @@
       $("countdownEnabled").checked = true;
       $("countdownSeconds").value = 10;
       $("overlayPosition").value = "center";
+      $("captureRegion").value = "0,0,960,540";
       $("qwenProvider").value = "ollama_native";
       $("qwenEndpoint").value = defaultEndpointForProvider("ollama_native");
       $("qwenUseProxy").checked = true;
@@ -1654,6 +1779,7 @@
 
     loadQwenConfig();
     update();
+    refreshServerFiles().catch((error) => addMessage("storage", `Initial file refresh failed: ${error.message}`));
   </script>
 </body>
 </html>
