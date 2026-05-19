@@ -48,6 +48,7 @@ scripts/
   truevision_studio_server.py
   truevision_resonance_recorder.py
   truevision_state_replay.py
+  trueframegen_fill.py
   truevision_state_scene_generator.py
   truevision_full_power_frame.py
   truevision_path_tracer.py
@@ -65,6 +66,14 @@ templates/
 truevision_runtime/
   rendering/
     template_renderer.py
+
+trueframegen/
+  temporal_616.py
+  causal_cell_map.py
+  state_interpolator.py
+  frame_gap_filler.py
+  render_missing_frame.py
+  verify_replay_continuity.py
 
 modules/
   screen_grid_mapper.py
@@ -96,6 +105,34 @@ python scripts\truevision_render_template.py templates\hard_has_no_meaning_here_
 ```
 
 The first high-power template lane is `mirror_maze_realism`: mirror corridors, cracked glass, smoke, shards, live-wire motion, silhouette blocking, bloom/grain finishing, and manifest-backed CPU/RAM/encoder stats.
+
+## TrueFrameGen
+
+TrueFrameGen fills missing frames from existing TrueVision cell-state captures. It does not rewrite the recorder and it does not claim missing raw reality was recovered.
+
+```text
+recorded frames
+-> TrueVision cell state
+-> 6-1-6 temporal map
+-> missing-frame cause/effect estimate
+-> generated in-between state
+-> rendered frame
+-> verification pass
+```
+
+Hard law:
+
+```text
+TrueVision records.
+6-1-6 explains temporal causality.
+TrueFrameGen fills only the missing state between known states.
+```
+
+Example:
+
+```powershell
+python scripts\trueframegen_fill.py --run-dir D:\path\to\truevision_capture --radius 6
+```
 
 ## Open The Studio
 

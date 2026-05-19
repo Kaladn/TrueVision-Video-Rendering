@@ -36,6 +36,11 @@ The lab proves the audio/video state-media language first.
 - [x] Reusable template renderer exists under `truevision_runtime/rendering/`.
 - [x] `mirror_maze_realism` visual mode exists for higher-power template-driven previews.
 - [x] `Hard Has No Meaning Here / Mirror Made` template exists.
+- [x] TrueFrameGen first slice exists as a separate module.
+- [x] TrueFrameGen consumes existing TrueVision cell-state chunks.
+- [x] TrueFrameGen uses 6-prior / missing-center / 6-future temporal mapping.
+- [x] TrueFrameGen fills RGB/luma/edge/motion/delta channels first.
+- [x] TrueFrameGen writes manifest, temporal trace JSONL, missing-frame report, and filled video.
 - [x] Signature profile extractor exists.
 - [x] Basement renderer can consume a signature profile bundle.
 - [x] AV-only tool registry exists.
@@ -173,6 +178,23 @@ storage/
 - [ ] Add a renderer capability registry: visual modes, required inputs, supported effects.
 - [ ] Add GPU/render profile presets: `preview_fast`, `preview_quality`, `full_quality`.
 - [ ] Add a true 3D/material lane for mirror glass, smoke, camera, and depth lighting.
+
+## Layer 2.6: TrueFrameGen Missing-Frame Fill
+
+- [x] Add `trueframegen/temporal_616.py`.
+- [x] Add `trueframegen/causal_cell_map.py`.
+- [x] Add `trueframegen/state_interpolator.py`.
+- [x] Add `trueframegen/frame_gap_filler.py`.
+- [x] Add `trueframegen/render_missing_frame.py`.
+- [x] Add `trueframegen/verify_replay_continuity.py`.
+- [x] Add `scripts/trueframegen_fill.py`.
+- [x] Add tests for 6-1-6 mapping, interpolation, render, manifest, trace, and continuity.
+- [ ] Add batch processing for long captures with chunked output.
+- [ ] Add optical-flow-like cell displacement estimation.
+- [ ] Add occlusion/opening confidence maps.
+- [ ] Add fog-specific temporal density interpolation.
+- [ ] Add QSV/GPU encode option for filled video output.
+- [ ] Add UI/AV-tool entrypoint for TrueFrameGen gap fill.
 
 ## Layer 3: Qwen Transformation Helper
 
