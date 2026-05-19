@@ -5,8 +5,10 @@ from pathlib import Path
 from truevision_studio_server import (
     build_recording_command_from_request,
     build_downstream_payload,
+    handle_assistant_message,
     list_storage_files,
     normalize_provider,
+    resolve_assistant_actions,
     validate_local_endpoint,
     write_json_artifact,
 )
@@ -110,6 +112,49 @@ class TrueVisionStudioServerTests(unittest.TestCase):
         self.assertIn("10,40,640,360", result["command"])
         self.assertIn("--grid", result["command"])
         self.assertIn("160x90", result["command"])
+
+    def test_resolve_assistant_actions_turns_chat_into_work(self):
+        request = {"local_llm": {"enabled": True}}
+
+        actions = resolve_assistant_actions("compile with qwen then prepare the record command", request)
+
+        self.assertIn("save_request", actions)
+        self.assertIn("qwen_compile", actions)
+        self.assertIn("prepare_record", actions)
+
+    def test_handle_assistant_message_executes_storage_and_record_actions(self):
+        request = {
+            "request_kind": "truevision_state_media_draft",
+            "local_llm": {"enabled": False},
+            "capture_shape": {
+                "duration_minutes": 0.25,
+                "fps": 9,
+                "grid_width": 160,
+                "grid_height": 90,
+                "resolution_width": 960,
+                "resolution_height": 540,
+            },
+            "record_start_zone": {
+                "selected_region": [0, 0, 960, 540],
+                "snapped_region": [0, 0, 960, 540],
+                "monitor": 0,
+            },
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = handle_assistant_message(
+                {
+                    "message": "save this and prepare record",
+                    "request": request,
+                },
+                storage_root=Path(tmpdir),
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertIn("save_request", result["actions"])
+            self.assertIn("prepare_record", result["actions"])
+            self.assertIn("recording", result["results"])
+            self.assertEqual(result["results"]["recording"]["duration_seconds"], 15)
+            self.assertGreaterEqual(len(result["files"]), 2)
 
 
 if __name__ == "__main__":

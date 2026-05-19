@@ -100,6 +100,16 @@ POST /api/state/request
 POST /api/state/plan
 POST /api/record/prepare
 POST /api/local-llm/chat
+POST /api/assistant/message
+```
+
+Catbot action words:
+
+```text
+compile / generate / draft / qwen -> save request, then queue Qwen compile when local Qwen is selected
+save / persist / write / store -> save current request
+prepare / record / capture / command -> save request and prepare recorder command
+files / list / refresh -> refresh storage file list
 ```
 
 ## Run Tests

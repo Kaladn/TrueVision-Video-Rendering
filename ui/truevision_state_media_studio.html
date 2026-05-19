@@ -790,7 +790,7 @@
     <main class="center">
       <header class="topbar">
         <div class="topbar-main">
-          <div class="title">State-Media Prompt Bench</div>
+          <div class="title">Catbot Workbench</div>
           <div class="subtitle" id="routeLine">SecureCore / API / State Formula</div>
         </div>
         <div class="topbar-actions">
@@ -847,12 +847,8 @@
           </div>
           <div class="chat-window" id="chatWindow">
             <div class="message">
-              <div class="meta"><span>Run Log</span><span>server-backed</span></div>
-              Prompt text is compiled into state-media JSON, saved through the local Studio server, and listed from storage.
-            </div>
-            <div class="message">
-              <div class="meta"><span>ClearSpeak</span><span>draft</span></div>
-              Keep the claim narrow: declared state formula, geometry sidecar, deterministic replay, synthetic label.
+              <div class="meta"><span>Catbot Run Log</span><span>server-backed</span></div>
+              Tell Catbot to Compile, save, prepare record, or refresh files. It calls local operations endpoints and logs real results.
             </div>
           </div>
         </div>
@@ -861,7 +857,7 @@
       <section class="composer">
         <textarea id="prompt" spellcheck="true">A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.</textarea>
         <div class="composer-actions">
-          <button class="primary" id="sendPrompt">Compile</button>
+          <button class="primary" id="sendPrompt">Tell Catbot</button>
           <button class="secondary" id="clearChat">Clear Log</button>
           <button class="secondary" id="resetDefaults">Reset</button>
         </div>
@@ -970,13 +966,7 @@
       mode: "state_formula",
       chatProfile: "director",
       lastQwenState: null,
-      files: [
-        { name: "state_script.json", kind: "state formula", size: "draft" },
-        { name: "geometry_sidecar.json", kind: "geometry", size: "draft" },
-        { name: "path_trace_report.md", kind: "renderer proof", size: "draft" },
-        { name: "cv_state_manifest.json", kind: "cv", size: "draft" },
-        { name: "replay_report.md", kind: "central writer", size: "draft" }
-      ]
+      files: []
     };
 
     const $ = (id) => document.getElementById(id);
@@ -1622,57 +1612,45 @@
     async function applyQwenStatePlan(plan) {
       state.lastQwenState = plan;
       const planName = plan?.scene?.name || plan?.scene?.description || "qwen_state_plan";
-      state.files = [
-        { name: "qwen_state_transition.json", kind: "local Qwen 32B", size: "validated draft" },
-        { name: "truevision_state_script.json", kind: "state formula", size: "planned" },
-        { name: "geometry_sidecar.json", kind: "camera/entities/depth", size: "planned" },
-        { name: "cv_state_manifest.json", kind: "cv sidecars", size: "planned" },
-        { name: "state_replay_manifest.json", kind: "synthetic boundary", size: "planned" }
-      ];
       addMessage("local Qwen 32B", `State plan accepted: ${String(planName).slice(0, 140)}`);
       $("qwenStatus").textContent = "Local Qwen returned a state-transition plan.";
       $("qwenStatus").className = "status-line ok";
       await savePlanToServer(plan);
     }
 
-    async function synthesizeDraft() {
-      const req = buildRequest();
-      state.files = [
-        { name: "truevision_state_script.json", kind: `${req.capture_shape.grid_width}x${req.capture_shape.grid_height} state`, size: `${req.capture_shape.duration_minutes}m` },
-        { name: "geometry_sidecar.json", kind: "camera/actor/depth", size: "required" },
-        { name: "path_trace_report.md", kind: "cpu path tracer", size: `${req.path_tracing.samples_per_pixel}spp/${req.path_tracing.max_bounces}b` },
-        { name: "motion_field_sidecar.npz", kind: "flow + gait phase", size: "planned" },
-        { name: "cv_state_manifest.json", kind: req.computer_vision.lane, size: "planned" },
-        { name: "state_replay_lossless_ffv1.mkv", kind: "video artifact", size: "planned" },
-        { name: "central_writer_report.md", kind: "boundary/report", size: "planned" }
-      ];
-      addMessage("operator", req.prompt, true);
-      try {
-        await saveRequestToServer(req);
-      } catch (error) {
-        addMessage("storage", `Save failed: ${error.message}`);
-      }
-      if (state.llm === "local-qwen-32b" && checked("localQwenStandby")) {
-        saveQwenConfig();
-        $("qwenStatus").textContent = "Calling local Qwen 32B...";
+    async function runAssistantAction(action, request, response) {
+      if (action === "qwen_compile") {
+        $("qwenStatus").textContent = "Catbot is calling local Qwen 32B...";
         $("qwenStatus").className = "status-line warn";
-        update();
-        try {
-          const plan = await callLocalQwen(req);
-          await applyQwenStatePlan(plan);
-          update();
-          return;
-        } catch (error) {
-          $("qwenStatus").textContent = `${error.message}. Falling back to deterministic local draft.`;
-          $("qwenStatus").className = "status-line warn";
-          addMessage("local Qwen 32B", `${error.message}. Fallback draft kept local and schema-shaped.`);
-        }
+        const plan = await callLocalQwen(request);
+        await applyQwenStatePlan(plan);
+        return;
       }
-      addMessage(
-        state.llm,
-        `Draft routed to ${state.remote}. Geometry, trig, linear algebra, physics, electronics, and CV controls are now reflected in the state request.`
-      );
+      if (action === "prepare_record" && response?.results?.recording) {
+        const recording = response.results.recording;
+        $("recordStatus").textContent = `Prepared ${recording.duration_seconds}s @ ${recording.fps}fps command for ${recording.preset.snapped_region.join(",")}.`;
+        addMessage("record", recording.command_text);
+      }
+    }
+
+    async function sendAssistantMessage(message = $("prompt").value.trim()) {
+      const req = buildRequest();
+      addMessage("operator", message || req.prompt, true);
+      const response = await apiJson("/api/assistant/message", {
+        message: message || req.prompt,
+        request: req
+      });
+      syncFilesFromServer(response.files);
+      addMessage("Catbot", response.assistant || "No assistant response.");
+      for (const action of response.actions || []) {
+        await runAssistantAction(action, req, response);
+      }
       update();
+      return response;
+    }
+
+    async function synthesizeDraft() {
+      return sendAssistantMessage("compile current state request");
     }
 
     function downloadJson() {
@@ -1706,7 +1684,13 @@
       });
     });
 
-    $("sendPrompt").addEventListener("click", synthesizeDraft);
+    $("sendPrompt").addEventListener("click", async () => {
+      try {
+        await sendAssistantMessage();
+      } catch (error) {
+        addMessage("Catbot", `Action failed: ${error.message}`);
+      }
+    });
     $("generateDraft").addEventListener("click", synthesizeDraft);
     $("saveRequest").addEventListener("click", async () => {
       try {

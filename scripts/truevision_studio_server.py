@@ -166,6 +166,84 @@ def build_recording_command_from_request(
     }
 
 
+def _append_action(actions: list[str], action: str) -> None:
+    if action not in actions:
+        actions.append(action)
+
+
+def resolve_assistant_actions(message: str, request: dict[str, Any]) -> list[str]:
+    text = message.lower()
+    actions: list[str] = []
+
+    wants_files = any(word in text for word in ["files", "list", "refresh", "show artifacts", "what exists"])
+    wants_save = any(word in text for word in ["save", "persist", "write", "store"])
+    wants_record = any(word in text for word in ["prepare", "record", "capture", "recorder", "command"])
+    wants_compile = any(word in text for word in ["compile", "generate", "draft", "state", "qwen", "catbot", "do it"])
+
+    if wants_files:
+        _append_action(actions, "refresh_files")
+    if wants_save or wants_record or wants_compile:
+        _append_action(actions, "save_request")
+    if wants_compile and request.get("local_llm", {}).get("enabled"):
+        _append_action(actions, "qwen_compile")
+    if wants_record:
+        _append_action(actions, "prepare_record")
+
+    if not actions:
+        _append_action(actions, "save_request")
+
+    return actions
+
+
+def handle_assistant_message(
+    payload: dict[str, Any],
+    *,
+    storage_root: Path = STORAGE_ROOT,
+) -> dict[str, Any]:
+    message = str(payload.get("message") or "").strip()
+    request = payload.get("request")
+    if not isinstance(request, dict):
+        raise ValueError("request must be an object")
+    actions = resolve_assistant_actions(message, request)
+    results: dict[str, Any] = {}
+
+    if "save_request" in actions:
+        results["request"] = write_json_artifact(
+            storage_root=storage_root,
+            lane="outbox",
+            prefix="assistant_state_request",
+            payload=request,
+        )
+    if "prepare_record" in actions:
+        recording = build_recording_command_from_request(request, storage_root=storage_root)
+        results["recording"] = recording
+        results["recording_artifact"] = write_json_artifact(
+            storage_root=storage_root,
+            lane="manifests",
+            prefix="assistant_record_command",
+            payload=recording,
+        )
+    files = list_storage_files(storage_root)
+
+    completed = [action for action in actions if action != "qwen_compile"]
+    pending = [action for action in actions if action == "qwen_compile"]
+    parts = []
+    if completed:
+        parts.append("ran " + ", ".join(completed))
+    if pending:
+        parts.append("queued " + ", ".join(pending))
+    if not parts:
+        parts.append("no action")
+
+    return {
+        "ok": True,
+        "assistant": "Catbot " + "; ".join(parts) + ".",
+        "actions": actions,
+        "results": results,
+        "files": files,
+    }
+
+
 def normalize_provider(provider: str | None) -> str:
     if provider == "openai_compatible":
         return "openai_compatible"
@@ -292,6 +370,9 @@ class StudioHandler(BaseHTTPRequestHandler):
         if parsed.path == "/api/record/prepare":
             self._handle_record_prepare()
             return
+        if parsed.path == "/api/assistant/message":
+            self._handle_assistant_message()
+            return
         self.send_error(404, "Not found")
 
     def _handle_local_llm_chat(self) -> None:
@@ -381,6 +462,14 @@ class StudioHandler(BaseHTTPRequestHandler):
                     "files": list_storage_files(STORAGE_ROOT),
                 }
             )
+        except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
+            self._send_json({"ok": False, "error": str(exc)}, 400)
+
+    def _handle_assistant_message(self) -> None:
+        try:
+            payload = self._read_json()
+            result = handle_assistant_message(payload, storage_root=STORAGE_ROOT)
+            self._send_json(result)
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self._send_json({"ok": False, "error": str(exc)}, 400)
 

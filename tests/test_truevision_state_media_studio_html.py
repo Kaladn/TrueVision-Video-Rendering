@@ -28,8 +28,11 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("/api/state/request", html)
         self.assertIn("/api/state/plan", html)
         self.assertIn("/api/record/prepare", html)
+        self.assertIn("/api/assistant/message", html)
         self.assertIn("/api/files", html)
         self.assertIn("saveRequestToServer", html)
+        self.assertIn("sendAssistantMessage", html)
+        self.assertIn("runAssistantAction", html)
         self.assertIn("prepareRecordCommand", html)
         self.assertIn("refreshServerFiles", html)
 
@@ -47,6 +50,8 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         html = HTML.read_text(encoding="utf-8")
 
         self.assertIn("Run Log", html)
+        self.assertIn("Catbot", html)
+        self.assertIn("Tell Catbot", html)
         self.assertIn("Compile", html)
         self.assertIn("Clear Log", html)
         self.assertIn("server-backed", html)
