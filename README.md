@@ -54,6 +54,7 @@ scripts/
   truevision_still_image_capture.py
   truevision_region_snip.py
   truevision_edge_audio_river.py
+  truevision_edge_world_v3.py
   truevision_basement_stick_narrative.py
   truevision_signature_profile_extract.py
 
@@ -222,6 +223,23 @@ python scripts\truevision_basement_stick_narrative.py `
   --lyrics "C:\Users\mydyi\OneDrive\Documents\Desktop\Full Album Lyrics_sound.txt" `
   --run-id "the_basement_full_arc_cod_signature_v1" `
   --signature-profile "storage\artifacts\signature_profiles\cod_fullscreen_20m_signature_v2\signature_profile_bundle.json"
+```
+
+Edge Of The World v3 renders the edge/smoke/river-below concept with machine-cost telemetry:
+
+```powershell
+python scripts\truevision_edge_world_v3.py `
+  --run-id "edge_of_the_world_v3_edge_smoke_river_codsig_v1" `
+  --width 1280 `
+  --height 720 `
+  --fps 24 `
+  --signature-profile "storage\artifacts\signature_profiles\cod_fullscreen_20m_signature_v2\signature_profile_bundle.json"
+```
+
+The v3 manifest records wall time, process CPU seconds, average logical CPU percent, and process memory snapshots. The current full render is:
+
+```text
+outputs\edge_of_the_world_v3\edge_of_the_world_v3_edge_smoke_river_codsig_v1\edge_of_the_world_v3_edge_smoke_river_codsig_v1_full_audio.mp4
 ```
 
 ## Run Tests

@@ -31,6 +31,7 @@ The lab proves the audio/video state-media language first.
 - [x] Still-image TrueVision capture exists.
 - [x] Path tracing lane exists.
 - [x] Edge audio river visualizer exists.
+- [x] Edge Of The World v3 edge/smoke/river renderer exists.
 - [x] The Basement stick-figure narrative renderer exists.
 - [x] Signature profile extractor exists.
 - [x] Basement renderer can consume a signature profile bundle.
@@ -48,6 +49,7 @@ The lab proves the audio/video state-media language first.
 - [x] COD full-screen 20-minute signature capture exists.
 - [x] COD signature profiles were extracted.
 - [x] Basement full arc was rendered with COD motion/look signature.
+- [x] Edge Of The World v3 was rendered with COD motion/look signature.
 
 ## Morning Re-Entry
 
@@ -297,6 +299,49 @@ no glyphs
 - [ ] Add full-song render job preparation.
 - [ ] Add full render execution behind approval.
 - [ ] Save every visualizer setup as a reusable template.
+
+## Layer 5A: Edge Of The World v3
+
+- [x] Add `scripts/truevision_edge_world_v3.py`.
+- [x] Use the Edge audio and lyric-derived theme.
+- [x] Keep no lyric overlay and no dialogue cards.
+- [x] Render iconic scenes:
+
+```text
+edge_horizon_smoke
+approach_edge
+looking_down_over_edge
+river_below_energy
+strands_unite
+ascension_column
+return_to_black_edge
+```
+
+- [x] Apply COD motion/look signature as abstract renderer grammar.
+- [x] Add smoke/steam rising from the edge.
+- [x] Add top-down look over the edge into the river below.
+- [x] Add river pulses, shock rings, shimmer, and unity braid.
+- [x] Track machine cost:
+
+```text
+wall_seconds
+process_cpu_seconds
+avg_cpu_core_equivalent
+avg_process_logical_cpu_percent
+memory_start
+memory_end
+```
+
+- [x] Render current full pass:
+
+```text
+outputs/edge_of_the_world_v3/edge_of_the_world_v3_edge_smoke_river_codsig_v1
+```
+
+- [ ] Add v3 renderer behind an AV tool call.
+- [ ] Add signature strength controls.
+- [ ] Add preview quality presets.
+- [ ] Add side-by-side score against v2 letterbox river.
 
 ## Layer 5B: Stick-Figure Narrative Video
 
