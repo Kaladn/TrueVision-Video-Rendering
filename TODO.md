@@ -37,6 +37,8 @@ The lab proves the audio/video state-media language first.
 - [x] Catbot can request AV tools through validated JSON.
 - [x] Chat-origin AV tool calls force `human_confirmed=false`.
 - [x] Delete and full render execution are gated.
+- [x] Model-neutral PromptToStateAdapter base exists.
+- [x] WAV feature extraction AV tool exists.
 - [x] Test suite was green at last commit: `60 tests`.
 
 ## Morning Re-Entry
@@ -133,7 +135,7 @@ storage/
 - [ ] Add JSON schema files for every AV tool.
 - [ ] Add tool argument examples under `docs/av_tools/examples/`.
 - [ ] Add `render_job_status`.
-- [ ] Add `audio_extract_features`.
+- [x] Add `audio_extract_features`.
 - [ ] Add `video_render_score`.
 - [ ] Add `video_extract_keyframes`.
 - [ ] Add `video_composite_layers`.
@@ -187,9 +189,19 @@ docs/qwen/RECALIBRATION_EXAMPLES.md
 docs/qwen/RENDER_FAILURE_EXAMPLES.md
 ```
 
+- [x] Add initial model-neutral adapter contract docs:
+
+```text
+docs/qwen/TRUEVISION_PROMPT_TO_STATE_CONTRACT.md
+docs/qwen/WAV_TO_VIDEO_WORKFLOW.md
+```
+
 ## Layer 4: Prompt-To-State Language
 
 - [ ] Define `truevision_state_template_v1`.
+- [x] Add minimal prompt-to-state validator.
+- [x] Add minimal repair loop.
+- [x] Add model-neutral prompt context builder.
 - [ ] Define required template fields:
 
 ```text

@@ -16,6 +16,7 @@ class AVToolSpec:
 
 AV_TOOLS: tuple[AVToolSpec, ...] = (
     AVToolSpec("audio_probe_duration", "Read exact media duration with local ffprobe.", 1, "high", "audio metadata"),
+    AVToolSpec("audio_extract_features", "Extract WAV audio feature timeline for AV state templates.", 1, "high", "feature timeline"),
     AVToolSpec("template_create", "Create an AV state template from prompt and timing inputs.", 1, "high", "template JSON"),
     AVToolSpec("template_load", "Load one flat template JSON file.", 1, "high", "template object"),
     AVToolSpec("template_save", "Save one flat template JSON file.", 1, "high", "saved template"),

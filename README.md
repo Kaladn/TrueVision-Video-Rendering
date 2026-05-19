@@ -134,12 +134,34 @@ AV tool calls are audio/video only:
 
 ```text
 audio_probe_duration
+audio_extract_features
 template_create / template_load / template_save / template_patch
 time_marker_add / recalibration_add_note
 video_render_preview / video_prepare_full_render
 ```
 
 Qwen may request these tools as JSON, but the local server validates the tool name, arguments, confirmation state, and flat filenames before anything runs. Every accepted or rejected call writes a receipt under `storage/receipts/`.
+
+Prompt-to-state adapter contract:
+
+```text
+human prompt + project context + schema
+-> model draft JSON
+-> validator
+-> repair loop if invalid
+-> canonical TrueVision AV state JSON
+-> AV tool runner
+```
+
+WAV files can drive videos through the audio river renderer:
+
+```powershell
+python scripts\truevision_edge_audio_river.py `
+  --audio "D:\path\to\song.wav" `
+  --output-root "outputs\wav_river" `
+  --run-id "song_river" `
+  --fps 12
+```
 
 ## Run Tests
 

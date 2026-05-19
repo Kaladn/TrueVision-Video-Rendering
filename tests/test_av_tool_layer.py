@@ -1,4 +1,6 @@
 import json
+import math
+import wave
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +16,7 @@ class AVToolLayerTests(unittest.TestCase):
         names = {tool["name"] for tool in tools}
 
         self.assertIn("audio_probe_duration", names)
+        self.assertIn("audio_extract_features", names)
         self.assertIn("video_render_preview", names)
         self.assertIn("template_patch", names)
         self.assertNotIn("filesystem_delete", names)
@@ -152,6 +155,39 @@ class AVToolLayerTests(unittest.TestCase):
             event_lines = (storage / "events" / "av_recalibration.jsonl").read_text(encoding="utf-8").splitlines()
             self.assertEqual(len(event_lines), 2)
             self.assertEqual(json.loads(event_lines[0])["kind"], "time_marker")
+
+    def test_audio_extract_features_reads_wav_and_writes_artifact(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = Path(tmpdir)
+            wav_path = storage / "tiny.wav"
+            sample_rate = 8000
+            samples = bytearray()
+            for index in range(sample_rate // 2):
+                value = int(math.sin(index / sample_rate * math.tau * 220) * 16000)
+                samples.extend(value.to_bytes(2, "little", signed=True))
+            with wave.open(str(wav_path), "wb") as handle:
+                handle.setnchannels(1)
+                handle.setsampwidth(2)
+                handle.setframerate(sample_rate)
+                handle.writeframes(bytes(samples))
+
+            result = run_av_tool_call(
+                {
+                    "tool": "audio_extract_features",
+                    "args": {
+                        "audio_path": str(wav_path),
+                        "fps": 10,
+                        "max_feature_frames": 3,
+                    },
+                },
+                storage_root=storage,
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["result"]["feature_count"], 5)
+            self.assertEqual(result["result"]["features_returned"], 3)
+            self.assertTrue(Path(result["result"]["feature_path"]).exists())
+            self.assertGreater(result["result"]["summary"]["max_rms"], 0)
 
 
 if __name__ == "__main__":

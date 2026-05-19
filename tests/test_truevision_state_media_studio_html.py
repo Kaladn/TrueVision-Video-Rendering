@@ -146,6 +146,7 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("/api/av-tools/call", html)
         self.assertIn("AV-only validated tools", html)
         self.assertIn("video_render_preview", html)
+        self.assertIn("audio_extract_features", html)
         self.assertIn("template_patch", html)
         self.assertIn("AI cannot execute directly", html)
         self.assertIn("extractAvToolRequest", html)
