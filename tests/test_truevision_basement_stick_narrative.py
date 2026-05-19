@@ -10,6 +10,7 @@ from truevision_basement_stick_narrative import (
     SCENE_BEATS,
     build_scene_schedule,
     generate_basement_stick_narrative,
+    load_signature_profile,
     render_frame,
     scene_for_time,
 )
@@ -59,6 +60,68 @@ class TrueVisionBasementStickNarrativeTests(unittest.TestCase):
         self.assertGreater(np.count_nonzero(frame), 500)
         self.assertEqual(metadata["scene_id"], "sword_awakening")
         self.assertIn("Grandpa guidance", metadata["story_anchor"])
+
+    def test_render_frame_can_apply_signature_profile_style(self):
+        feature = {
+            "frame_index": 17,
+            "time_seconds": 73.0,
+            "rms": 0.65,
+            "bass": 0.9,
+            "mid": 0.4,
+            "high": 0.3,
+            "beat": 0.8,
+        }
+        signature = {
+            "kind": "truevision_signature_profile_bundle",
+            "profile_id": "unit_signature",
+            "timeline_samples": [
+                {
+                    "time_norm": 0.0,
+                    "motion": 0.2,
+                    "edge": 0.1,
+                    "contrast": 0.2,
+                    "saturation": 0.2,
+                    "flash": 0.0,
+                    "shake_x": -0.1,
+                    "shake_y": 0.0,
+                },
+                {
+                    "time_norm": 0.75,
+                    "motion": 0.9,
+                    "edge": 0.8,
+                    "contrast": 0.7,
+                    "saturation": 0.6,
+                    "flash": 0.5,
+                    "shake_x": 0.45,
+                    "shake_y": -0.25,
+                },
+            ],
+        }
+
+        plain, _plain_meta = render_frame(320, 180, feature, 100.0)
+        styled, styled_meta = render_frame(320, 180, feature, 100.0, signature_profile=signature)
+
+        self.assertFalse(np.array_equal(plain, styled))
+        self.assertTrue(styled_meta["signature_style"]["applied"])
+        self.assertEqual(styled_meta["signature_style"]["profile_id"], "unit_signature")
+
+    def test_load_signature_profile_reads_bundle(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "signature_profile_bundle.json"
+            path.write_text(
+                json.dumps(
+                    {
+                        "kind": "truevision_signature_profile_bundle",
+                        "profile_id": "unit_signature",
+                        "timeline_samples": [{"time_norm": 0.0}],
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            loaded = load_signature_profile(path)
+
+        self.assertEqual(loaded["profile_id"], "unit_signature")
 
     def test_generate_basement_stick_narrative_writes_tiny_bundle_without_text_cards(self):
         sample_rate = 8000

@@ -32,6 +32,8 @@ The lab proves the audio/video state-media language first.
 - [x] Path tracing lane exists.
 - [x] Edge audio river visualizer exists.
 - [x] The Basement stick-figure narrative renderer exists.
+- [x] Signature profile extractor exists.
+- [x] Basement renderer can consume a signature profile bundle.
 - [x] AV-only tool registry exists.
 - [x] AV-only policy validation exists.
 - [x] AV tool receipts exist.
@@ -42,7 +44,10 @@ The lab proves the audio/video state-media language first.
 - [x] WAV feature extraction AV tool exists.
 - [x] ffmpeg audio level analysis AV tool exists.
 - [x] Initial state-pattern library exists.
-- [x] Test suite was green after Basement renderer addition: `70 tests`.
+- [x] Test suite was green after signature extractor addition: `73 tests`.
+- [x] COD full-screen 20-minute signature capture exists.
+- [x] COD signature profiles were extracted.
+- [x] Basement full arc was rendered with COD motion/look signature.
 
 ## Morning Re-Entry
 
@@ -321,10 +326,54 @@ seal and ascend
 - [x] Drive lighting and pressure from audio features.
 - [x] Write frame-state JSONL.
 - [x] Write manifest, report, thumbnail, visual-only video, and audio-muxed video.
+- [x] Add optional `--signature-profile` to apply captured motion/look grammar.
 - [ ] Add this renderer behind an AV tool call.
 - [ ] Add template controls for scene beat percentages.
 - [ ] Add Qwen template compiler examples for narrative state sequencing.
 - [ ] Add operator time-marker recalibration for story beats.
+
+## Layer 5C: Signature Library
+
+- [x] Capture 20 minutes of full-screen COD-style video state:
+
+```text
+storage/artifacts/signature_captures/cod_fullscreen_20m_signature_v2
+```
+
+- [x] Preserve no raw frames.
+- [x] Preserve 160x90x16 cell state chunks.
+- [x] Extract reusable signature profiles:
+
+```text
+motion_profile.json
+camera_shake_profile.json
+edge_density_profile.json
+contrast_color_profile.json
+energy_timing_profile.json
+cut_rhythm_profile.json
+signature_profile_bundle.json
+```
+
+- [x] Render `the_basement_full_arc_cod_signature_v1` with the extracted profile.
+- [ ] Add signature profile listing to the UI.
+- [ ] Add signature profile selection to template creation.
+- [ ] Add signature strength controls:
+
+```text
+camera_shake_strength
+motion_blur_strength
+edge_shimmer_strength
+contrast_grade_strength
+flash_response_strength
+```
+
+- [ ] Add signature profile AV tools:
+
+```text
+signature_profile_extract
+signature_profile_list
+signature_profile_apply_to_template
+```
 
 ## Layer 6: Recalibration Workflow
 

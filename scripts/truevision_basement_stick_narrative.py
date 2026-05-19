@@ -277,7 +277,105 @@ def draw_escape(frame: np.ndarray, t: float, intensity: float, final: bool = Fal
         frame[:] = np.clip(frame.astype(np.float32) + intensity * 110, 0, 255).astype(np.uint8)
 
 
-def render_frame(width: int, height: int, feature: dict[str, float], duration_seconds: float) -> tuple[np.ndarray, dict[str, Any]]:
+def load_signature_profile(path: Path | str | None) -> dict[str, Any] | None:
+    if not path:
+        return None
+    profile_path = Path(path)
+    payload = json.loads(profile_path.read_text(encoding="utf-8"))
+    if payload.get("kind") != "truevision_signature_profile_bundle":
+        raise ValueError("signature profile must be a truevision_signature_profile_bundle")
+    if not isinstance(payload.get("timeline_samples"), list):
+        raise ValueError("signature profile is missing timeline_samples")
+    payload["source_path"] = str(profile_path)
+    return payload
+
+
+def _nearest_signature_sample(signature_profile: dict[str, Any], time_seconds: float, duration_seconds: float) -> dict[str, float]:
+    samples = signature_profile.get("timeline_samples") or []
+    if not samples:
+        return {}
+    time_norm = 0.0 if duration_seconds <= 0 else max(0.0, min(1.0, time_seconds / duration_seconds))
+    nearest = min(samples, key=lambda sample: abs(float(sample.get("time_norm", 0.0)) - time_norm))
+    return {str(key): float(value) for key, value in nearest.items() if isinstance(value, (int, float))}
+
+
+def _apply_signature_style(
+    frame: np.ndarray,
+    *,
+    signature_profile: dict[str, Any] | None,
+    time_seconds: float,
+    duration_seconds: float,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    if not signature_profile:
+        return frame, {"applied": False}
+
+    sample = _nearest_signature_sample(signature_profile, time_seconds, duration_seconds)
+    if not sample:
+        return frame, {"applied": False, "profile_id": signature_profile.get("profile_id")}
+
+    motion = max(0.0, min(1.0, sample.get("motion", 0.0)))
+    edge = max(0.0, min(1.0, sample.get("edge", 0.0)))
+    contrast = max(0.0, min(1.0, sample.get("contrast", 0.0)))
+    saturation = max(0.0, min(1.0, sample.get("saturation", 0.0)))
+    flash = max(0.0, min(1.0, sample.get("flash", 0.0)))
+    shake_x = max(-1.0, min(1.0, sample.get("shake_x", 0.0)))
+    shake_y = max(-1.0, min(1.0, sample.get("shake_y", 0.0)))
+
+    styled = frame
+    shift_x = int(round(shake_x * (4 + 12 * motion)))
+    shift_y = int(round(shake_y * (3 + 8 * motion)))
+    if shift_x or shift_y:
+        transform = np.float32([[1, 0, shift_x], [0, 1, shift_y]])
+        styled = cv2.warpAffine(styled, transform, (styled.shape[1], styled.shape[0]), borderMode=cv2.BORDER_REFLECT)
+
+    if motion > 0.45:
+        kernel_size = 3 if motion < 0.75 else 5
+        if abs(shift_x) >= abs(shift_y):
+            kernel = np.zeros((kernel_size, kernel_size), dtype=np.float32)
+            kernel[kernel_size // 2, :] = 1.0 / kernel_size
+        else:
+            kernel = np.zeros((kernel_size, kernel_size), dtype=np.float32)
+            kernel[:, kernel_size // 2] = 1.0 / kernel_size
+        styled = cv2.filter2D(styled, -1, kernel)
+
+    gain = 1.0 + 0.18 * contrast + 0.08 * flash
+    bias = 10.0 * flash - 4.0 * motion
+    styled = cv2.convertScaleAbs(styled, alpha=gain, beta=bias)
+
+    if saturation > 0.05:
+        hsv = cv2.cvtColor(styled, cv2.COLOR_BGR2HSV).astype(np.float32)
+        hsv[:, :, 1] = np.clip(hsv[:, :, 1] * (1.0 + 0.22 * saturation), 0, 255)
+        styled = cv2.cvtColor(hsv.astype(np.uint8), cv2.COLOR_HSV2BGR)
+
+    if edge > 0.12:
+        gray = cv2.cvtColor(styled, cv2.COLOR_BGR2GRAY)
+        edges = cv2.Canny(gray, 60, 150)
+        edge_layer = np.zeros_like(styled)
+        edge_layer[:, :, 0] = np.clip(edges.astype(np.float32) * (0.25 + 0.65 * edge), 0, 255).astype(np.uint8)
+        edge_layer[:, :, 1] = np.clip(edges.astype(np.float32) * (0.10 + 0.25 * edge), 0, 255).astype(np.uint8)
+        styled = cv2.addWeighted(styled, 1.0, edge_layer, 0.35, 0)
+
+    return styled, {
+        "applied": True,
+        "profile_id": signature_profile.get("profile_id"),
+        "motion": round(motion, 6),
+        "edge": round(edge, 6),
+        "contrast": round(contrast, 6),
+        "saturation": round(saturation, 6),
+        "flash": round(flash, 6),
+        "shake_x": round(shake_x, 6),
+        "shake_y": round(shake_y, 6),
+    }
+
+
+def render_frame(
+    width: int,
+    height: int,
+    feature: dict[str, float],
+    duration_seconds: float,
+    *,
+    signature_profile: dict[str, Any] | None = None,
+) -> tuple[np.ndarray, dict[str, Any]]:
     time_seconds = float(feature["time_seconds"])
     scene = scene_for_time(time_seconds, duration_seconds)
     rms = float(feature.get("rms", 0.0))
@@ -308,6 +406,12 @@ def render_frame(width: int, height: int, feature: dict[str, float], duration_se
     vignette = np.linspace(0.50, 1.0, width, dtype=np.float32)
     vignette = np.minimum(vignette, vignette[::-1])
     frame = np.clip(frame.astype(np.float32) * vignette[np.newaxis, :, np.newaxis], 0, 255).astype(np.uint8)
+    frame, signature_style = _apply_signature_style(
+        frame,
+        signature_profile=signature_profile,
+        time_seconds=time_seconds,
+        duration_seconds=duration_seconds,
+    )
     return frame, {
         "frame_index": int(feature["frame_index"]),
         "time_seconds": round(time_seconds, 6),
@@ -317,6 +421,7 @@ def render_frame(width: int, height: int, feature: dict[str, float], duration_se
         "rms": round(rms, 6),
         "beat": round(beat, 6),
         "intensity": round(intensity, 6),
+        "signature_style": signature_style,
     }
 
 
@@ -362,6 +467,7 @@ def generate_basement_stick_narrative(
     sample_rate: int = 44100,
     max_seconds: float | None = None,
     mux_audio: bool = True,
+    signature_profile_path: Path | None = None,
 ) -> dict[str, Any]:
     started = time.perf_counter()
     started_at = utc_now()
@@ -374,6 +480,7 @@ def generate_basement_stick_narrative(
         raise FileNotFoundError(story_path)
     if not lyrics_path.exists():
         raise FileNotFoundError(lyrics_path)
+    signature_profile = load_signature_profile(signature_profile_path) if signature_profile_path else None
     run_id = slug(run_id)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -430,7 +537,7 @@ def generate_basement_stick_narrative(
         for index, feature in enumerate(features):
             frame_state = dict(feature)
             frame_state["frame_index"] = index
-            frame, metadata = render_frame(width, height, frame_state, duration_seconds)
+            frame, metadata = render_frame(width, height, frame_state, duration_seconds, signature_profile=signature_profile)
             scene_counts[metadata["scene_id"]] = scene_counts.get(metadata["scene_id"], 0) + 1
             proc.stdin.write(frame.tobytes())
             state_handle.write(json.dumps(metadata, allow_nan=False) + "\n")
@@ -444,7 +551,13 @@ def generate_basement_stick_narrative(
         raise RuntimeError(f"ffmpeg video encoder failed with exit code {return_code}")
 
     if thumbnail_frame is None:
-        thumbnail_frame = render_frame(width, height, {**features[0], "frame_index": 0}, duration_seconds)[0]
+        thumbnail_frame = render_frame(
+            width,
+            height,
+            {**features[0], "frame_index": 0},
+            duration_seconds,
+            signature_profile=signature_profile,
+        )[0]
     cv2.imwrite(str(thumb_path), thumbnail_frame)
 
     audio_muxed = False
@@ -503,6 +616,12 @@ def generate_basement_stick_narrative(
             "style": "stick_figure_horror_narrative_audio_reactive_lighting",
             "scene_counts": scene_counts,
             "scene_schedule": build_scene_schedule(duration_seconds),
+            "signature_profile": {
+                "enabled": bool(signature_profile),
+                "profile_id": signature_profile.get("profile_id") if signature_profile else None,
+                "path": signature_profile.get("source_path") if signature_profile else None,
+                "usage": "motion_look_signature_not_source_video" if signature_profile else None,
+            },
         },
         "audio_feature_summary": {
             key: {
@@ -569,6 +688,7 @@ def generate_basement_stick_narrative(
         "frames": len(features),
         "duration_seconds": round(duration_seconds, 6),
         "video_sha256": manifest["outputs"]["video_sha256"],
+        "signature_profile": manifest["render"]["signature_profile"],
     }
 
 
@@ -585,6 +705,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--sample-rate", type=int, default=44100)
     parser.add_argument("--max-seconds", type=float, default=None)
     parser.add_argument("--visual-only", action="store_true")
+    parser.add_argument("--signature-profile", default="", help="Optional truevision_signature_profile_bundle JSON.")
     return parser
 
 
@@ -602,6 +723,7 @@ def main() -> None:
         sample_rate=args.sample_rate,
         max_seconds=args.max_seconds,
         mux_audio=not args.visual_only,
+        signature_profile_path=Path(args.signature_profile) if args.signature_profile else None,
     )
     print(json.dumps(result, indent=2))
 

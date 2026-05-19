@@ -55,6 +55,7 @@ scripts/
   truevision_region_snip.py
   truevision_edge_audio_river.py
   truevision_basement_stick_narrative.py
+  truevision_signature_profile_extract.py
 
 modules/
   screen_grid_mapper.py
@@ -190,6 +191,38 @@ python scripts\truevision_basement_stick_narrative.py `
 ```
 
 That renderer keeps the output literal to the story scenery: storm, basement door, hallway window creature, Frank falling, dragging descent, red rift, Nether World, sword awakening, rescue, sealing, and ascension. It does not render lyric text or dialogue cards.
+
+Capture-derived motion/look signatures can be extracted from a completed TrueVision recording:
+
+```powershell
+python scripts\truevision_signature_profile_extract.py `
+  --capture-dir "storage\artifacts\signature_captures\cod_fullscreen_20m_signature_v2" `
+  --output-dir "storage\artifacts\signature_profiles\cod_fullscreen_20m_signature_v2" `
+  --profile-id "cod_fullscreen_20m_signature_v2"
+```
+
+The extractor writes reusable, non-evidence profiles:
+
+```text
+motion_profile.json
+camera_shake_profile.json
+edge_density_profile.json
+contrast_color_profile.json
+energy_timing_profile.json
+cut_rhythm_profile.json
+signature_profile_bundle.json
+```
+
+The Basement renderer can consume the bundle as an abstract motion/look signature:
+
+```powershell
+python scripts\truevision_basement_stick_narrative.py `
+  --audio "C:\Users\mydyi\Downloads\The Basement.mp3" `
+  --story "C:\Users\mydyi\OneDrive\Documents\Desktop\The Basement.txt" `
+  --lyrics "C:\Users\mydyi\OneDrive\Documents\Desktop\Full Album Lyrics_sound.txt" `
+  --run-id "the_basement_full_arc_cod_signature_v1" `
+  --signature-profile "storage\artifacts\signature_profiles\cod_fullscreen_20m_signature_v2\signature_profile_bundle.json"
+```
 
 ## Run Tests
 
