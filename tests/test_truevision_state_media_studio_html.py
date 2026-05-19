@@ -35,6 +35,17 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("Return only JSON", html)
         self.assertIn("truevision_state_media_draft", html)
 
+    def test_record_start_zone_uses_manual_minutes(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("Record Start Zone", html)
+        self.assertIn('id="durationMinutes"', html)
+        self.assertIn('type="number"', html)
+        self.assertIn("duration_minutes", html)
+        self.assertIn('duration_seconds: Math.round(number("durationMinutes") * 60)', html)
+        self.assertIn("start_delay_minutes", html)
+        self.assertNotIn('id="duration" type="range"', html)
+
 
 if __name__ == "__main__":
     unittest.main()

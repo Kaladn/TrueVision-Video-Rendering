@@ -668,7 +668,7 @@
         </section>
 
         <section class="section">
-          <div class="section-title">State Budget</div>
+          <div class="section-title">Record Start Zone</div>
           <label>
             Grid
             <select id="gridShape">
@@ -687,12 +687,15 @@
           </label>
           <div style="height:10px"></div>
           <label>
-            Duration
-            <div class="range-row">
-              <input id="duration" type="range" min="1" max="60" step="1" value="5">
-              <span class="value" id="durationValue">5s</span>
-            </div>
+            Time Limit (minutes)
+            <input id="durationMinutes" type="number" min="0.25" max="480" step="0.25" value="5">
           </label>
+          <div style="height:10px"></div>
+          <label>
+            Start Delay (minutes)
+            <input id="startDelayMinutes" type="number" min="0" max="120" step="0.25" value="0">
+          </label>
+          <div class="status-line" id="recordStatus">Manual record limit: 5 minutes, start immediately.</div>
         </section>
       </div>
     </aside>
@@ -994,7 +997,11 @@
           grid_width: gridX,
           grid_height: gridY,
           fps: number("fps"),
-          duration_seconds: number("duration")
+          duration_minutes: number("durationMinutes"),
+          duration_seconds: Math.round(number("durationMinutes") * 60),
+          start_delay_minutes: number("startDelayMinutes"),
+          start_delay_seconds: Math.round(number("startDelayMinutes") * 60),
+          recording_mode: "manual_time_limit_minutes"
         },
         geometry: {
           fov_degrees: number("fov"),
@@ -1292,7 +1299,6 @@
 
     function updateLabels() {
       $("fpsValue").textContent = $("fps").value;
-      $("durationValue").textContent = `${$("duration").value}s`;
       $("waveAmpValue").textContent = Number($("waveAmp").value).toFixed(2);
       $("waveFreqValue").textContent = Number($("waveFreq").value).toFixed(1);
       $("phaseValue").textContent = Number($("phase").value).toFixed(2);
@@ -1315,6 +1321,9 @@
       $("electronicsState").textContent = `osc ${$("oscHz").value}Hz`;
       $("renderState").textContent = `${$("ptSamples").value} spp, ${$("ptBounces").value} bounces`;
       $("cvState").textContent = $("cvLane").value.replaceAll("_", " ");
+      const minutes = number("durationMinutes");
+      const delay = number("startDelayMinutes");
+      $("recordStatus").textContent = `Manual record limit: ${minutes} minute${minutes === 1 ? "" : "s"}, start ${delay === 0 ? "immediately" : `after ${delay} minute${delay === 1 ? "" : "s"}`}.`;
     }
 
     function update() {
@@ -1354,7 +1363,7 @@
     async function synthesizeDraft() {
       const req = buildRequest();
       state.files = [
-        { name: "truevision_state_script.json", kind: `${req.capture_shape.grid_width}x${req.capture_shape.grid_height} state`, size: `${req.capture_shape.duration_seconds}s` },
+        { name: "truevision_state_script.json", kind: `${req.capture_shape.grid_width}x${req.capture_shape.grid_height} state`, size: `${req.capture_shape.duration_minutes}m` },
         { name: "geometry_sidecar.json", kind: "camera/actor/depth", size: "required" },
         { name: "path_trace_report.md", kind: "cpu path tracer", size: `${req.path_tracing.samples_per_pixel}spp/${req.path_tracing.max_bounces}b` },
         { name: "motion_field_sidecar.npz", kind: "flow + gait phase", size: "planned" },
@@ -1442,7 +1451,8 @@
     $("resetDefaults").addEventListener("click", () => {
       $("prompt").value = "A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.";
       $("fps").value = 15;
-      $("duration").value = 5;
+      $("durationMinutes").value = 5;
+      $("startDelayMinutes").value = 0;
       $("gridShape").value = "160x90";
       $("waveAmp").value = 0.44;
       $("waveFreq").value = 3.6;
