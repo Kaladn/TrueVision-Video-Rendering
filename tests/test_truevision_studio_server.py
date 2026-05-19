@@ -130,6 +130,31 @@ class TrueVisionStudioServerTests(unittest.TestCase):
         self.assertIn("save_request", actions)
         self.assertIn("qwen_compile", actions)
 
+    def test_resolve_assistant_actions_routes_plain_chat_to_qwen_chat(self):
+        request = {"local_llm": {"enabled": True}}
+
+        actions = resolve_assistant_actions("what can you help me do in this studio?", request)
+
+        self.assertEqual(actions, ["qwen_chat"])
+
+    def test_handle_assistant_message_queues_chat_without_storage_write(self):
+        request = {
+            "request_kind": "truevision_state_media_draft",
+            "local_llm": {"enabled": True},
+        }
+        with tempfile.TemporaryDirectory() as tmpdir:
+            result = handle_assistant_message(
+                {
+                    "message": "what can you help me do in this studio?",
+                    "request": request,
+                },
+                storage_root=Path(tmpdir),
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["actions"], ["qwen_chat"])
+            self.assertEqual(result["files"], [])
+
     def test_handle_assistant_message_executes_storage_and_record_actions(self):
         request = {
             "request_kind": "truevision_state_media_draft",

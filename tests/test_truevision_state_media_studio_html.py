@@ -57,11 +57,21 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         html = HTML.read_text(encoding="utf-8")
 
         self.assertIn("async function callLocalQwen", html)
+        self.assertIn("async function callLocalQwenText", html)
         self.assertIn("fetch(endpoint", html)
         self.assertIn("if (apiKey && !useProxy)", html)
         self.assertIn("buildOllamaChatBody", html)
         self.assertIn("buildOpenAiChatBody", html)
         self.assertIn("parseQwenStateResponse", html)
+
+    def test_catbot_has_conversation_lane_not_only_action_log(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("buildCatbotSystemPrompt", html)
+        self.assertIn('action === "qwen_chat"', html)
+        self.assertIn("callCatbotQwen", html)
+        self.assertIn("Talk with Catbot", html)
+        self.assertIn("available_tools", html)
 
     def test_center_panel_is_an_operations_log_not_generic_chat(self):
         html = HTML.read_text(encoding="utf-8")

@@ -214,7 +214,10 @@ def resolve_assistant_actions(message: str, request: dict[str, Any]) -> list[str
         _append_action(actions, "prepare_record")
 
     if not actions:
-        _append_action(actions, "save_request")
+        if request.get("local_llm", {}).get("enabled"):
+            _append_action(actions, "qwen_chat")
+        else:
+            _append_action(actions, "save_request")
 
     return actions
 
@@ -249,8 +252,9 @@ def handle_assistant_message(
         )
     files = list_storage_files(storage_root)
 
-    completed = [action for action in actions if action != "qwen_compile"]
-    pending = [action for action in actions if action == "qwen_compile"]
+    pending_actions = {"qwen_chat", "qwen_compile"}
+    completed = [action for action in actions if action not in pending_actions]
+    pending = [action for action in actions if action in pending_actions]
     parts = []
     if completed:
         parts.append("ran " + ", ".join(completed))

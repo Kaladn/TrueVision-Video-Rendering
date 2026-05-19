@@ -786,7 +786,7 @@
       <header class="topbar">
         <div class="topbar-main">
           <div class="title">Catbot Workbench</div>
-          <div class="subtitle" id="routeLine">SecureCore / API / State Formula</div>
+          <div class="subtitle" id="routeLine">SecureCore / local Qwen 32B / State Formula</div>
         </div>
         <div class="topbar-actions">
           <button class="secondary" id="saveRequest">Save Request</button>
@@ -843,7 +843,7 @@
           <div class="chat-window" id="chatWindow">
             <div class="message">
               <div class="meta"><span>Catbot Run Log</span><span>server-backed</span></div>
-              Tell Catbot to Compile, save, prepare record, or refresh files. It calls local operations endpoints and logs real results.
+              Talk with Catbot, or ask it to Compile, save, prepare record, or refresh files. It answers through local Qwen and calls real studio endpoints for tools.
             </div>
           </div>
         </div>
@@ -1214,6 +1214,18 @@
       ].join("\\n");
     }
 
+    function buildCatbotSystemPrompt() {
+      return [
+        "You are Catbot, the local TrueVision State Media Studio helper.",
+        "Talk naturally and briefly with the operator.",
+        "You can explain the current studio settings and what the available tools will do.",
+        "Available tools are save_request, qwen_compile, qwen_chat, prepare_record, and refresh_files.",
+        "Never pretend a tool ran unless the supplied tool_results say it ran.",
+        "Generated state media is synthetic, not evidence.",
+        "When the operator wants a video or image plan, steer them toward compile/generate so qwen_compile can create state JSON."
+      ].join("\\n");
+    }
+
     function stripJsonFence(text) {
       return text
         .trim()
@@ -1237,30 +1249,30 @@
       };
     }
 
-    function buildQwenMessages(request) {
+    function buildQwenMessages(request, systemPrompt = buildQwenSystemPrompt()) {
       return [
-        { role: "system", content: buildQwenSystemPrompt() },
+        { role: "system", content: systemPrompt },
         { role: "user", content: JSON.stringify(request, null, 2) }
       ];
     }
 
-    function buildOllamaChatBody(model, request) {
+    function buildOllamaChatBody(model, request, systemPrompt = buildQwenSystemPrompt()) {
       return {
         model,
         stream: false,
-        messages: buildQwenMessages(request),
+        messages: buildQwenMessages(request, systemPrompt),
         options: {
           temperature: 0.1
         }
       };
     }
 
-    function buildOpenAiChatBody(model, request) {
+    function buildOpenAiChatBody(model, request, systemPrompt = buildQwenSystemPrompt()) {
       return {
         model,
         temperature: 0.1,
         stream: false,
-        messages: buildQwenMessages(request)
+        messages: buildQwenMessages(request, systemPrompt)
       };
     }
 
@@ -1320,7 +1332,7 @@
       }[$("overlayPosition").value] || "center";
     }
 
-    async function callLocalQwen(request) {
+    async function callLocalQwenText(request, systemPrompt = buildQwenSystemPrompt()) {
       const useProxy = checked("qwenUseProxy");
       const endpoint = useProxy ? $("qwenProxyEndpoint").value.trim() : $("qwenEndpoint").value.trim();
       const model = $("qwenModel").value.trim();
@@ -1339,12 +1351,12 @@
             endpoint: $("qwenEndpoint").value.trim(),
             model,
             api_key: apiKey,
-            system_prompt: buildQwenSystemPrompt(),
+            system_prompt: systemPrompt,
             request
           }
         : provider === "openai_compatible"
-          ? buildOpenAiChatBody(model, request)
-          : buildOllamaChatBody(model, request);
+          ? buildOpenAiChatBody(model, request, systemPrompt)
+          : buildOllamaChatBody(model, request, systemPrompt);
 
       const response = await fetch(endpoint, {
         method: "POST",
@@ -1362,6 +1374,11 @@
       if (!content) {
         throw new Error(`Local Qwen response did not include message content for ${provider}`);
       }
+      return content;
+    }
+
+    async function callLocalQwen(request) {
+      const content = await callLocalQwenText(request, buildQwenSystemPrompt());
       return parseQwenStateResponse(content);
     }
 
@@ -1637,7 +1654,31 @@
       await savePlanToServer(plan);
     }
 
+    async function callCatbotQwen(message, request, response) {
+      const chatPayload = {
+        message,
+        current_request: request,
+        actions: response?.actions || [],
+        tool_results: response?.results || {},
+        available_tools: ["save_request", "qwen_compile", "qwen_chat", "prepare_record", "refresh_files"],
+        studio_boundary: {
+          forward_truevision: "witnesses",
+          reverse_truevision: "replays or demonstrates state",
+          generated_state_media: "synthetic, not evidence"
+        }
+      };
+      const answer = await callLocalQwenText(chatPayload, buildCatbotSystemPrompt());
+      addMessage("Catbot", answer);
+      return answer;
+    }
+
     async function runAssistantAction(action, request, response) {
+      if (action === "qwen_chat") {
+        $("qwenStatus").textContent = "Catbot is talking through local Qwen 32B...";
+        $("qwenStatus").className = "status-line warn";
+        await callCatbotQwen(response?.message || request.prompt, request, response);
+        return;
+      }
       if (action === "qwen_compile") {
         $("qwenStatus").textContent = "Catbot is calling local Qwen 32B...";
         $("qwenStatus").className = "status-line warn";
@@ -1660,7 +1701,11 @@
         request: req
       });
       syncFilesFromServer(response.files);
-      addMessage("Catbot", response.assistant || "No assistant response.");
+      const actions = response.actions || [];
+      if (actions.some((action) => action !== "qwen_chat")) {
+        addMessage("Catbot tools", response.assistant || "No assistant response.");
+      }
+      response.message = message || req.prompt;
       for (const action of response.actions || []) {
         await runAssistantAction(action, req, response);
       }

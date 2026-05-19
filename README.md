@@ -106,6 +106,7 @@ POST /api/assistant/message
 Catbot action words:
 
 ```text
+plain conversation -> queue qwen_chat and answer through local Qwen, with no storage write
 compile / generate / draft / qwen -> save request, then queue Qwen compile when local Qwen is selected
 save / persist / write / store -> save current request
 prepare / record / capture / command -> save request and prepare recorder command
