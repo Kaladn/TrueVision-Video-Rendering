@@ -148,6 +148,10 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("video_render_preview", html)
         self.assertIn("template_patch", html)
         self.assertIn("AI cannot execute directly", html)
+        self.assertIn("extractAvToolRequest", html)
+        self.assertIn("runAvToolRequest", html)
+        self.assertIn("available_av_tools", html)
+        self.assertIn("human_confirmed: false", html)
 
 
 if __name__ == "__main__":

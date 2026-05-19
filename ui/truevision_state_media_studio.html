@@ -1387,8 +1387,11 @@
         "Available tools are save_request, qwen_compile, qwen_chat, prepare_record, and refresh_files.",
         "AV-only validated tools are exposed separately through /api/av-tools and /api/av-tools/call.",
         "Important AV tool names include video_render_preview, template_patch, time_marker_add, recalibration_add_note, and video_prepare_full_render.",
+        "When AV work should run, return exactly one JSON object shaped like {\"tool\":\"video_render_preview\",\"args\":{...}} with no prose.",
+        "For normal conversation, return prose and no tool JSON.",
         "Never pretend a tool ran unless the supplied tool_results say it ran.",
         "AI cannot execute directly; tool calls are requests validated by the local server.",
+        "Do not set human_confirmed. The Studio forces chat-origin calls to unconfirmed.",
         "Generated state media is synthetic, not evidence.",
         "When the operator wants to build, steer them toward compile/generate so qwen_compile can create state JSON.",
         "Do not auto-build from plain chat. Conversation is allowed to stay conversation."
@@ -1549,6 +1552,44 @@
     async function callLocalQwen(request) {
       const content = await callLocalQwenText(request, buildQwenSystemPrompt());
       return parseQwenStateResponse(content);
+    }
+
+    function extractAvToolRequest(text) {
+      try {
+        const parsed = JSON.parse(stripJsonFence(text));
+        const candidate = parsed?.tool_request || parsed?.av_tool_request || parsed;
+        if (candidate && typeof candidate === "object" && typeof candidate.tool === "string") {
+          return {
+            tool: candidate.tool,
+            args: candidate.args && typeof candidate.args === "object" ? candidate.args : {},
+            requested_by: "catbot_qwen",
+            human_confirmed: false
+          };
+        }
+      } catch (_error) {
+        return null;
+      }
+      return null;
+    }
+
+    async function runAvToolRequest(call) {
+      const safeCall = {
+        ...call,
+        requested_by: "catbot_qwen",
+        human_confirmed: false
+      };
+      const result = await apiJson("/api/av-tools/call", { call: safeCall });
+      const receipt = result.receipt?.name ? ` receipt=${result.receipt.name}` : "";
+      if (result.ok) {
+        addMessage("AV tool", `${result.tool} accepted.${receipt}`);
+        $("qwenStatus").textContent = `${result.tool} ran through the AV policy layer.`;
+        $("qwenStatus").className = "status-line ok";
+      } else {
+        addMessage("AV tool rejected", `${result.tool || safeCall.tool}: ${result.error || "policy rejected call"}${receipt}`);
+        $("qwenStatus").textContent = `${safeCall.tool} was rejected by AV policy.`;
+        $("qwenStatus").className = "status-line warn";
+      }
+      return result;
     }
 
     function drawPreview() {
@@ -1981,6 +2022,17 @@
         actions: response?.actions || [],
         tool_results: response?.results || {},
         available_tools: ["save_request", "qwen_compile", "qwen_chat", "prepare_record", "refresh_files"],
+        available_av_tools: [
+          "audio_probe_duration",
+          "template_create",
+          "template_save",
+          "template_load",
+          "template_patch",
+          "time_marker_add",
+          "recalibration_add_note",
+          "video_render_preview",
+          "video_prepare_full_render"
+        ],
         studio_boundary: {
           forward_truevision: "witnesses",
           reverse_truevision: "replays or demonstrates state",
@@ -1989,6 +2041,10 @@
       };
       const answer = await callLocalQwenText(chatPayload, buildCatbotSystemPrompt());
       addMessage("Catbot", answer);
+      const toolRequest = extractAvToolRequest(answer);
+      if (toolRequest) {
+        await runAvToolRequest(toolRequest);
+      }
       return answer;
     }
 
