@@ -19,7 +19,7 @@ import numpy as np
 
 
 PROFILE_KIND = "truevision_signature_profile_bundle"
-DEFAULT_CAPTURE_DIR = Path("storage/artifacts/signature_captures/cod_fullscreen_20m_signature_v2")
+DEFAULT_CAPTURE_DIR = Path("storage/artifacts/signature_captures/default")
 
 
 def utc_now() -> str:

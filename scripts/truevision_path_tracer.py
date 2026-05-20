@@ -33,7 +33,7 @@ from truevision_resonance_recorder import (
 from truevision_state_replay import replay_capture
 
 
-DEFAULT_OUTPUT_ROOT = Path("D:/arc_solver_clean/cod_616/data/truevision_generated")
+DEFAULT_OUTPUT_ROOT = Path("storage/artifacts/truevision_generated")
 DEFAULT_RUN_ID = "path_traced_grounded_sphere_5s"
 
 

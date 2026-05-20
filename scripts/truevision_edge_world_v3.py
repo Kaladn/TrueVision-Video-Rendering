@@ -38,7 +38,7 @@ from truevision_basement_stick_narrative import load_signature_profile
 
 DEFAULT_OUTPUT_ROOT = Path("outputs/edge_of_the_world_v3")
 DEFAULT_RUN_ID = "edge_of_the_world_v3_edge_smoke_river"
-DEFAULT_SIGNATURE_PROFILE = Path("storage/artifacts/signature_profiles/cod_fullscreen_20m_signature_v2/signature_profile_bundle.json")
+DEFAULT_SIGNATURE_PROFILE = Path("storage/artifacts/signature_profiles/default/signature_profile_bundle.json")
 
 
 @dataclass(frozen=True)

@@ -10,7 +10,7 @@ from typing import Any, Mapping
 import cv2
 import numpy as np
 
-from truevision_state_replay import sha256_file
+from truevision_state_replay import read_cell_chunk, sha256_file
 
 from .render_missing_frame import render_missing_frame
 from .state_interpolator import interpolate_missing_state
@@ -41,11 +41,11 @@ def read_truevision_cells(run_dir: Path) -> tuple[dict[int, np.ndarray], list[st
     feature_names = list(manifest["cell_state"]["feature_names"])
     cells_by_frame: dict[int, np.ndarray] = {}
     for chunk in manifest["cell_state"]["chunks"]:
-        with np.load(chunk["path"], allow_pickle=False) as data:
-            cell_state = data["cell_state"].astype(np.float32)
-            frame_numbers = data["frame_numbers"].astype(np.int64)
-            for index, frame_number in enumerate(frame_numbers):
-                cells_by_frame[int(frame_number)] = cell_state[index]
+        cell_state, frame_numbers = read_cell_chunk(chunk)
+        cell_state = cell_state.astype(np.float32, copy=False)
+        frame_numbers = frame_numbers.astype(np.int64, copy=False)
+        for index, frame_number in enumerate(frame_numbers):
+            cells_by_frame[int(frame_number)] = cell_state[index]
     return cells_by_frame, feature_names, manifest, summary
 
 
@@ -190,4 +190,3 @@ def fill_truevision_capture(
     manifest_path = output_dir / f"{manifest['run_id']}_trueframegen_manifest.json"
     manifest_path.write_text(json.dumps(out_manifest, indent=2, allow_nan=False), encoding="utf-8")
     return {"manifest_json": str(manifest_path), **out_manifest["outputs"]}
-

@@ -111,10 +111,16 @@ storage_list_templates
 | Lightning/flash extractor | `scripts/truevision_extract_lightning_signature.py` | exists | Extracts 6-1-6 peak hot-cell lighting signatures. |
 | Edge projection | `scripts/truevision_project_edge_from_capture.py` | exists | Projects capture dynamics across Edge Of The World audio. |
 | TrueFrameGen fill | `scripts/trueframegen_fill.py` | exists | Fills missing frames from surrounding state. |
+| TrueFrameGen upsample | `scripts/trueframegen_upsample.py` | exists | Generates in-between state frames inside the source timeline for higher FPS playback. |
+| TrueFrameGen live upsample | `scripts/trueframegen_live_upsample.py` | exists | Reads native `.tvcells` chunks before the final manifest and renders trailing high-FPS output. |
+| TrueFrameGen live pipeline | `scripts/trueframegen_live_pipeline.py` | exists | Starts native capture and launches TrueFrameGen after a trailing delay while capture continues. |
+| Rust TrueFrameGen stream | `native/truevision_capture_rs/src/bin/trueframegen_stream_rs.rs` | exists | Compiled bounded-cache renderer from `.tvcells` to 60fps MP4 through ffmpeg; supports `libx264`, QSV, AMF, D3D12, Vulkan encoder names, `temporal-map`, `recursive-midpoint`, center-crop proofs, confidence traces, and RGB neighbor smoothing. |
 | 6-1-6 temporal map | `trueframegen/temporal_616.py` | exists | 6-prior / center / 6-future temporal mapping. |
 | Causal cell map | `trueframegen/causal_cell_map.py` | exists | Cell-level cause/effect estimation. |
 | State interpolator | `trueframegen/state_interpolator.py` | exists | Interpolates missing cell state. |
 | Gap filler | `trueframegen/frame_gap_filler.py` | exists | Builds missing frame state. |
+| Frame upsampler | `trueframegen/frame_upsampler.py` | exists | Converts low-FPS captures to high-FPS output without extending duration. |
+| Live upsampler | `trueframegen/live_upsampler.py` | exists | Watches native chunk state so generation can overlap capture. |
 | Missing frame render | `trueframegen/render_missing_frame.py` | exists | Renders missing frame output. |
 | Continuity verifier | `trueframegen/verify_replay_continuity.py` | exists | Checks continuity and error. |
 | Temporal projector | `trueframegen/temporal_causality_projector.py` | exists | Projects captured 6-1-6 motion over audio timeline. |
@@ -237,6 +243,15 @@ dynamic range
 compression
 sidechain-style visual response
 ```
+
+The first TrueVision-native distillation lives here:
+
+```text
+docs/TRUEVISION_STATE_GENERATION_PRIMITIVES.md
+```
+
+Use that document as the system vocabulary before adding new render controls or
+tool names.
 
 ## Tooling Rules
 

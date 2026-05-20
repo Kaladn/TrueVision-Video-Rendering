@@ -2,8 +2,8 @@
 """Generate synthetic TrueVision-style state media from explicit scene rules.
 
 This does not generate from prompts and does not produce evidence. It writes
-the same replayable 16:9 cell-state shape used by the COD/TrueVision capture
-lane, then optionally renders it through the state replay path.
+the same replayable 16:9 cell-state shape used by the TrueVision capture lane,
+then optionally renders it through the state replay path.
 """
 
 from __future__ import annotations
@@ -32,7 +32,7 @@ from truevision_resonance_recorder import (
 from truevision_state_replay import replay_capture
 
 
-DEFAULT_OUTPUT_ROOT = Path("D:/arc_solver_clean/cod_616/data/truevision_generated")
+DEFAULT_OUTPUT_ROOT = Path("storage/artifacts/truevision_generated")
 DEFAULT_RUN_ID = "person_field_walk_5s_state_media"
 
 
@@ -293,7 +293,7 @@ def _write_formula_report(
                 "",
                 "## Claim",
                 "",
-                "A 5-second no-sound walking-person scene was generated as COD/TrueVision-shaped cell-state vectors, then replayed as video from those vectors.",
+                "A 5-second no-sound walking-person scene was generated as TrueVision-shaped cell-state vectors, then replayed as video from those vectors.",
                 "",
                 "## Boundary",
                 "",
@@ -301,7 +301,7 @@ def _write_formula_report(
                 "This is synthetic state media.",
                 "It is not evidence.",
                 "It is not prompt video.",
-                "It is a declared scene formula rendered into the same 16:9 cell-state shape used by COD/TrueVision capture.",
+                "It is a declared scene formula rendered into the same 16:9 cell-state shape used by TrueVision capture.",
                 "```",
                 "",
                 "## Formula",
@@ -312,7 +312,7 @@ def _write_formula_report(
                 "  -> walking_person_actor(x(t), walk_phase(t), limb_phase(t))",
                 "  -> 90x160 addressed cells",
                 "  -> 16-feature cell vectors",
-                "  -> replayable COD/TrueVision bundle",
+                "  -> replayable TrueVision bundle",
                 "```",
                 "",
                 "## Outputs",

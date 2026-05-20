@@ -2,7 +2,7 @@
 """Generate one rich TrueVision-shaped synthetic state frame.
 
 The point is not prompt art. This creates a detailed scene, samples it through
-the COD/TrueVision 16-channel cell-state shape, then reconstructs a clean frame
+the TrueVision 16-channel cell-state shape, then reconstructs a clean frame
 using more than rgb_mean.
 """
 
@@ -24,7 +24,7 @@ import numpy as np
 from truevision_resonance_recorder import CELL_FEATURE_NAMES, build_video_cell_state, sha256_file
 
 
-DEFAULT_OUTPUT_ROOT = Path("D:/arc_solver_clean/cod_616/data/truevision_generated")
+DEFAULT_OUTPUT_ROOT = Path("storage/artifacts/truevision_generated")
 DEFAULT_RUN_ID = "person_field_clean_frame_full_power"
 
 
@@ -346,7 +346,7 @@ def generate_full_power_frame(
                 "",
                 "## Claim",
                 "",
-                "One clean frame was generated from a detailed scene state, sampled into COD/TrueVision 16-channel cell vectors, then reconstructed using more than RGB means.",
+                "One clean frame was generated from a detailed scene state, sampled into TrueVision 16-channel cell vectors, then reconstructed using more than RGB means.",
                 "",
                 "## Channels Used",
                 "",

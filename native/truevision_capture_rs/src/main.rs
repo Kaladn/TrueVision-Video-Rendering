@@ -60,7 +60,17 @@ unsafe extern "system" {
     fn CreateCompatibleBitmap(hdc: Hdc, cx: Int, cy: Int) -> Hbitmap;
     fn SelectObject(hdc: Hdc, h: Hgdiobj) -> Hgdiobj;
     fn DeleteObject(ho: Hgdiobj) -> Bool;
-    fn BitBlt(hdc: Hdc, x: Int, y: Int, cx: Int, cy: Int, hdc_src: Hdc, x1: Int, y1: Int, rop: Dword) -> Bool;
+    fn BitBlt(
+        hdc: Hdc,
+        x: Int,
+        y: Int,
+        cx: Int,
+        cy: Int,
+        hdc_src: Hdc,
+        x1: Int,
+        y1: Int,
+        rop: Dword,
+    ) -> Bool;
     fn StretchBlt(
         hdc_dest: Hdc,
         x_dest: Int,
@@ -156,7 +166,10 @@ fn run() -> Result<(), String> {
         return Err("resolution must divide evenly by grid".to_string());
     }
     if args.start_delay > 0.0 {
-        println!("Starting native capture in {:.3} seconds.", args.start_delay);
+        println!(
+            "Starting native capture in {:.3} seconds.",
+            args.start_delay
+        );
         sleep(Duration::from_secs_f64(args.start_delay));
     }
 
@@ -165,7 +178,9 @@ fn run() -> Result<(), String> {
     create_dir_all(&cell_dir).map_err(|e| format!("create run dir failed: {e}"))?;
 
     let records_path = run_dir.join(format!("{}_records.jsonl", args.run_id));
-    let mut records = BufWriter::new(File::create(&records_path).map_err(|e| format!("records open failed: {e}"))?);
+    let mut records = BufWriter::new(
+        File::create(&records_path).map_err(|e| format!("records open failed: {e}"))?,
+    );
 
     let source_region = source_region(&args);
     let ctx = CaptureContext::new(args.resolution.0, args.resolution.1)?;
@@ -173,7 +188,8 @@ fn run() -> Result<(), String> {
     let mut previous_luma = vec![0_f32; args.grid.0 * args.grid.1];
     let mut have_previous = false;
 
-    let mut chunk_frames: Vec<f32> = Vec::with_capacity(args.chunk_frames * args.grid.0 * args.grid.1 * FEATURE_NAMES.len());
+    let mut chunk_frames: Vec<f32> =
+        Vec::with_capacity(args.chunk_frames * args.grid.0 * args.grid.1 * FEATURE_NAMES.len());
     let mut chunk_numbers: Vec<u32> = Vec::with_capacity(args.chunk_frames);
     let mut chunks: Vec<ChunkMeta> = Vec::new();
 
@@ -182,7 +198,13 @@ fn run() -> Result<(), String> {
     while started.elapsed().as_secs_f64() < args.duration {
         let frame_started = Instant::now();
         ctx.capture(source_region, &mut bgra)?;
-        let screen_energy = build_cell_state(&bgra, &args, &mut previous_luma, &mut have_previous, &mut chunk_frames);
+        let screen_energy = build_cell_state(
+            &bgra,
+            &args,
+            &mut previous_luma,
+            &mut have_previous,
+            &mut chunk_frames,
+        );
         chunk_numbers.push(frame_number);
 
         let elapsed = started.elapsed().as_secs_f64();
@@ -199,7 +221,13 @@ fn run() -> Result<(), String> {
         .map_err(|e| format!("records write failed: {e}"))?;
 
         if chunk_numbers.len() >= args.chunk_frames {
-            flush_chunk(&args, &cell_dir, &mut chunks, &mut chunk_frames, &mut chunk_numbers)?;
+            flush_chunk(
+                &args,
+                &cell_dir,
+                &mut chunks,
+                &mut chunk_frames,
+                &mut chunk_numbers,
+            )?;
         }
 
         frame_number += 1;
@@ -209,12 +237,34 @@ fn run() -> Result<(), String> {
             sleep(target - spent);
         }
     }
-    flush_chunk(&args, &cell_dir, &mut chunks, &mut chunk_frames, &mut chunk_numbers)?;
-    records.flush().map_err(|e| format!("records flush failed: {e}"))?;
+    flush_chunk(
+        &args,
+        &cell_dir,
+        &mut chunks,
+        &mut chunk_frames,
+        &mut chunk_numbers,
+    )?;
+    records
+        .flush()
+        .map_err(|e| format!("records flush failed: {e}"))?;
 
     let duration_seconds = started.elapsed().as_secs_f64();
-    write_summary(&args, &run_dir, frame_number, duration_seconds, source_region)?;
-    write_manifest(&args, &run_dir, &records_path, &chunks, frame_number, duration_seconds, source_region)?;
+    write_summary(
+        &args,
+        &run_dir,
+        frame_number,
+        duration_seconds,
+        source_region,
+    )?;
+    write_manifest(
+        &args,
+        &run_dir,
+        &records_path,
+        &chunks,
+        frame_number,
+        duration_seconds,
+        source_region,
+    )?;
 
     println!(
         "{{\n  \"run_id\": \"{}\",\n  \"frames\": {},\n  \"duration_seconds\": {:.3},\n  \"run_dir\": \"{}\",\n  \"records_jsonl\": \"{}\",\n  \"summary_json\": \"{}\",\n  \"manifest_json\": \"{}\"\n}}",
@@ -366,7 +416,11 @@ fn build_cell_state(
                     let r = bgra[idx + 2] as f32;
                     let maxc = r.max(g).max(b);
                     let minc = r.min(g).min(b);
-                    let sat = if maxc > 0.0 { ((maxc - minc) / maxc) * 255.0 } else { 0.0 };
+                    let sat = if maxc > 0.0 {
+                        ((maxc - minc) / maxc) * 255.0
+                    } else {
+                        0.0
+                    };
                     let luma = 0.299 * r + 0.587 * g + 0.114 * b;
                     sum_r += r;
                     sum_g += g;
@@ -384,11 +438,19 @@ fn build_cell_state(
             let r_mean = sum_r / pixels_per_cell;
             let g_mean = sum_g / pixels_per_cell;
             let b_mean = sum_b / pixels_per_cell;
-            let r_std = ((sum_r2 / pixels_per_cell) - r_mean * r_mean).max(0.0).sqrt();
-            let g_std = ((sum_g2 / pixels_per_cell) - g_mean * g_mean).max(0.0).sqrt();
-            let b_std = ((sum_b2 / pixels_per_cell) - b_mean * b_mean).max(0.0).sqrt();
+            let r_std = ((sum_r2 / pixels_per_cell) - r_mean * r_mean)
+                .max(0.0)
+                .sqrt();
+            let g_std = ((sum_g2 / pixels_per_cell) - g_mean * g_mean)
+                .max(0.0)
+                .sqrt();
+            let b_std = ((sum_b2 / pixels_per_cell) - b_mean * b_mean)
+                .max(0.0)
+                .sqrt();
             let luma_mean = sum_l / pixels_per_cell;
-            let luma_std = ((sum_l2 / pixels_per_cell) - luma_mean * luma_mean).max(0.0).sqrt();
+            let luma_std = ((sum_l2 / pixels_per_cell) - luma_mean * luma_mean)
+                .max(0.0)
+                .sqrt();
             let sat_mean = sum_sat / pixels_per_cell;
             let value_mean = sum_v / pixels_per_cell;
             let cell_index = gy * grid_w + gx;
@@ -401,22 +463,8 @@ fn build_cell_state(
             screen_energy += delta_luma + luma_std * 0.05;
 
             output.extend_from_slice(&[
-                r_mean,
-                g_mean,
-                b_mean,
-                r_std,
-                g_std,
-                b_std,
-                0.0,
-                sat_mean,
-                value_mean,
-                luma_mean,
-                luma_std,
-                sat_mean,
-                delta_luma,
-                0.0,
-                luma_std,
-                delta_luma,
+                r_mean, g_mean, b_mean, r_std, g_std, b_std, 0.0, sat_mean, value_mean, luma_mean,
+                luma_std, sat_mean, delta_luma, 0.0, luma_std, delta_luma,
             ]);
         }
     }
@@ -442,23 +490,29 @@ fn flush_chunk(
     }
     let chunk_id = chunks.len();
     let path = cell_dir.join(format!("{}_cells_{:04}.tvcells", args.run_id, chunk_id));
-    let mut file = BufWriter::new(File::create(&path).map_err(|e| format!("chunk open failed: {e}"))?);
-    file.write_all(b"TVCELL01").map_err(|e| format!("chunk write failed: {e}"))?;
+    let mut file =
+        BufWriter::new(File::create(&path).map_err(|e| format!("chunk open failed: {e}"))?);
+    file.write_all(b"TVCELL01")
+        .map_err(|e| format!("chunk write failed: {e}"))?;
     for value in [
         chunk_numbers.len() as u32,
         args.grid.1 as u32,
         args.grid.0 as u32,
         FEATURE_NAMES.len() as u32,
     ] {
-        file.write_all(&value.to_le_bytes()).map_err(|e| format!("chunk write failed: {e}"))?;
+        file.write_all(&value.to_le_bytes())
+            .map_err(|e| format!("chunk write failed: {e}"))?;
     }
     for number in chunk_numbers.iter() {
-        file.write_all(&number.to_le_bytes()).map_err(|e| format!("chunk write failed: {e}"))?;
+        file.write_all(&number.to_le_bytes())
+            .map_err(|e| format!("chunk write failed: {e}"))?;
     }
     for value in chunk_frames.iter() {
-        file.write_all(&value.to_le_bytes()).map_err(|e| format!("chunk write failed: {e}"))?;
+        file.write_all(&value.to_le_bytes())
+            .map_err(|e| format!("chunk write failed: {e}"))?;
     }
-    file.flush().map_err(|e| format!("chunk flush failed: {e}"))?;
+    file.flush()
+        .map_err(|e| format!("chunk flush failed: {e}"))?;
     chunks.push(ChunkMeta {
         path,
         chunk_id,
@@ -551,7 +605,14 @@ fn source_region(args: &Args) -> (i32, i32, i32, i32) {
     if let Some(region) = args.region {
         return region;
     }
-    unsafe { (0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)) }
+    unsafe {
+        (
+            0,
+            0,
+            GetSystemMetrics(SM_CXSCREEN),
+            GetSystemMetrics(SM_CYSCREEN),
+        )
+    }
 }
 
 fn parse_args() -> Result<Args, String> {
@@ -562,15 +623,26 @@ fn parse_args() -> Result<Args, String> {
         resolution: (960, 540),
         grid: (160, 90),
         region: None,
-        output_root: PathBuf::from("E:\\TruEVision Generation\\library\\capture_units\\20_minute\\incoming"),
+        output_root: PathBuf::from(
+            "E:\\TruEVision Generation\\library\\capture_units\\20_minute\\incoming",
+        ),
         run_id: format!("truevision_rs_{}", timestamp_slug()),
         start_delay: 0.0,
         chunk_frames: 30,
     };
     while let Some(flag) = args.next() {
         let value = match flag.as_str() {
-            "--duration" | "--fps" | "--resolution" | "--grid" | "--region" | "--output-root" | "--run-id"
-            | "--start-delay" | "--cell-chunk-frames" => args.next().ok_or_else(|| format!("{flag} requires a value"))?,
+            "--duration"
+            | "--fps"
+            | "--resolution"
+            | "--grid"
+            | "--region"
+            | "--output-root"
+            | "--run-id"
+            | "--start-delay"
+            | "--cell-chunk-frames" => args
+                .next()
+                .ok_or_else(|| format!("{flag} requires a value"))?,
             "--help" | "-h" => {
                 print_help();
                 std::process::exit(0);
@@ -586,7 +658,11 @@ fn parse_args() -> Result<Args, String> {
             "--output-root" => out.output_root = PathBuf::from(value),
             "--run-id" => out.run_id = value,
             "--start-delay" => out.start_delay = parse_f64(&value, "start-delay")?,
-            "--cell-chunk-frames" => out.chunk_frames = value.parse::<usize>().map_err(|_| "bad cell-chunk-frames".to_string())?,
+            "--cell-chunk-frames" => {
+                out.chunk_frames = value
+                    .parse::<usize>()
+                    .map_err(|_| "bad cell-chunk-frames".to_string())?
+            }
             _ => {}
         }
     }
@@ -600,7 +676,9 @@ fn print_help() {
 }
 
 fn parse_f64(value: &str, name: &str) -> Result<f64, String> {
-    value.parse::<f64>().map_err(|_| format!("bad {name}: {value}"))
+    value
+        .parse::<f64>()
+        .map_err(|_| format!("bad {name}: {value}"))
 }
 
 fn parse_pair(value: &str, name: &str) -> Result<(usize, usize), String> {
@@ -608,8 +686,12 @@ fn parse_pair(value: &str, name: &str) -> Result<(usize, usize), String> {
     if parts.len() != 2 {
         return Err(format!("{name} must look like WIDTHxHEIGHT"));
     }
-    let width = parts[0].parse::<usize>().map_err(|_| format!("bad {name} width"))?;
-    let height = parts[1].parse::<usize>().map_err(|_| format!("bad {name} height"))?;
+    let width = parts[0]
+        .parse::<usize>()
+        .map_err(|_| format!("bad {name} width"))?;
+    let height = parts[1]
+        .parse::<usize>()
+        .map_err(|_| format!("bad {name} height"))?;
     if width == 0 || height == 0 {
         return Err(format!("{name} values must be positive"));
     }
@@ -621,10 +703,18 @@ fn parse_region(value: &str) -> Result<(i32, i32, i32, i32), String> {
     if parts.len() != 4 {
         return Err("region must look like left,top,width,height".to_string());
     }
-    let left = parts[0].parse::<i32>().map_err(|_| "bad region left".to_string())?;
-    let top = parts[1].parse::<i32>().map_err(|_| "bad region top".to_string())?;
-    let width = parts[2].parse::<i32>().map_err(|_| "bad region width".to_string())?;
-    let height = parts[3].parse::<i32>().map_err(|_| "bad region height".to_string())?;
+    let left = parts[0]
+        .parse::<i32>()
+        .map_err(|_| "bad region left".to_string())?;
+    let top = parts[1]
+        .parse::<i32>()
+        .map_err(|_| "bad region top".to_string())?;
+    let width = parts[2]
+        .parse::<i32>()
+        .map_err(|_| "bad region width".to_string())?;
+    let height = parts[3]
+        .parse::<i32>()
+        .map_err(|_| "bad region height".to_string())?;
     if width <= 0 || height <= 0 {
         return Err("region width/height must be positive".to_string());
     }
@@ -636,11 +726,16 @@ fn json_escape(value: &str) -> String {
 }
 
 fn timestamp_slug() -> String {
-    let secs = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    let secs = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
     format!("{secs}")
 }
 
 fn utc_timestamp() -> String {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     format!("unix_ms:{}", now.as_millis())
 }

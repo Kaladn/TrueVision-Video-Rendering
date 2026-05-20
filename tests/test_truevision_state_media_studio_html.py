@@ -84,7 +84,7 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("Clear Log", html)
         self.assertIn("server-backed", html)
 
-    def test_local_qwen_prompt_preserves_securecore_boundary(self):
+    def test_local_qwen_prompt_preserves_truevision_boundary(self):
         html = HTML.read_text(encoding="utf-8")
 
         self.assertIn("Generated state media is synthetic, not evidence.", html)

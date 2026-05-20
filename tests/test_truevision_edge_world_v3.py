@@ -18,7 +18,7 @@ class TrueVisionEdgeWorldV3Tests(unittest.TestCase):
     def _signature(self) -> dict:
         return {
             "kind": "truevision_signature_profile_bundle",
-            "profile_id": "unit_cod_signature",
+            "profile_id": "unit_signature",
             "timeline_samples": [
                 {
                     "time_norm": 0.0,
@@ -113,7 +113,7 @@ class TrueVisionEdgeWorldV3Tests(unittest.TestCase):
         )
 
         self.assertFalse(np.array_equal(plain, styled))
-        self.assertEqual(styled_meta["signature_style"]["profile_id"], "unit_cod_signature")
+        self.assertEqual(styled_meta["signature_style"]["profile_id"], "unit_signature")
 
     def test_generate_edge_world_v3_writes_tiny_bundle(self):
         sample_rate = 8000

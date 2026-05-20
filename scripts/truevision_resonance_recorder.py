@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
-"""Record full CompuCogVision frame-state telemetry.
+"""Record full TrueVision frame-state telemetry.
 
-This is not SecureCore's compact TrueVision SC Forge wrapper. It records the
-older COD/ARC visual resonance lane directly: screen grid deltas plus the full
-20-feature ScreenResonanceState output.
+This recorder maps observed screen frames into cell-level visual state:
+grid deltas plus the full ScreenResonanceState feature set.
 
 No raw frames are written.
 """
@@ -27,7 +26,7 @@ from modules.screen_grid_mapper import ScreenGridMapper
 
 
 RECORD_KIND = "compucogvision_full_frame_state"
-DEFAULT_OUTPUT_ROOT = Path("D:/arc_solver_clean/cod_616/data/truevision_full")
+DEFAULT_OUTPUT_ROOT = Path("storage/artifacts/truevision_captures")
 CELL_FEATURE_NAMES = [
     "rgb_mean_r",
     "rgb_mean_g",
@@ -168,7 +167,7 @@ def build_record(
     record = {
         "schema_version": 1,
         "record_kind": RECORD_KIND,
-        "source": "cod_616.screen_resonance_state",
+        "source": "truevision.screen_resonance_state",
         "run_id": run_id,
         "observed_at_utc": features.get("observed_at_utc") or utc_now(),
         "timestamp_unix": clean_value(features.get("wall_time_unix", features.get("timestamp"))),

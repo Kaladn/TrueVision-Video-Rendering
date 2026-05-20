@@ -5,6 +5,12 @@ __pycache__/
 .ruff_cache/
 .test_tmp/
 
+artifact_index/**
+historical_securecore_data/**
+manifests/**
+reports/**
+docs/MACHINE_TO_MACHINE_NETWORK_SHARE_HANDOFF_*.md
+
 outputs/**
 !outputs/.gitkeep
 
