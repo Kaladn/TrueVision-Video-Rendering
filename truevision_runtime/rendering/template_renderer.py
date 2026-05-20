@@ -317,34 +317,53 @@ def beat_value(mid: float, high: float) -> float:
 
 def _draw_smoke(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, high: float, scene: dict[str, Any]) -> None:
     height, width = frame.shape[:2]
-    smoke = np.zeros_like(frame)
-    rng = np.random.default_rng(int(time_seconds * 18) % 10007)
-    coarse = rng.random((max(8, height // 22), max(8, width // 22)), dtype=np.float32)
-    coarse = cv2.resize(coarse, (width, height), interpolation=cv2.INTER_CUBIC)
-    coarse = cv2.GaussianBlur(coarse, (0, 0), sigmaX=22 + 22 * rms)
+    scene_seed = sum(ord(char) for char in str(scene.get("scene_id", "mirror"))) % 9973
     y = np.linspace(0.0, 1.0, height, dtype=np.float32)[:, None]
-    floor_mask = np.clip((y - 0.30) / 0.70, 0.0, 1.0) ** 1.4
-    density = np.clip((coarse - 0.28) * floor_mask * (0.65 + 0.8 * rms), 0.0, 1.0)
-    smoke[:, :, 0] = np.clip(density * (50 + 50 * high), 0, 140).astype(np.uint8)
-    smoke[:, :, 1] = np.clip(density * (55 + 35 * high), 0, 130).astype(np.uint8)
-    smoke[:, :, 2] = np.clip(density * (64 + 52 * bass), 0, 160).astype(np.uint8)
+    x = np.linspace(0.0, 1.0, width, dtype=np.float32)[None, :]
+    density = np.zeros((height, width), dtype=np.float32)
 
-    plume_count = 24
-    for index in range(plume_count):
-        lane = ((index * 37) % plume_count) / plume_count
-        base_x = width * lane
-        depth = ((time_seconds * (0.022 + rms * 0.03) + index * 0.071) % 1.0)
-        drift = math.sin(time_seconds * (0.18 + high * 0.2) + index * 0.67) * width * (0.025 + 0.025 * bass)
-        y = int(height * (0.93 - depth * 0.7))
-        x = int(base_x + drift)
-        rx = int(width * (0.012 + 0.035 * (1.0 - depth) + 0.012 * bass))
-        ry = int(height * (0.020 + 0.050 * (1.0 - depth) + 0.014 * rms))
-        value = int(24 + 70 * (1.0 - depth) * (0.35 + 0.65 * rms))
-        color = (value, value + int(12 * high), value + int(26 * bass))
-        cv2.ellipse(smoke, (x, y), (max(4, rx), max(5, ry)), index * 19, 0, 360, color, -1, cv2.LINE_AA)
-    blur = 51
-    smoke = cv2.GaussianBlur(smoke, (blur, blur), 0)
-    cv2.addWeighted(smoke, 0.34 + 0.22 * rms, frame, 1.0, 0, dst=frame)
+    octave_specs = (
+        (34, 19, 0.54, 0.020, 0.009, 18.0),
+        (67, 37, 0.31, -0.013, 0.014, 34.0),
+        (131, 73, 0.15, 0.007, -0.006, 58.0),
+    )
+    for index, (cols, rows, weight, drift_x, drift_y, blur_sigma) in enumerate(octave_specs):
+        rng = np.random.default_rng(scene_seed + index * 1459)
+        base = rng.random((rows, cols), dtype=np.float32)
+        layer = cv2.resize(base, (width, height), interpolation=cv2.INTER_CUBIC)
+        layer = np.roll(layer, int(time_seconds * width * (drift_x + 0.012 * bass)), axis=1)
+        layer = np.roll(layer, int(time_seconds * height * (drift_y - 0.010 * high)), axis=0)
+        layer = cv2.GaussianBlur(layer, (0, 0), sigmaX=blur_sigma, sigmaY=blur_sigma * 0.62)
+        density += layer * weight
+
+    curl = (
+        np.sin((x * 7.4 + y * 2.1 + time_seconds * (0.17 + 0.10 * bass)) * math.tau)
+        + np.sin((x * 2.7 - y * 5.8 - time_seconds * (0.11 + 0.08 * high)) * math.tau)
+    ).astype(np.float32)
+    density += curl * 0.055
+
+    floor_rise = np.clip((y - 0.26) / 0.72, 0.0, 1.0) ** 1.25
+    far_veil = np.clip(1.0 - np.abs(y - 0.47) * 1.7, 0.0, 1.0) ** 1.8
+    side_spill = np.clip(1.0 - np.abs(x - 0.5) * 1.55, 0.0, 1.0)
+    density = (density - float(density.min())) / max(1e-6, float(density.max() - density.min()))
+    density = np.clip((density - 0.31) * (1.5 + 0.7 * rms), 0.0, 1.0)
+    density *= np.clip(floor_rise * 0.72 + far_veil * 0.38 + side_spill * 0.14, 0.0, 1.0)
+    density = cv2.GaussianBlur(density, (0, 0), sigmaX=5.5 + 10.0 * rms, sigmaY=9.0 + 18.0 * rms)
+
+    light_shaft = np.clip(1.0 - (x * 0.65 + y * 0.42), 0.0, 1.0) ** 2.4
+    density = np.clip(density + light_shaft * (0.04 + 0.08 * high) * far_veil, 0.0, 1.0)
+
+    alpha = np.clip(density * (0.20 + 0.34 * rms + 0.08 * bass), 0.0, 0.72)
+    fog_color = np.zeros_like(frame, dtype=np.float32)
+    fog_color[:, :, 0] = 58 + 38 * high + 18 * far_veil
+    fog_color[:, :, 1] = 63 + 28 * high + 12 * far_veil
+    fog_color[:, :, 2] = 70 + 42 * bass + 24 * far_veil
+
+    frame_float = frame.astype(np.float32)
+    frame_float = frame_float * (1.0 - alpha[:, :, None]) + fog_color * alpha[:, :, None]
+    shadow = np.clip(1.0 - density * (0.07 + 0.10 * bass) * floor_rise, 0.78, 1.0)
+    frame_float *= shadow[:, :, None]
+    frame[:, :, :] = np.clip(frame_float, 0, 255).astype(np.uint8)
 
 
 def _draw_shards(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, high: float, beat: float, scene: dict[str, Any]) -> None:
@@ -479,7 +498,16 @@ def render_mirror_maze_frame(
         "time_seconds": round(time_seconds, 6),
         "scene_id": scene.get("scene_id"),
         "visual_mode": template.visual_mode,
-        "layers": ["mirror_corridor", "mirror_cracks", "volumetric_smoke", "mirror_shards", "live_wires", "silhouette", "bloom_grain"],
+        "layers": [
+            "mirror_corridor",
+            "mirror_cracks",
+            "density_field_fog",
+            "volumetric_smoke",
+            "mirror_shards",
+            "live_wires",
+            "silhouette",
+            "bloom_grain",
+        ],
         "audio_features": {
             "rms": round(rms, 6),
             "bass": round(bass, 6),
@@ -491,6 +519,7 @@ def render_mirror_maze_frame(
             "generated_state_media": "synthetic_not_evidence",
             "template_driven": True,
             "no_lyric_overlay": True,
+            "fog_uses_density_field": True,
         },
     }
     return frame, metadata

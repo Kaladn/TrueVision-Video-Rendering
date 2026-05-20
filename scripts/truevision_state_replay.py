@@ -99,6 +99,36 @@ def read_jsonl(path: Path) -> list[dict[str, Any]]:
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
+def read_native_cell_chunk(path: Path) -> tuple[np.ndarray, np.ndarray]:
+    """Read Rust native TVCELL01 chunks: header, frame numbers, f32 cell tensor."""
+    data = path.read_bytes()
+    if len(data) < 24:
+        raise ValueError(f"native cell chunk is too small: {path}")
+    if data[:8] != b"TVCELL01":
+        raise ValueError(f"unknown native cell chunk magic: {path}")
+    header = np.frombuffer(data, dtype="<u4", count=4, offset=8)
+    frame_count, grid_rows, grid_cols, feature_count = [int(value) for value in header]
+    numbers_offset = 24
+    numbers_bytes = frame_count * 4
+    frame_numbers = np.frombuffer(data, dtype="<u4", count=frame_count, offset=numbers_offset).astype(np.int32)
+    cells_offset = numbers_offset + numbers_bytes
+    expected_values = frame_count * grid_rows * grid_cols * feature_count
+    cells = np.frombuffer(data, dtype="<f4", count=expected_values, offset=cells_offset)
+    if cells.size != expected_values:
+        raise ValueError(f"native cell chunk ended early: {path}")
+    cells = cells.reshape(frame_count, grid_rows, grid_cols, feature_count).astype(np.float32, copy=False)
+    return cells, frame_numbers
+
+
+def read_cell_chunk(chunk: dict[str, Any]) -> tuple[np.ndarray, np.ndarray]:
+    path = Path(chunk["path"])
+    chunk_format = str(chunk.get("format") or "")
+    if chunk_format == "tvcells_f32le_v1" or path.suffix.lower() == ".tvcells":
+        return read_native_cell_chunk(path)
+    with np.load(path, allow_pickle=False) as data:
+        return data["cell_state"], data["frame_numbers"]
+
+
 def _write_video(path: Path, frames: list[np.ndarray], *, fps: float, fourcc_text: str) -> bool:
     if not frames:
         return False
@@ -139,26 +169,24 @@ def replay_capture(run_dir: Path, *, output_dir: Path | None = None, fps: float 
     record_by_frame = {int(record["frame_number"]): record for record in records}
     frame_index = 0
     for chunk in manifest["cell_state"]["chunks"]:
-        with np.load(chunk["path"], allow_pickle=False) as data:
-            cell_state = data["cell_state"]
-            frame_numbers = data["frame_numbers"]
-            for local_index, frame_number in enumerate(frame_numbers):
-                cells = cell_state[local_index]
-                frame = build_rgb_replay_frame(cells, feature_names=feature_names, output_shape=frame_shape)
-                frames.append(frame)
-                if frame_index in sample_targets:
-                    metrics = cell_rgb_accuracy(frame, cells, feature_names=feature_names)
-                    record = record_by_frame.get(int(frame_number), {})
-                    accuracy_samples.append(
-                        {
-                            "frame_index": frame_index,
-                            "frame_number": int(frame_number),
-                            "elapsed_seconds": record.get("elapsed_seconds"),
-                            "screen_energy": record.get("screen_energy"),
-                            **metrics,
-                        }
-                    )
-                frame_index += 1
+        cell_state, frame_numbers = read_cell_chunk(chunk)
+        for local_index, frame_number in enumerate(frame_numbers):
+            cells = cell_state[local_index]
+            frame = build_rgb_replay_frame(cells, feature_names=feature_names, output_shape=frame_shape)
+            frames.append(frame)
+            if frame_index in sample_targets:
+                metrics = cell_rgb_accuracy(frame, cells, feature_names=feature_names)
+                record = record_by_frame.get(int(frame_number), {})
+                accuracy_samples.append(
+                    {
+                        "frame_index": frame_index,
+                        "frame_number": int(frame_number),
+                        "elapsed_seconds": record.get("elapsed_seconds"),
+                        "screen_energy": record.get("screen_energy"),
+                        **metrics,
+                    }
+                )
+            frame_index += 1
 
     lossless_path = output_dir / f"{manifest['run_id']}_cell_rgb_replay_lossless_ffv1.mkv"
     preview_path = output_dir / f"{manifest['run_id']}_cell_rgb_replay_preview_mp4v.mp4"

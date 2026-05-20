@@ -13,6 +13,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PRESET_DIR = PROJECT_ROOT / "presets"
 DEFAULT_OUTPUT_ROOT = PROJECT_ROOT / "connected_artifacts"
 RECORDER_PATH = PROJECT_ROOT / "scripts" / "truevision_resonance_recorder.py"
+NATIVE_RECORDER_PATH = PROJECT_ROOT / "native" / "truevision_capture_rs" / "target" / "release" / "truevision_capture_rs.exe"
 
 
 @dataclass(frozen=True)
@@ -310,9 +312,112 @@ def _screen_bounds() -> Region:
         return Region(0, 0, 1920, 1080)
 
 
+def _capture_screen_rgb() -> Any:
+    import mss
+    import numpy as np
+
+    with mss.mss() as sct:
+        monitor = sct.monitors[1]
+        shot = sct.grab(monitor)
+        bgra = np.asarray(shot, dtype=np.uint8)
+        return bgra[:, :, :3][:, :, ::-1].copy()
+
+
+def detect_motion_video_region(
+    *,
+    samples: int = 4,
+    interval: float = 0.35,
+    min_area_ratio: float = 0.03,
+) -> Region:
+    """Detect the largest moving screen region and return its bounding box."""
+    import cv2
+    import numpy as np
+
+    if samples < 2:
+        raise ValueError("samples must be at least 2")
+
+    frames = []
+    for index in range(samples):
+        frames.append(_capture_screen_rgb())
+        if index < samples - 1:
+            time.sleep(max(0.05, interval))
+
+    height, width = frames[0].shape[:2]
+    accumulated = np.zeros((height, width), dtype=np.uint8)
+    previous = cv2.cvtColor(frames[0], cv2.COLOR_RGB2GRAY)
+    for frame in frames[1:]:
+        gray = cv2.cvtColor(frame, cv2.COLOR_RGB2GRAY)
+        diff = cv2.absdiff(gray, previous)
+        blur = cv2.GaussianBlur(diff, (5, 5), 0)
+        _, mask = cv2.threshold(blur, 7, 255, cv2.THRESH_BINARY)
+        accumulated = cv2.bitwise_or(accumulated, mask)
+        previous = gray
+
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (31, 31))
+    accumulated = cv2.morphologyEx(accumulated, cv2.MORPH_CLOSE, kernel, iterations=2)
+    accumulated = cv2.dilate(accumulated, kernel, iterations=2)
+
+    contours, _ = cv2.findContours(accumulated, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    min_area = width * height * min_area_ratio
+    candidates: list[tuple[float, Region]] = []
+    for contour in contours:
+        x, y, w, h = cv2.boundingRect(contour)
+        area = float(w * h)
+        if area >= min_area:
+            candidates.append((area, Region(int(x), int(y), int(w), int(h))))
+
+    if not candidates:
+        raise RuntimeError("could not detect a moving video region; make sure the video is playing")
+
+    _, region = max(candidates, key=lambda item: item[0])
+    pad_x = max(8, int(region.width * 0.015))
+    pad_y = max(8, int(region.height * 0.015))
+    return Region(
+        max(0, region.left - pad_x),
+        max(0, region.top - pad_y),
+        min(width - max(0, region.left - pad_x), region.width + pad_x * 2),
+        min(height - max(0, region.top - pad_y), region.height + pad_y * 2),
+    )
+
+
+def build_native_recorder_command(
+    preset: dict[str, Any],
+    *,
+    duration: float,
+    fps: int,
+    output_root: Path,
+    run_id: str,
+) -> list[str]:
+    region = ",".join(str(int(v)) for v in preset["snapped_region"])
+    resolution = "x".join(str(int(v)) for v in preset.get("capture_resolution", [2560, 1440]))
+    grid = "x".join(str(int(v)) for v in preset.get("grid", [640, 360]))
+    return [
+        str(NATIVE_RECORDER_PATH),
+        "--duration",
+        str(duration),
+        "--fps",
+        str(int(fps)),
+        "--resolution",
+        resolution,
+        "--grid",
+        grid,
+        "--region",
+        region,
+        "--run-id",
+        run_id,
+        "--output-root",
+        str(output_root),
+        "--start-delay",
+        "0",
+    ]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Select and run TrueVision-compatible screen capture regions.")
     parser.add_argument("--select", action="store_true", help="Drag-select a region with a transparent overlay.")
+    parser.add_argument("--auto-video", action="store_true", help="Detect the currently playing video area by motion.")
+    parser.add_argument("--samples", type=int, default=4, help="Screen samples for --auto-video.")
+    parser.add_argument("--sample-interval", type=float, default=0.35, help="Seconds between --auto-video samples.")
     parser.add_argument("--region", default="", help="Manual selected region: left,top,width,height.")
     parser.add_argument("--bounds", default="", help="Optional bounds: left,top,width,height. Defaults to primary screen.")
     parser.add_argument("--preset-id", default="truevision_region")
@@ -320,16 +425,22 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--monitor", type=int, default=0)
     parser.add_argument("--duration", type=float, default=30.0)
     parser.add_argument("--fps", type=int, default=15)
+    parser.add_argument("--capture-resolution", default="2560x1440")
+    parser.add_argument("--grid", default="640x360")
+    parser.add_argument("--blocks", default="16x9")
     parser.add_argument("--run-id", default="")
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--print-command", action="store_true")
+    parser.add_argument("--native", action="store_true", help="Print a native Rust capture command for the preset.")
     parser.add_argument("--watch", action="store_true", help="Run the existing TrueVision recorder against the preset.")
     return parser
 
 
 def main() -> None:
     args = build_parser().parse_args()
-    if args.select:
+    if args.auto_video:
+        selected = detect_motion_video_region(samples=args.samples, interval=args.sample_interval)
+    elif args.select:
         selected = select_region_tkinter()
     elif args.region:
         selected = parse_region(args.region)
@@ -338,6 +449,9 @@ def main() -> None:
 
     bounds = parse_region(args.bounds) if args.bounds else _screen_bounds()
     snapped = snap_region_to_truevision(selected, bounds=bounds)
+    capture_resolution = tuple(parse_region(f"0,0,{args.capture_resolution.replace('x', ',')}").as_list()[2:])
+    grid = tuple(parse_region(f"0,0,{args.grid.replace('x', ',')}").as_list()[2:])
+    blocks = tuple(parse_region(f"0,0,{args.blocks.replace('x', ',')}").as_list()[2:])
     preset_path = Path(args.preset_path) if args.preset_path else DEFAULT_PRESET_DIR / f"{args.preset_id}.json"
     preset = save_preset(
         path=preset_path,
@@ -345,9 +459,19 @@ def main() -> None:
         selected=selected,
         snapped=snapped,
         monitor=args.monitor,
+        capture_resolution=capture_resolution,
+        grid=grid,
+        blocks=blocks,
     )
     run_id = args.run_id or f"{args.preset_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
     command = build_recorder_command(
+        preset,
+        duration=args.duration,
+        fps=args.fps,
+        output_root=Path(args.output_root),
+        run_id=run_id,
+    )
+    native_command = build_native_recorder_command(
         preset,
         duration=args.duration,
         fps=args.fps,
@@ -359,13 +483,15 @@ def main() -> None:
         "selected_region": selected.as_list(),
         "snapped_region": snapped.as_list(),
         "recorder_command": command,
+        "native_recorder_command": native_command,
     }
     print(json.dumps(result, indent=2, allow_nan=False))
 
     if args.print_command:
-        print(" ".join(f'"{part}"' if " " in part else part for part in command))
+        printable = native_command if args.native else command
+        print(" ".join(f'"{part}"' if " " in part else part for part in printable))
     if args.watch:
-        completed = subprocess.run(command, cwd=str(PROJECT_ROOT), check=False)
+        completed = subprocess.run(native_command if args.native else command, cwd=str(PROJECT_ROOT), check=False)
         raise SystemExit(completed.returncode)
 
 

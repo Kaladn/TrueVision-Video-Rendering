@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -23,7 +24,8 @@ from truevision_region_snip import build_recorder_command
 
 
 HTML_PATH = ROOT / "ui" / "truevision_state_media_studio.html"
-STORAGE_ROOT = ROOT / "storage"
+DEFAULT_STORAGE_ROOT = ROOT / "storage"
+STORAGE_ROOT_ENV = "TRUEVISION_STORAGE_ROOT"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 DEFAULT_MODEL = "qwen3-coder:30b"
@@ -35,12 +37,26 @@ STORAGE_LANES = {
     "artifacts",
     "chats",
     "manifests",
+    "library",
     "reports",
     "receipts",
     "presets",
     "templates",
     "tmp",
 }
+
+
+def resolve_storage_root(value: str | None = None) -> Path:
+    raw = value or os.environ.get(STORAGE_ROOT_ENV)
+    if not raw:
+        return DEFAULT_STORAGE_ROOT
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = ROOT / path
+    return path.resolve()
+
+
+STORAGE_ROOT = resolve_storage_root()
 
 
 def utc_now() -> str:
@@ -867,9 +883,14 @@ class StudioHandler(BaseHTTPRequestHandler):
         print(f"[studio] {self.address_string()} - {fmt % args}")
 
 
-def run(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT) -> None:
+def run(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, storage_root: str | None = None) -> None:
+    global STORAGE_ROOT
+    if storage_root:
+        STORAGE_ROOT = resolve_storage_root(storage_root)
+    ensure_storage_layout(STORAGE_ROOT)
     server = ThreadingHTTPServer((host, port), StudioHandler)
     print(f"TrueVision Studio: http://{host}:{port}/")
+    print(f"TrueVision storage root: {STORAGE_ROOT}")
     server.serve_forever()
 
 
@@ -877,8 +898,13 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Serve TrueVision Studio with a local LLM CORS proxy.")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
+    parser.add_argument(
+        "--storage-root",
+        default=None,
+        help=f"Runtime storage root for chats/templates/receipts/artifacts. Overrides {STORAGE_ROOT_ENV}.",
+    )
     args = parser.parse_args()
-    run(args.host, args.port)
+    run(args.host, args.port, args.storage_root)
 
 
 if __name__ == "__main__":

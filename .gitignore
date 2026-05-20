@@ -40,3 +40,5 @@ storage/tmp/**
 !storage/tmp/.gitkeep
 
 *.log
+
+native/**/target/

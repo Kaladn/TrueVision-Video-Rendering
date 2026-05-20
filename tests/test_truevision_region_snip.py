@@ -5,6 +5,7 @@ from pathlib import Path
 
 from truevision_region_snip import (
     Region,
+    build_native_recorder_command,
     build_recorder_command,
     load_preset,
     save_preset,
@@ -69,6 +70,28 @@ class TrueVisionRegionSnipTests(unittest.TestCase):
         self.assertIn("960x540", command)
         self.assertIn("--grid", command)
         self.assertIn("160x90", command)
+
+    def test_build_native_recorder_command_uses_snapped_video_region(self):
+        preset = {
+            "snapped_region": [4, 0, 1280, 720],
+            "capture_resolution": [2560, 1440],
+            "grid": [640, 360],
+        }
+
+        command = build_native_recorder_command(
+            preset,
+            duration=20,
+            fps=9,
+            output_root=Path("E:/TruEVision Generation/library/capture_units/20_minute/incoming"),
+            run_id="atmosphere",
+        )
+
+        self.assertIn("--region", command)
+        self.assertIn("4,0,1280,720", command)
+        self.assertIn("--resolution", command)
+        self.assertIn("2560x1440", command)
+        self.assertIn("--grid", command)
+        self.assertIn("640x360", command)
 
 
 if __name__ == "__main__":

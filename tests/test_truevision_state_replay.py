@@ -1,8 +1,10 @@
 import unittest
+import tempfile
+from pathlib import Path
 
 import numpy as np
 
-from truevision_state_replay import build_rgb_replay_frame, cell_rgb_accuracy
+from truevision_state_replay import build_rgb_replay_frame, cell_rgb_accuracy, read_native_cell_chunk
 
 
 class TrueVisionStateReplayTests(unittest.TestCase):
@@ -46,6 +48,22 @@ class TrueVisionStateReplayTests(unittest.TestCase):
         self.assertEqual(metrics["max_abs_error"], 0.0)
         self.assertEqual(metrics["mean_abs_error"], 0.0)
         self.assertEqual(metrics["cell_count"], 8)
+
+    def test_read_native_cell_chunk_supports_rust_tvcells(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            path = Path(tmpdir) / "tiny.tvcells"
+            frames = np.array([0, 3], dtype="<u4")
+            cells = np.arange(2 * 2 * 3 * 4, dtype="<f4").reshape(2, 2, 3, 4)
+            with path.open("wb") as handle:
+                handle.write(b"TVCELL01")
+                handle.write(np.array([2, 2, 3, 4], dtype="<u4").tobytes())
+                handle.write(frames.tobytes())
+                handle.write(cells.tobytes())
+
+            observed_cells, observed_numbers = read_native_cell_chunk(path)
+
+            np.testing.assert_array_equal(observed_numbers, np.array([0, 3], dtype=np.int32))
+            np.testing.assert_array_equal(observed_cells, cells.astype(np.float32))
 
 
 if __name__ == "__main__":

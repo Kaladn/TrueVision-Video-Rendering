@@ -13,6 +13,8 @@ from truevision_studio_server import (
     list_templates,
     normalize_provider,
     read_chat_log,
+    resolve_storage_root,
+    ROOT,
     resolve_assistant_actions,
     run_av_tool_call,
     save_template,
@@ -38,6 +40,15 @@ class TrueVisionStudioServerTests(unittest.TestCase):
         self.assertEqual(normalize_provider(""), "ollama_native")
         self.assertEqual(normalize_provider("ollama_native"), "ollama_native")
         self.assertEqual(normalize_provider("openai_compatible"), "openai_compatible")
+
+    def test_resolve_storage_root_accepts_external_absolute_root(self):
+        self.assertEqual(
+            resolve_storage_root(r"E:\TruEVision Generation"),
+            Path(r"E:\TruEVision Generation").resolve(),
+        )
+
+    def test_resolve_storage_root_resolves_relative_to_project(self):
+        self.assertEqual(resolve_storage_root("storage_alt"), (ROOT / "storage_alt").resolve())
 
     def test_build_downstream_payload_for_ollama(self):
         payload = build_downstream_payload(

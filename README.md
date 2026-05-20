@@ -46,6 +46,7 @@ ui/
 
 scripts/
   truevision_studio_server.py
+  truevision_storage_library.py
   truevision_resonance_recorder.py
   truevision_state_replay.py
   trueframegen_fill.py
@@ -58,6 +59,8 @@ scripts/
   truevision_edge_world_v3.py
   truevision_basement_stick_narrative.py
   truevision_signature_profile_extract.py
+  truevision_extract_lightning_signature.py
+  truevision_project_edge_from_capture.py
   truevision_render_template.py
 
 templates/
@@ -74,9 +77,15 @@ trueframegen/
   frame_gap_filler.py
   render_missing_frame.py
   verify_replay_continuity.py
+  temporal_causality_projector.py
+  lightning_signature.py
 
 modules/
   screen_grid_mapper.py
+
+native/
+  truevision_capture_rs/
+    Rust native TrueVision screen recorder
 
 screen_resonance_state.py
 
@@ -93,6 +102,60 @@ connected_artifacts/
 outputs/
   ad hoc render/capture outputs, ignored by default
 ```
+
+Tool inventory and terminology queue:
+
+```text
+docs/TRUEVISION_AV_TOOLING_LIBRARY.md
+```
+
+## External Storage Vault
+
+Heavy captures and long renders should go to the external runtime vault, not the repo:
+
+```text
+E:\TruEVision Generation
+```
+
+Initialize the tidy audio/video library layout:
+
+```powershell
+cd D:\TrueVision_Generation_Lab
+python scripts\truevision_storage_library.py init --root "E:\TruEVision Generation"
+```
+
+Run the studio against that vault:
+
+```powershell
+$env:TRUEVISION_STORAGE_ROOT="E:\TruEVision Generation"
+python scripts\truevision_studio_server.py
+```
+
+or:
+
+```powershell
+python scripts\truevision_studio_server.py --storage-root "E:\TruEVision Generation"
+```
+
+The library keeps file types separated:
+
+```text
+library/source_audio/wav
+library/source_audio/mp3
+library/source_video/mp4
+library/source_stills/jpg
+library/truevision_captures/
+library/capture_units/20_minute/
+library/signature_profiles/fog
+library/signature_profiles/smoke
+library/signature_profiles/lighting
+library/signature_profiles/camera_motion
+library/renders/previews
+library/renders/full
+library/trueframegen/
+```
+
+Twenty-minute clips are the default signature-learning unit. They are long enough for fog drift, camera rhythm, lighting drift, and motion texture, but short enough to index, compare, rerun, and delete cleanly.
 
 ## Template Rendering
 
@@ -132,6 +195,67 @@ Example:
 
 ```powershell
 python scripts\trueframegen_fill.py --run-dir D:\path\to\truevision_capture --radius 6
+```
+
+## Native Rust Capture
+
+The Python recorder is still useful for compatibility and experiments, but high-density capture belongs in native code. The first native lane is:
+
+```text
+native/truevision_capture_rs
+```
+
+Build:
+
+```powershell
+cd D:\TrueVision_Generation_Lab\native\truevision_capture_rs
+cargo build --release
+```
+
+Example native capture:
+
+```powershell
+cd D:\TrueVision_Generation_Lab
+.\native\truevision_capture_rs\target\release\truevision_capture_rs.exe `
+  --duration 2 `
+  --fps 9 `
+  --resolution 2560x1440 `
+  --grid 640x360 `
+  --output-root "E:\TruEVision Generation\library\capture_units\20_minute\incoming" `
+  --run-id "truevision_rs_1440p_640x360_test"
+```
+
+Native chunks use:
+
+```text
+tvcells_f32le_v1
+```
+
+Python replay supports both legacy compressed `.npz` chunks and native `.tvcells` chunks.
+
+Proof run:
+
+```text
+Python 1440p / 640x360: 5 frames over 2.542s
+Rust   1440p / 640x360: 18 frames over 2.061s
+```
+
+Prepare a playback clarity test without recording:
+
+```powershell
+python scripts\truevision_native_clarity_test.py
+```
+
+Run it only after the screen/video is ready:
+
+```powershell
+python scripts\truevision_native_clarity_test.py --execute
+```
+
+GPU boundary notes:
+
+```text
+reports/NATIVE_CAPTURE_GPU_BOUNDARY.md
 ```
 
 ## Open The Studio
@@ -298,6 +422,73 @@ The v3 manifest records wall time, process CPU seconds, average logical CPU perc
 ```text
 outputs\edge_of_the_world_v3\edge_of_the_world_v3_edge_smoke_river_codsig_v1\edge_of_the_world_v3_edge_smoke_river_codsig_v1_full_audio.mp4
 ```
+
+## Edge 6-1-6 Projection
+
+TrueFrameGen can use an atmospheric TrueVision capture as a temporal teacher,
+then project that learned 6-1-6 motion history across the full Edge Of The
+World song. This is projection from observed state dynamics, not a copied video
+loop.
+
+```powershell
+python scripts\truevision_project_edge_from_capture.py `
+  --capture-run-dir "E:\TruEVision Generation\library\capture_units\20_minute\incoming\YOUR_1_MINUTE_CAPTURE" `
+  --run-id "edge_of_the_world_616_projected_atmosphere_v1" `
+  --resolution 2560x1440 `
+  --fps 12
+```
+
+Preview first:
+
+```powershell
+python scripts\truevision_project_edge_from_capture.py `
+  --capture-run-dir "E:\TruEVision Generation\library\capture_units\20_minute\incoming\YOUR_1_MINUTE_CAPTURE" `
+  --run-id "edge_616_projection_preview" `
+  --resolution 2560x1440 `
+  --fps 12 `
+  --max-seconds 5
+```
+
+Hell/edge-stacked style preview:
+
+```powershell
+python scripts\truevision_project_edge_from_capture.py `
+  --capture-run-dir "E:\TruEVision Generation\library\capture_units\20_minute\incoming\YOUR_1_MINUTE_CAPTURE" `
+  --run-id "edge_616_hell_power_walk_preview" `
+  --resolution 2560x1440 `
+  --fps 12 `
+  --max-seconds 5 `
+  --style hell_power_walk
+```
+
+Peak/lightning-style flash signatures are extracted from captured TrueVision
+state, not hand-drawn first. The extractor scores playback frames for intensity
+spikes, pulls the 6-prior / peak / 6-future cell neighborhood, and writes a
+reusable lighting signature:
+
+```powershell
+python scripts\truevision_extract_lightning_signature.py `
+  --capture-run-dir "E:\TruEVision Generation\library\capture_units\20_minute\incoming\YOUR_CAPTURE" `
+  --signature-id "edge_teacher_peak_flash_signature"
+```
+
+Use that signature during projection so music peaks and bass drops fire the
+captured cell pattern with red rhythm transitions:
+
+```powershell
+python scripts\truevision_project_edge_from_capture.py `
+  --capture-run-dir "E:\TruEVision Generation\library\capture_units\20_minute\incoming\YOUR_CAPTURE" `
+  --run-id "edge_616_hell_power_walk_signature_flash_preview" `
+  --resolution 2560x1440 `
+  --fps 12 `
+  --max-seconds 10 `
+  --style hell_power_walk `
+  --lightning-signature "E:\TruEVision Generation\library\signature_profiles\lighting\edge_teacher_peak_flash_signature.json"
+```
+
+If the source capture is fog/atmosphere, the output is a peak-flash signature.
+If the source capture is real lightning footage, the same tool becomes the
+lightning-signature snagging lane.
 
 ## Run Tests
 

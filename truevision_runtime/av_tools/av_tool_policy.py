@@ -18,7 +18,7 @@ SAFE_TEMPLATE_TOOLS = {
     "template_from_audio_signals",
     "template_delete",
 }
-SAFE_MEDIA_LANES = {"artifacts", "manifests", "reports", "templates", "receipts", "events"}
+SAFE_MEDIA_LANES = {"artifacts", "manifests", "reports", "templates", "receipts", "events", "library"}
 
 
 def safe_flat_json_name(name: str) -> str:

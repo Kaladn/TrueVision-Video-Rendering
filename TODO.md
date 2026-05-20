@@ -18,6 +18,7 @@ The lab proves the audio/video state-media language first.
 
 - [x] Standalone project root exists at `D:\TrueVision_Generation_Lab`.
 - [x] Project is separated from SecureCore and AnchorWorks.
+- [x] External heavy vault selected: `E:\TruEVision Generation`.
 - [x] Static studio UI exists at `ui/truevision_state_media_studio.html`.
 - [x] Local studio server exists at `scripts/truevision_studio_server.py`.
 - [x] Local Qwen/Ollama proxy route exists.
@@ -41,6 +42,15 @@ The lab proves the audio/video state-media language first.
 - [x] TrueFrameGen uses 6-prior / missing-center / 6-future temporal mapping.
 - [x] TrueFrameGen fills RGB/luma/edge/motion/delta channels first.
 - [x] TrueFrameGen writes manifest, temporal trace JSONL, missing-frame report, and filled video.
+- [x] Storage library initializer exists.
+- [x] Storage library uses tidy file-type directories.
+- [x] Storage library includes 20-minute clip lanes.
+- [x] Native Rust TrueVision recorder first slice exists.
+- [x] Python replay can read native `.tvcells` chunks.
+- [x] Rust 1440p / 640x360 proof hit near 9fps for a 2-second sample.
+- [x] Throwaway recordings from this session were removed from the `E:` vault.
+- [x] Native capture GPU boundary report exists.
+- [x] Playback clarity test harness exists.
 - [x] Signature profile extractor exists.
 - [x] Basement renderer can consume a signature profile bundle.
 - [x] AV-only tool registry exists.
@@ -59,6 +69,7 @@ The lab proves the audio/video state-media language first.
 - [x] Basement full arc was rendered with COD motion/look signature.
 - [x] Edge Of The World v3 was rendered with COD motion/look signature.
 - [x] `Hard Has No Meaning Here / Mirror Made` 1080p QSV preview rendered from template.
+- [x] Tooling library started at `docs/TRUEVISION_AV_TOOLING_LIBRARY.md`.
 
 ## Morning Re-Entry
 
@@ -135,6 +146,34 @@ storage/
 - [ ] Add a cleanup command for generated previews only.
 - [ ] Keep cleanup gated by explicit human confirmation.
 
+## Layer 1.5: External Media Library
+
+- [x] Use `E:\TruEVision Generation` for heavy runtime capture/generation data.
+- [x] Add `scripts/truevision_storage_library.py`.
+- [x] Add `truevision_runtime/storage_library.py`.
+- [x] Add source audio directories by file type.
+- [x] Add source video directories by file type.
+- [x] Add source still directories by file type.
+- [x] Add TrueVision capture lanes.
+- [x] Add signature profile lanes.
+- [x] Add render preview/full/still lanes.
+- [x] Add TrueFrameGen input/output/trace lanes.
+- [x] Add 20-minute clip unit lanes:
+
+```text
+library/capture_units/20_minute/incoming
+library/capture_units/20_minute/runs
+library/capture_units/20_minute/profiles
+library/capture_units/20_minute/reports
+```
+
+- [ ] Route new long TrueVision capture commands into `library/capture_units/20_minute/runs`.
+- [ ] Route extracted fog/smoke profiles into `library/signature_profiles/fog` and `library/signature_profiles/smoke`.
+- [ ] Route full renders into `library/renders/full`.
+- [ ] Route previews into `library/renders/previews`.
+- [ ] Add a library index update after every new capture/profile/render.
+- [ ] Add retention rules for 20-minute chunks.
+
 ## Layer 2: AV Tool Bus
 
 - [x] Add `truevision_runtime/av_tools/av_tool_registry.py`.
@@ -164,8 +203,44 @@ storage/
 - [ ] Add `video_color_grade`.
 - [ ] Add `variant_compare`.
 - [ ] Add a policy test for every tool.
+- [ ] Promote `docs/TRUEVISION_AV_TOOLING_LIBRARY.md` into a generated/indexed tooling catalog.
 
-## Layer 2.5: Template-Driven Rendering
+## Layer 2.5: Arc Mixer
+
+- [ ] Add Arc Mixer as an audio/video-only composition lane.
+- [ ] Keep Arc Mixer separate from SecureCore and AnchorWorks.
+- [ ] Define Arc Mixer inputs:
+
+```text
+audio features
+TrueVision captures
+signature profiles
+state templates
+time-marker recalibration notes
+TrueFrameGen traces
+```
+
+- [ ] Define Arc Mixer outputs:
+
+```text
+mixed state template
+render job manifest
+source contribution map
+calibration receipt
+learning record
+```
+
+- [ ] Mix audio-driven timing with visual signature profiles.
+- [ ] Mix fog/smoke/water/camera/light signatures without copying raw reference frames.
+- [ ] Add source weighting per time segment.
+- [ ] Add "less geometry / more atmosphere" control.
+- [ ] Add "realism pressure" control.
+- [ ] Add "motion inheritance" control from TrueVision captures.
+- [ ] Add "do not draw as circles/triangles" artifact guard.
+- [ ] Add manifest fields for every mixed source.
+- [ ] Add tests that Arc Mixer never claims generated media is evidence.
+
+## Layer 2.6: Template-Driven Rendering
 
 - [x] Add a generic template render runner.
 - [x] Add reusable `mirror_maze_realism` renderer.
@@ -179,7 +254,7 @@ storage/
 - [ ] Add GPU/render profile presets: `preview_fast`, `preview_quality`, `full_quality`.
 - [ ] Add a true 3D/material lane for mirror glass, smoke, camera, and depth lighting.
 
-## Layer 2.6: TrueFrameGen Missing-Frame Fill
+## Layer 2.7: TrueFrameGen Missing-Frame Fill
 
 - [x] Add `trueframegen/temporal_616.py`.
 - [x] Add `trueframegen/causal_cell_map.py`.
@@ -195,6 +270,30 @@ storage/
 - [ ] Add fog-specific temporal density interpolation.
 - [ ] Add QSV/GPU encode option for filled video output.
 - [ ] Add UI/AV-tool entrypoint for TrueFrameGen gap fill.
+
+## Layer 2.8: Native Capture Acceleration
+
+- [x] Add `native/truevision_capture_rs`.
+- [x] Capture screen through native Windows GDI.
+- [x] Compute RGB/luma/saturation/motion cell features in Rust.
+- [x] Write native `tvcells_f32le_v1` chunks.
+- [x] Write manifest, summary, and records JSONL.
+- [x] Update Python replay to read `.tvcells`.
+- [x] Build release executable with Cargo.
+- [x] Prove 1440p / 640x360 cells can approach target 9fps in Rust.
+- [x] Verify native hot loop does not run 6-1-6 mapping, signature extraction, replay generation, or fingerprint building.
+- [x] Add playback clarity harness: `scripts/truevision_native_clarity_test.py`.
+- [x] Add GPU capture boundary report.
+- [ ] Add native capture route to the studio server.
+- [ ] Add UI switch: Python recorder vs Rust recorder.
+- [ ] Add native capture receipts.
+- [ ] Add QSV replay encode path for native captures.
+- [ ] Add multi-threaded cell feature computation.
+- [ ] Add DirectX Desktop Duplication path after GDI proof.
+- [ ] Add GPU path for resize/color/feature extraction.
+- [ ] Add benchmark report for 960p, 1080p, 1440p, and 4K grids.
+- [ ] Add safe 20-minute native capture preset.
+- [ ] Add clean abort/stop control for long native captures.
 
 ## Layer 3: Qwen Transformation Helper
 
@@ -415,6 +514,37 @@ seal and ascend
 - [ ] Add this renderer behind an AV tool call.
 - [ ] Add template controls for scene beat percentages.
 - [ ] Add Qwen template compiler examples for narrative state sequencing.
+
+## Layer 5B: Edge Of The World 6-1-6 Projection
+
+- [x] Add `trueframegen/temporal_causality_projector.py`.
+- [x] Add `scripts/truevision_project_edge_from_capture.py`.
+- [x] Read Edge lyrics before projection.
+- [x] Build an ffmpeg soundprint before projection.
+- [x] Use captured TrueVision state as a 6-1-6 temporal teacher.
+- [x] Enforce project-not-clone boundary in manifest/report.
+- [x] Stream projected frames instead of saving one giant full-song cell dump.
+- [x] Record a clean 1-minute full-screen atmospheric teacher capture after human start command.
+- [x] Render a 5-second projection preview from the 1-minute teacher.
+- [x] Add `hell_power_walk` style: Canny, Scharr, Laplacian, DoG, edge glow, ember grade, walking-away power silhouette.
+- [x] Add `trueframegen/lightning_signature.py`.
+- [x] Add `scripts/truevision_extract_lightning_signature.py`.
+- [x] Extract peak/lightning-style 6-1-6 hot-cell signatures from TrueVision capture state.
+- [x] Let `hell_power_walk` consume a lighting signature instead of only drawing synthetic bolts.
+- [x] Drive red flash transitions from rhythm/high-intensity/bass pressure.
+- [x] Render a 10-second signature-flash preview:
+
+```text
+E:\TruEVision Generation\library\renders\full\edge_616_hell_power_walk_signature_flash_10s
+```
+
+- [ ] Capture a true lightning reference clip, then extract a real lightning signature profile.
+- [ ] Render full 04:38.32 Edge projection after preview approval.
+- [ ] Save the 1-minute teacher under the heavy vault capture library.
+- [ ] Save the projected Edge render under the heavy vault full-render library.
+- [ ] Compare 20-second teacher projection vs 1-minute teacher projection.
+- [ ] Add render cost telemetry to the temporal projection manifest.
+- [ ] Add optional Intel/QSV encode path for long full-song runs.
 - [ ] Add operator time-marker recalibration for story beats.
 
 ## Layer 5C: Signature Library

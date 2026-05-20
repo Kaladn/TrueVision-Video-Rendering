@@ -1,10 +1,13 @@
 import json
+import inspect
 import tempfile
 import unittest
 import wave
 from pathlib import Path
 
 import numpy as np
+
+import truevision_runtime.rendering.template_renderer as template_renderer
 
 from truevision_runtime.rendering.template_renderer import (
     load_render_template,
@@ -98,6 +101,33 @@ class TemplateRendererTests(unittest.TestCase):
             self.assertIn("volumetric_smoke", metadata["layers"])
             self.assertTrue(metadata["boundary"]["template_driven"])
 
+    def test_fog_renderer_uses_density_field_not_primitive_plumes(self):
+        source = inspect.getsource(template_renderer._draw_smoke)
+
+        self.assertNotIn("cv2.ellipse", source)
+        self.assertNotIn("cv2.circle", source)
+        self.assertNotIn("fillConvexPoly", source)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            template = load_render_template(self._template(Path(tmp)))
+            frame, metadata = render_mirror_maze_frame(
+                template=template,
+                frame_state={
+                    "frame_index": 4,
+                    "time_seconds": 0.75,
+                    "rms": 0.72,
+                    "bass": 0.55,
+                    "mid": 0.4,
+                    "high": 0.25,
+                    "beat": 0.2,
+                },
+                duration_seconds=1.0,
+            )
+
+            self.assertIn("density_field_fog", metadata["layers"])
+            self.assertTrue(metadata["boundary"]["fog_uses_density_field"])
+            self.assertGreater(float(frame[:, :, 0].std()), 8.0)
+
     def test_render_template_writes_manifest_with_encoder_and_cost(self):
         with tempfile.TemporaryDirectory() as tmp:
             result = render_template(self._template(Path(tmp)), mux_audio=False)
@@ -116,4 +146,3 @@ class TemplateRendererTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

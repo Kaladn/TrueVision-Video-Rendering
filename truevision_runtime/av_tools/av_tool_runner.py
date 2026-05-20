@@ -17,7 +17,7 @@ from .av_tool_receipts import stable_hash, utc_now, write_tool_receipt
 
 
 def _ensure_storage(storage_root: Path) -> None:
-    for lane in ["artifacts", "events", "manifests", "receipts", "reports", "templates"]:
+    for lane in ["artifacts", "events", "library", "manifests", "receipts", "reports", "templates"]:
         path = storage_root / lane
         path.mkdir(parents=True, exist_ok=True)
         keep = path / ".gitkeep"
