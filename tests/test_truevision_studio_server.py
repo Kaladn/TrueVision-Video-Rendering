@@ -9,6 +9,7 @@ from truevision_studio_server import (
     build_downstream_payload,
     delete_template,
     handle_assistant_message,
+    list_render_presets,
     list_storage_files,
     list_templates,
     normalize_provider,
@@ -172,6 +173,14 @@ class TrueVisionStudioServerTests(unittest.TestCase):
             self.assertTrue(result["ok"])
             self.assertEqual(result["result"]["template"]["timeline"]["frame_count"], 100)
             self.assertTrue(Path(result["receipt"]["path"]).exists())
+
+    def test_render_presets_are_available_to_studio_server(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            presets = list_render_presets(Path(tmpdir))
+
+            preset_ids = {preset["preset_id"] for preset in presets}
+            self.assertIn("glitch_444_alive_poster", preset_ids)
+            self.assertIn("house_remix_audio_city", preset_ids)
 
     def test_list_storage_files_reports_saved_artifacts(self):
         with tempfile.TemporaryDirectory() as tmpdir:

@@ -37,6 +37,14 @@ AV_TOOLS: tuple[AVToolSpec, ...] = (
     AVToolSpec("learning_record_save", "Save AV render success/failure learning.", 1, "medium", "learning record"),
     AVToolSpec("storage_list_artifacts", "List media artifacts from AV storage lanes only.", 1, "medium", "media listing"),
     AVToolSpec("storage_list_templates", "List saved AV templates.", 1, "medium", "template listing"),
+    AVToolSpec("source_snap_tool", "Prepare still/video source-state snap packets for record, regen, or generation reference.", 1, "high", "source snap plan"),
+    AVToolSpec("existing_state_animator", "Animate only existing source-state regions without adding new composition.", 1, "high", "state animation plan"),
+    AVToolSpec("electric_glow_intensity_animator", "Pulse existing electric/glow regions by intensity only.", 1, "high", "glow intensity plan"),
+    AVToolSpec("spectrum_audio_reactive_city", "Create an audio-reactive city/spectrum preset or template.", 1, "high", "city spectrum preset"),
+    AVToolSpec("frame_diff_replay_accuracy", "Compare source and regen manifests or state artifacts for replay drift.", 1, "medium", "accuracy report"),
+    AVToolSpec("manifest_browser", "Browse AV render/capture manifests.", 1, "medium", "manifest listing"),
+    AVToolSpec("render_preset_library", "List, load, save, and promote reusable render presets.", 1, "high", "preset library result"),
+    AVToolSpec("local_qwen_controller", "Describe or validate the local Qwen planner/controller contract.", 1, "high", "controller contract"),
 )
 
 

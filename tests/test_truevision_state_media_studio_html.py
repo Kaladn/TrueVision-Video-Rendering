@@ -156,6 +156,23 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("available_av_tools", html)
         self.assertIn("human_confirmed: false", html)
 
+    def test_html_exposes_reusable_studio_tools_and_presets(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn("Render Preset Library", html)
+        self.assertIn("/api/render-presets", html)
+        self.assertIn("refreshPresets", html)
+        self.assertIn("loadPreset", html)
+        self.assertIn("selectedPreset", html)
+        self.assertIn("source_snap_tool", html)
+        self.assertIn("existing_state_animator", html)
+        self.assertIn("electric_glow_intensity_animator", html)
+        self.assertIn("spectrum_audio_reactive_city", html)
+        self.assertIn("frame_diff_replay_accuracy", html)
+        self.assertIn("manifest_browser", html)
+        self.assertIn("render_preset_library", html)
+        self.assertIn("local_qwen_controller", html)
+
 
 if __name__ == "__main__":
     unittest.main()

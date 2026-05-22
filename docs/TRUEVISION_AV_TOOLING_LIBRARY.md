@@ -20,6 +20,60 @@ Reverse TrueVision replays, regenerates, or demonstrates state.
 Generated media is synthetic state media, not evidence.
 ```
 
+## Render Law
+
+This is now a project law:
+
+```text
+Grid/state storage is not the same thing as pixel presentation.
+Production render lanes must be state/grid/primitive first.
+Pixels are final output, not the primary reasoning layer.
+```
+
+Bad production shape:
+
+```text
+for every output pixel:
+  solve the whole scene again
+```
+
+Allowed only as:
+
+```text
+prototype
+visual sketch
+validation pass
+final rasterization
+```
+
+Correct production shape:
+
+```text
+audio/video signal
+-> state/grid fields
+-> temporal fields / primitive lanes
+-> deterministic frame plan
+-> final raster/encode
+-> manifest + receipts + hashes
+```
+
+Hardware-use law:
+
+```text
+Use CPU cores for parallel state/render work.
+Use GPU hardware encoders when available.
+Record encoder, render threads, bitrate, frame count, duration,
+state-log interval, wall time, memory, and deterministic hashes.
+```
+
+Plain-language law:
+
+```text
+TrueVision does not earn trust by hand-painting pixels.
+It earns trust by preserving state, showing what drove the output,
+and proving the run with manifests and hashes.
+```
+
 ## External Utilities Used
 
 ```text
@@ -47,6 +101,7 @@ These are implementation utilities. They are not general autonomous tools.
 | AV runner | `truevision_runtime/av_tools/av_tool_runner.py` | exists | Executes validated AV-only tool calls. |
 | AV receipts | `truevision_runtime/av_tools/av_tool_receipts.py` | exists | Logs tool execution receipts. |
 | Recalibration | `truevision_runtime/av_tools/av_recalibration.py` | exists | Stores time-marker notes and patch proposals. |
+| Studio tooling | `truevision_runtime/studio/studio_tooling.py` | exists | Reusable Studio tool contracts and render preset library. |
 | Storage library | `truevision_runtime/storage_library.py` | exists | Keeps repo storage and external vault layout tidy. |
 | Template renderer | `truevision_runtime/rendering/template_renderer.py` | exists | Generic template-driven renderer. |
 
@@ -77,6 +132,40 @@ receipt_create
 learning_record_save
 storage_list_artifacts
 storage_list_templates
+source_snap_tool
+existing_state_animator
+electric_glow_intensity_animator
+spectrum_audio_reactive_city
+frame_diff_replay_accuracy
+manifest_browser
+render_preset_library
+local_qwen_controller
+```
+
+## TrueVision Studio Tool Set
+
+These are the reusable Studio-level controls. They are tool contracts, not
+throwaway scripts.
+
+| Tool | Purpose |
+| --- | --- |
+| Source Snap Tool | Creates still/video source-state packets for record, regen, or generation reference. |
+| Existing-State Animator | Animates only existing source-state regions without adding composition. |
+| Electric/Glow Intensity Animator | Pulses existing lightning, glow, halo, tower, waveform, or analyzer regions by intensity. |
+| Spectrum/Audio-Reactive City Tool | Maps audio pressure to skyline, windows, glow, fog, and beat-synced frame pressure. |
+| Frame Diff / Replay Accuracy Tool | Measures source-vs-regenerated drift through manifests, state, or frame artifacts. |
+| Manifest Browser | Reads render/capture manifests through the Studio instead of manual folder digging. |
+| Render Preset Library | Promotes successful render lanes into reusable presets and templates. |
+| Local Qwen Controller | Lets Qwen plan AV state and request tools through validation and receipts. |
+
+Current reusable presets:
+
+```text
+glitch_444_alive_poster
+house_remix_audio_city
+storm_ember_city
+mirror_maze_realism
+edge_audio_river
 ```
 
 ## Capture And Replay Tools

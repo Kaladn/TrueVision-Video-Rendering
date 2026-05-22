@@ -1,0 +1,60 @@
+{
+  "template_id": "center_warp_laserfield_sample",
+  "title": "Center Warp Laserfield Sample",
+  "purpose": "Minimal sample for the full human-prompt to audio-reactive video pipeline.",
+  "audio": {
+    "path": "replace-with-local-wav-or-mp3-file",
+    "sample_rate": 44100
+  },
+  "render": {
+    "renderer": "truevision_weird_occlusion_rs",
+    "scene_mode": "warp_laser_field",
+    "palette": "glitch_444",
+    "width": 1280,
+    "height": 720,
+    "fps": 30,
+    "duration_seconds": 30,
+    "video_encoder": "h264_qsv",
+    "fallback_encoder": "h264_amf",
+    "bitrate": "24M",
+    "render_threads": 32,
+    "state_log_every": 1
+  },
+  "state_language": {
+    "background": "pure_black",
+    "origin": "center_screen",
+    "motifs": [
+      "radial_laser_fan",
+      "warp_starfield",
+      "center_energy_core",
+      "tunnel_rings"
+    ],
+    "audio_mapping": {
+      "bass": [
+        "center_core_size",
+        "beam_travel_speed",
+        "tunnel_depth"
+      ],
+      "rms": [
+        "beam_brightness",
+        "starfield_velocity"
+      ],
+      "highs": [
+        "star_streak_shimmer",
+        "laser_color_energy"
+      ],
+      "beat": [
+        "center_flash",
+        "radial_beam_pressure",
+        "tunnel_ring_pulse"
+      ]
+    }
+  },
+  "boundary": {
+    "generated_state_media": "synthetic_not_evidence",
+    "state_grid_primitive_first": true,
+    "pixels_last": true,
+    "no_fog": true,
+    "no_external_visual_assets": true
+  }
+}

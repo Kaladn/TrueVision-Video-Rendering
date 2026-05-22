@@ -10,6 +10,14 @@ from typing import Any
 import numpy as np
 
 from truevision_runtime.state_patterns.audio_video_patterns import choose_patterns_for_signal
+from truevision_runtime.studio.studio_tooling import (
+    build_studio_tool_plan,
+    get_render_preset,
+    list_render_presets,
+    list_studio_tools,
+    preset_to_template,
+    save_render_preset,
+)
 
 from .av_recalibration import append_recalibration_event, list_recalibration_events
 from .av_tool_policy import AVToolPolicyError, safe_flat_json_name, validate_tool_call
@@ -534,6 +542,94 @@ def _list_media_artifacts(storage_root: Path, lane: str | None = None) -> list[d
     return sorted(files, key=lambda item: item["name"])
 
 
+def _browse_manifests(storage_root: Path, *, limit: int = 50) -> dict[str, Any]:
+    candidates: list[Path] = []
+    manifest_root = storage_root / "manifests"
+    if manifest_root.exists():
+        candidates.extend(path for path in manifest_root.glob("*.json") if path.is_file())
+    output_root = Path("outputs")
+    if output_root.exists():
+        candidates.extend(path for path in output_root.glob("*/*_manifest.json") if path.is_file())
+    items: list[dict[str, Any]] = []
+    for path in sorted(candidates, key=lambda item: item.stat().st_mtime, reverse=True)[:limit]:
+        summary: dict[str, Any] = {}
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(payload, dict):
+                summary = {
+                    "schema": payload.get("schema") or payload.get("manifest_kind"),
+                    "run_id": payload.get("run_id") or payload.get("payload", {}).get("run_id"),
+                    "duration_seconds": (payload.get("render") or {}).get("duration_seconds"),
+                    "frame_count": (payload.get("render") or {}).get("frame_count"),
+                    "wall_seconds": (payload.get("machine") or {}).get("wall_seconds"),
+                }
+        except (OSError, json.JSONDecodeError):
+            summary = {"read_error": True}
+        items.append(
+            {
+                "name": path.name,
+                "path": str(path),
+                "size_bytes": path.stat().st_size,
+                "modified_at_utc": utc_now(),
+                "summary": summary,
+            }
+        )
+    return {"manifests": items, "count": len(items)}
+
+
+def _render_preset_library(storage_root: Path, args: dict[str, Any]) -> dict[str, Any]:
+    action = str(args.get("action") or "list")
+    if action == "list":
+        return {"presets": list_render_presets(storage_root), "tools": list_studio_tools()}
+    if action == "load":
+        return {"preset": get_render_preset(str(args.get("preset_id") or ""), storage_root)}
+    if action == "save":
+        preset = args.get("preset")
+        if not isinstance(preset, dict):
+            raise ValueError("preset must be an object")
+        return save_render_preset(storage_root, preset)
+    if action == "promote_to_template":
+        preset = get_render_preset(str(args.get("preset_id") or ""), storage_root)
+        template = preset_to_template(
+            preset,
+            name=args.get("name"),
+            prompt=str(args.get("prompt") or preset.get("purpose") or ""),
+            audio_path=str(args.get("audio_path") or ""),
+            duration_seconds=float(args["duration_seconds"]) if args.get("duration_seconds") not in {None, ""} else None,
+            fps=int(args["fps"]) if args.get("fps") not in {None, ""} else None,
+        )
+        return _write_template(storage_root, str(args.get("template_name") or f"{preset['preset_id']}.json"), template)
+    raise ValueError(f"unsupported preset action: {action}")
+
+
+def _frame_diff_replay_accuracy(args: dict[str, Any]) -> dict[str, Any]:
+    source = Path(str(args.get("source") or args.get("source_path") or ""))
+    regen = Path(str(args.get("regen") or args.get("regen_path") or ""))
+    report = {
+        "source_path": str(source) if str(source) else "",
+        "regen_path": str(regen) if str(regen) else "",
+        "source_exists": source.exists() if str(source) else False,
+        "regen_exists": regen.exists() if str(regen) else False,
+        "metrics": {},
+        "boundary": {"state_or_manifest_diff_only": True, "semantic_detection": False},
+    }
+    if source.exists() and regen.exists():
+        source_size = source.stat().st_size
+        regen_size = regen.stat().st_size
+        report["metrics"] = {
+            "source_size_bytes": source_size,
+            "regen_size_bytes": regen_size,
+            "size_delta_bytes": regen_size - source_size,
+            "size_ratio": round(regen_size / max(1, source_size), 6),
+        }
+    else:
+        report["metrics"] = {
+            "status": "paths_missing_or_not_supplied",
+            "planned_metrics": ["frame_count_match", "duration_match", "state_channel_delta", "manifest_field_diff"],
+        }
+    return report
+
+
 def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> dict[str, Any]:
     tool = validated["tool"]
     args = validated["args"]
@@ -587,6 +683,32 @@ def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> di
         return {"templates": _list_media_artifacts(storage_root, "templates")}
     if tool == "storage_list_artifacts":
         return {"files": _list_media_artifacts(storage_root, args.get("lane"))}
+    if tool in {
+        "source_snap_tool",
+        "existing_state_animator",
+        "electric_glow_intensity_animator",
+        "spectrum_audio_reactive_city",
+        "local_qwen_controller",
+    }:
+        plan = build_studio_tool_plan(tool, args)
+        if tool == "spectrum_audio_reactive_city" and args.get("promote_to_template"):
+            preset = get_render_preset("house_remix_audio_city", storage_root)
+            template = preset_to_template(
+                preset,
+                name=str(args.get("name") or "House Remix Audio City"),
+                prompt=str(args.get("prompt") or preset.get("purpose") or ""),
+                audio_path=str(args.get("audio_path") or ""),
+                duration_seconds=float(args["duration_seconds"]) if args.get("duration_seconds") not in {None, ""} else None,
+                fps=int(args["fps"]) if args.get("fps") not in {None, ""} else None,
+            )
+            return _write_template(storage_root, str(args.get("template_name") or "house_remix_audio_city.json"), template)
+        return {"plan": plan}
+    if tool == "frame_diff_replay_accuracy":
+        return _frame_diff_replay_accuracy(args)
+    if tool == "manifest_browser":
+        return _browse_manifests(storage_root, limit=int(args.get("limit") or 50))
+    if tool == "render_preset_library":
+        return _render_preset_library(storage_root, args)
     if tool == "time_marker_add":
         event = {
             "kind": "time_marker",

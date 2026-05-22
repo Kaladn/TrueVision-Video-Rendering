@@ -13,6 +13,50 @@ Generated media is synthetic state media, not evidence.
 Raw frames are not implied unless explicitly enabled.
 ```
 
+## Rendering Law
+
+TrueVision render lanes must separate state work from final pixels.
+
+```text
+state/grid/primitive plan first
+pixel output last
+```
+
+The rule:
+
+```text
+Do not solve production video by asking every output pixel what it should be.
+Build deterministic state first:
+  audio/video signals
+  cell/grid fields
+  temporal transition fields
+  render primitives
+  confidence/receipt data
+
+Then rasterize or encode the final pixels.
+```
+
+Pixel-level inspection is allowed for validation, replay accuracy, and final
+presentation. Pixel-first full-frame procedural rendering is a prototype path
+only unless it is explicitly marked as such.
+
+The current high-performance render lane follows this machine-use law:
+
+```text
+CPU: use available render threads for state/render work.
+GPU: use hardware video encoding when available.
+Manifest: record encoder, render threads, bitrate, frame count, duration,
+state-log interval, wall time, memory, and hashes.
+```
+
+Plain version:
+
+```text
+TrueVision should think in state, not paint every pixel by hand.
+The machine can still output pixels, but pixels are the final delivery format,
+not the main reasoning system.
+```
+
 ## Scientific Summary
 
 TrueVision represents video as time-ordered visual state rather than as a prompt-only media product. A capture maps observed frames into addressed cell tensors containing channels such as color, luminance, edge density, texture energy, motion energy, and temporal deltas. TrueFrameGen then reconstructs higher-rate video by estimating transition fields between known states.
@@ -41,6 +85,8 @@ Instead of asking an AI to invent every frame from scratch, TrueVision keeps tra
 - Rust streaming TrueFrameGen renderer for bounded-memory high-FPS reconstruction.
 - AV-only tool bus for local audio/video template, render, and recalibration workflows.
 - Local model adapter shape for prompt-to-state translation behind schema validation.
+- TrueVision Studio control-plane tools for source snaps, existing-state animation, glow intensity animation, spectrum/city rendering, frame diff, manifest browsing, preset reuse, and local Qwen orchestration.
+- Document-state reader for treating page frames and glyph cells as replayable visual state.
 - Storage library support for keeping heavy runtime data outside the repository.
 
 ## Repository Layout
@@ -51,10 +97,23 @@ native/truevision_capture_rs/ Rust capture and streaming frame generation
 scripts/                      Research CLIs and studio server
 tests/                        Unit and integration tests
 trueframegen/                 Python temporal reconstruction modules
-truevision_runtime/           AV tools, storage, renderer, and LLM adapter
+truevision_runtime/           AV tools, document state, storage, renderer, and LLM adapter
 ui/                           Local studio HTML
 storage/                      Ignored runtime lanes with tracked placeholders
 outputs/                      Ignored generated output lane
+```
+
+## Studio Presets
+
+Successful render lanes are preserved as reusable presets instead of one-off
+scripts. Current built-in presets include:
+
+```text
+glitch_444_alive_poster
+house_remix_audio_city
+storm_ember_city
+mirror_maze_realism
+edge_audio_river
 ```
 
 ## Runtime Data Policy
@@ -116,6 +175,16 @@ Example 60 FPS reconstruction from captured state:
   --target-fps 60 `
   --motion-mode segment-field
 ```
+
+## Full Pipeline
+
+The operator path from human intent to rendered video is documented here:
+
+[docs/HUMAN_TO_VIDEO_PIPELINE.md](docs/HUMAN_TO_VIDEO_PIPELINE.md)
+
+The current lab status, proof ledger, rejected experiments, and TODO roundup are documented here:
+
+[docs/BEAST_MODE_LAB_REPORT_2026-05-22.md](docs/BEAST_MODE_LAB_REPORT_2026-05-22.md)
 
 ## Local Studio
 

@@ -20,6 +20,7 @@ if str(ROOT) not in sys.path:
 
 from truevision_runtime.av_tools.av_tool_registry import list_av_tools
 from truevision_runtime.av_tools.av_tool_runner import run_av_tool_call
+from truevision_runtime.studio.studio_tooling import list_render_presets, list_studio_tools
 from truevision_region_snip import build_recorder_command
 
 
@@ -637,6 +638,12 @@ class StudioHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/av-tools":
             self._send_json({"ok": True, "tools": list_av_tools()})
+            return
+        if parsed.path == "/api/studio/tools":
+            self._send_json({"ok": True, "tools": list_studio_tools()})
+            return
+        if parsed.path == "/api/render-presets":
+            self._send_json({"ok": True, "presets": list_render_presets(STORAGE_ROOT)})
             return
         self.send_error(404, "Not found")
 

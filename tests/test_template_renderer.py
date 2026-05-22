@@ -12,6 +12,7 @@ import truevision_runtime.rendering.template_renderer as template_renderer
 from truevision_runtime.rendering.template_renderer import (
     load_render_template,
     render_mirror_maze_frame,
+    render_storm_ember_city_frame,
     render_template,
     scene_for_time,
 )
@@ -100,6 +101,42 @@ class TemplateRendererTests(unittest.TestCase):
             self.assertIn("mirror_shards", metadata["layers"])
             self.assertIn("volumetric_smoke", metadata["layers"])
             self.assertTrue(metadata["boundary"]["template_driven"])
+
+    def test_render_storm_ember_city_frame_uses_pictorial_state_language(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            template_path = self._template(Path(tmp))
+            data = json.loads(template_path.read_text(encoding="utf-8"))
+            data["render"]["visual_mode"] = "storm_ember_city"
+            data["style"] = {
+                "palette": "black_blue_rain_orange_ember",
+                "bloom_strength": 0.62,
+                "vignette_strength": 1.55,
+            }
+            template_path.write_text(json.dumps(data), encoding="utf-8")
+            template = load_render_template(template_path)
+
+            frame, metadata = render_storm_ember_city_frame(
+                template=template,
+                frame_state={
+                    "frame_index": 5,
+                    "time_seconds": 0.8,
+                    "rms": 0.66,
+                    "bass": 0.72,
+                    "mid": 0.5,
+                    "high": 0.62,
+                    "beat": 0.85,
+                },
+                duration_seconds=1.0,
+            )
+
+            self.assertEqual(frame.shape, (90, 160, 3))
+            self.assertGreater(np.count_nonzero(frame), 1000)
+            self.assertIn("rain_streaks", metadata["layers"])
+            self.assertIn("ember_ash_particles", metadata["layers"])
+            self.assertIn("wet_pavement_reflections", metadata["layers"])
+            self.assertIn("lonely_backlit_silhouette", metadata["layers"])
+            self.assertEqual(metadata["visual_mode"], "storm_ember_city")
+            self.assertTrue(metadata["boundary"]["no_external_visual_assets"])
 
     def test_fog_renderer_uses_density_field_not_primitive_plumes(self):
         source = inspect.getsource(template_renderer._draw_smoke)

@@ -1,0 +1,71 @@
+{
+  "template_id": "storm_ember_city_no_cheat",
+  "run_id": "storm_ember_city_no_cheat_preview",
+  "title": "Storm Ember City No-Cheat Preview",
+  "audio": {
+    "path": "replace-with-local-audio-file.mp3",
+    "sample_rate": 44100
+  },
+  "render": {
+    "visual_mode": "storm_ember_city"
+  },
+  "output": {
+    "root": "outputs/template_renders",
+    "width": 1280,
+    "height": 720,
+    "fps": 24,
+    "max_seconds": 16,
+    "encoder": "libx264",
+    "program_stamp": null
+  },
+  "style": {
+    "palette": "deep_black_blue_gray_ember_orange",
+    "bloom_strength": 0.58,
+    "vignette_strength": 1.62,
+    "motifs": [
+      "rain",
+      "embers",
+      "ash",
+      "storm_sky",
+      "burning_city_glow",
+      "neon_reflections",
+      "wet_pavement",
+      "ghosted_silhouettes",
+      "father_walking_away",
+      "hands_almost_touching"
+    ],
+    "meaning": "loss, survival, memory, and the first fragile signal of return"
+  },
+  "scenes": [
+    {
+      "scene_id": "cold_rain_city_loss",
+      "start_norm": 0.0,
+      "end_norm": 0.25,
+      "meaning": "wide lonely night streets, rain, smoke, and cold distance"
+    },
+    {
+      "scene_id": "memory_ghost_overlay",
+      "start_norm": 0.25,
+      "end_norm": 0.5,
+      "meaning": "childhood memory and damaged reflection appear as visual pressure"
+    },
+    {
+      "scene_id": "fire_in_puddles",
+      "start_norm": 0.5,
+      "end_norm": 0.78,
+      "meaning": "orange fire and blue rain fight across wet pavement"
+    },
+    {
+      "scene_id": "survival_not_sunshine",
+      "start_norm": 0.78,
+      "end_norm": 1.0,
+      "meaning": "the figure keeps walking through ash without pretending the wound is clean"
+    }
+  ],
+  "boundary": {
+    "generated_state_media": "synthetic_not_evidence",
+    "no_external_visual_assets": true,
+    "no_lyric_overlay": true,
+    "template_driven": true
+  }
+}

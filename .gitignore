@@ -1,5 +1,6 @@
 __pycache__/
 *.pyc
+.vscode/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
@@ -46,5 +47,6 @@ storage/tmp/**
 !storage/tmp/.gitkeep
 
 *.log
+video ref.png
 
 native/**/target/

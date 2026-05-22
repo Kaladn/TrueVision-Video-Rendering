@@ -440,6 +440,143 @@ def _draw_live_wires(frame: np.ndarray, *, time_seconds: float, rms: float, mid:
         cv2.polylines(frame, [np.asarray(points, dtype=np.int32)], False, color, 1 + int(2 * high), cv2.LINE_AA)
 
 
+def _draw_storm_city_base(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, high: float, scene: dict[str, Any]) -> None:
+    height, width = frame.shape[:2]
+    y = np.linspace(0.0, 1.0, height, dtype=np.float32)[:, None]
+    x = np.linspace(0.0, 1.0, width, dtype=np.float32)[None, :]
+
+    sky = np.zeros_like(frame, dtype=np.float32)
+    storm = np.clip(1.0 - y * 1.28, 0.0, 1.0)
+    fire_side = np.clip(1.0 - np.abs(x - 0.74) * 2.5, 0.0, 1.0) * np.clip(1.0 - y * 1.7, 0.0, 1.0)
+    blue_side = np.clip(1.0 - np.abs(x - 0.26) * 2.2, 0.0, 1.0) * storm
+    sky[:, :, 0] = 16 + 60 * storm + 22 * blue_side + 10 * high
+    sky[:, :, 1] = 13 + 25 * storm + 8 * blue_side + 20 * fire_side * bass
+    sky[:, :, 2] = 14 + 16 * storm + 78 * fire_side * (0.45 + 0.55 * rms)
+    frame[:, :, :] = np.clip(sky, 0, 255).astype(np.uint8)
+
+    horizon = int(height * (0.43 + 0.015 * math.sin(time_seconds * 0.2)))
+    rng = np.random.default_rng(1129 + int(sum(ord(char) for char in str(scene.get("scene_id", "")))))
+    for index in range(34):
+        bx = int(width * (index / 33.0) + math.sin(index * 1.7) * width * 0.02)
+        bw = int(width * (0.012 + 0.025 * rng.random()))
+        bh = int(height * (0.10 + 0.26 * rng.random()))
+        top = max(0, horizon - bh)
+        cv2.rectangle(frame, (bx, top), (min(width, bx + bw), height), (7, 10, 16), -1)
+        if index % 5 == 0:
+            glow = 30 + int(70 * bass)
+            cv2.rectangle(frame, (bx + bw // 2, top + bh // 3), (min(width, bx + bw // 2 + 2), min(height, top + bh // 3 + 8)), (glow, glow // 2, glow), -1)
+
+    pavement_y = int(height * 0.58)
+    cv2.rectangle(frame, (0, pavement_y), (width, height), (7, 8, 10), -1)
+    for line in range(9):
+        z = line / 8.0
+        y_pos = int(pavement_y + (height - pavement_y) * (z ** 1.8))
+        color = int(18 + 35 * (1.0 - z))
+        cv2.line(frame, (0, y_pos), (width, y_pos + int(8 * z)), (color, color, color + 4), 1, cv2.LINE_AA)
+
+
+def _draw_wet_pavement_reflections(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, high: float) -> None:
+    height, width = frame.shape[:2]
+    pavement_y = int(height * 0.58)
+    yy = np.linspace(0.0, 1.0, height - pavement_y, dtype=np.float32)[:, None]
+    xx = np.linspace(0.0, 1.0, width, dtype=np.float32)[None, :]
+    ripple = (
+        np.sin((xx * 10.0 + yy * 3.2 + time_seconds * 0.33) * math.tau)
+        + 0.6 * np.sin((xx * 22.0 - yy * 7.5 - time_seconds * 0.51) * math.tau)
+    ).astype(np.float32)
+    mask = np.clip((1.0 - yy) ** 1.5 + ripple * 0.055, 0.0, 1.0)
+    reflection = np.zeros((height - pavement_y, width, 3), dtype=np.float32)
+    fire_band = np.clip(1.0 - np.abs(xx - 0.72) * 3.0, 0.0, 1.0)
+    blue_band = np.clip(1.0 - np.abs(xx - 0.25) * 3.2, 0.0, 1.0)
+    reflection[:, :, 0] = 22 + 86 * blue_band * (0.25 + high) + 12 * mask
+    reflection[:, :, 1] = 16 + 35 * blue_band + 34 * fire_band * bass
+    reflection[:, :, 2] = 18 + 120 * fire_band * (0.24 + rms) + 18 * mask
+    reflection = cv2.GaussianBlur(reflection, (0, 0), sigmaX=9.0, sigmaY=2.2)
+    alpha = np.clip(mask * (0.24 + 0.22 * bass), 0.0, 0.58)
+    target = frame[pavement_y:, :, :].astype(np.float32)
+    target = target * (1.0 - alpha[:, :, None]) + reflection * alpha[:, :, None]
+    frame[pavement_y:, :, :] = np.clip(target, 0, 255).astype(np.uint8)
+
+
+def _draw_rain(frame: np.ndarray, *, time_seconds: float, high: float, beat: float) -> None:
+    height, width = frame.shape[:2]
+    rain = np.zeros_like(frame)
+    drop_count = max(80, int((width * height) / 5800 * (0.75 + high)))
+    rng = np.random.default_rng(2441 + int(time_seconds * 18))
+    slant = int(width * (-0.012 - 0.025 * beat))
+    for index in range(drop_count):
+        x = int(rng.random() * width)
+        y = int(rng.random() * height)
+        length = int(height * (0.018 + 0.045 * rng.random()) * (1.0 + high * 0.55))
+        brightness = int(48 + 82 * rng.random() + 48 * high)
+        cv2.line(rain, (x, y), (x + slant, min(height - 1, y + length)), (brightness, brightness, brightness + 5), 1, cv2.LINE_AA)
+    rain = cv2.GaussianBlur(rain, (0, 0), sigmaX=0.45, sigmaY=0.95)
+    cv2.addWeighted(rain, 0.62, frame, 1.0, 0, dst=frame)
+
+
+def _draw_ember_ash_particles(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, high: float) -> None:
+    height, width = frame.shape[:2]
+    overlay = np.zeros_like(frame)
+    count = max(55, int((width * height) / 9000 * (0.65 + bass + 0.35 * rms)))
+    for index in range(count):
+        seed = index * 19.713
+        drift = (time_seconds * (0.028 + 0.018 * bass) + index * 0.037) % 1.0
+        side_bias = 0.72 + 0.22 * math.sin(seed)
+        x = int(width * ((side_bias + 0.20 * math.sin(seed + time_seconds * 0.9)) % 1.0))
+        y = int(height * (0.88 - drift * 0.90 + 0.04 * math.sin(seed * 0.31 + time_seconds)))
+        if y < 0 or y >= height:
+            continue
+        radius = max(1, int(height * (0.0025 + 0.0045 * ((index % 5) / 4.0)) * (1.0 + bass)))
+        warmth = 120 + int(95 * bass)
+        if index % 3 == 0:
+            color = (35 + int(34 * high), 52 + int(56 * bass), warmth)
+        else:
+            gray = 62 + int(55 * high)
+            color = (gray, gray, gray + 4)
+        cv2.circle(overlay, (x, y), radius, color, -1, cv2.LINE_AA)
+    overlay = cv2.GaussianBlur(overlay, (0, 0), sigmaX=1.6 + 2.4 * bass)
+    cv2.addWeighted(overlay, 0.74, frame, 1.0, 0, dst=frame)
+
+
+def _draw_lonely_silhouettes(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, mid: float, beat: float) -> None:
+    height, width = frame.shape[:2]
+    ground = int(height * 0.86)
+    glow = np.zeros_like(frame)
+
+    cx = int(width * (0.55 + 0.018 * math.sin(time_seconds * 0.62)))
+    scale = height / 720.0
+    body_h = int(238 * scale)
+    head_r = max(3, int(27 * scale))
+    shoulder = int(58 * scale)
+    leg_sway = int(24 * scale * math.sin(time_seconds * 2.2))
+    aura_color = (22 + int(38 * beat), 52 + int(90 * mid), 130 + int(90 * beat))
+    cv2.ellipse(glow, (cx, ground - int(body_h * 0.35)), (int(86 * scale), int(150 * scale)), 0, 0, 360, aura_color, -1, cv2.LINE_AA)
+    glow_blur = cv2.GaussianBlur(glow, (0, 0), sigmaX=22 + 26 * beat)
+    cv2.addWeighted(glow_blur, 0.58, frame, 1.0, 0, dst=frame)
+
+    body = np.asarray(
+        [
+            (cx - shoulder, ground - body_h + int(45 * scale)),
+            (cx + shoulder, ground - body_h + int(45 * scale)),
+            (cx + int(25 * scale), ground - int(42 * scale)),
+            (cx - int(25 * scale), ground - int(42 * scale)),
+        ],
+        dtype=np.int32,
+    )
+    cv2.circle(frame, (cx, ground - body_h), head_r, (1, 2, 4), -1, cv2.LINE_AA)
+    cv2.fillConvexPoly(frame, body, (1, 2, 4), cv2.LINE_AA)
+    cv2.line(frame, (cx - int(14 * scale), ground - int(45 * scale)), (cx - int(33 * scale) - leg_sway, ground), (1, 2, 4), max(2, int(11 * scale)), cv2.LINE_AA)
+    cv2.line(frame, (cx + int(14 * scale), ground - int(45 * scale)), (cx + int(34 * scale) + leg_sway, ground), (1, 2, 4), max(2, int(11 * scale)), cv2.LINE_AA)
+
+    ghost_x = int(width * 0.31)
+    ghost_ground = int(height * 0.77)
+    ghost = np.zeros_like(frame)
+    cv2.circle(ghost, (ghost_x, ghost_ground - int(118 * scale)), max(2, int(17 * scale)), (70, 74, 86), -1, cv2.LINE_AA)
+    cv2.ellipse(ghost, (ghost_x, ghost_ground - int(58 * scale)), (int(28 * scale), int(65 * scale)), 0, 0, 360, (58, 62, 76), -1, cv2.LINE_AA)
+    ghost = cv2.GaussianBlur(ghost, (0, 0), sigmaX=3.0 + 4.0 * rms)
+    cv2.addWeighted(ghost, 0.20 + 0.16 * mid, frame, 1.0, 0, dst=frame)
+
+
 def _apply_finish(frame: np.ndarray, *, time_seconds: float, rms: float, bass: float, high: float, style: dict[str, Any]) -> np.ndarray:
     bloom_strength = float(style.get("bloom_strength", 0.68))
     blur = cv2.GaussianBlur(frame, (0, 0), sigmaX=3.0 + 8.0 * rms)
@@ -525,6 +662,75 @@ def render_mirror_maze_frame(
     return frame, metadata
 
 
+def render_storm_ember_city_frame(
+    *,
+    template: RenderTemplate,
+    frame_state: dict[str, float],
+    duration_seconds: float,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    width, height = template.width, template.height
+    time_seconds = float(frame_state["time_seconds"])
+    rms = float(frame_state["rms"])
+    bass = float(frame_state["bass"])
+    mid = float(frame_state["mid"])
+    high = float(frame_state["high"])
+    beat = float(frame_state["beat"])
+    scene = scene_for_time(template, time_seconds, duration_seconds)
+
+    frame = np.zeros((height, width, 3), dtype=np.uint8)
+    _draw_storm_city_base(frame, time_seconds=time_seconds, rms=rms, bass=bass, high=high, scene=scene)
+    _draw_wet_pavement_reflections(frame, time_seconds=time_seconds, rms=rms, bass=bass, high=high)
+    _draw_smoke(frame, time_seconds=time_seconds, rms=0.45 + rms * 0.45, bass=bass, high=high, scene=scene)
+    _draw_lonely_silhouettes(frame, time_seconds=time_seconds, rms=rms, bass=bass, mid=mid, beat=beat)
+    _draw_ember_ash_particles(frame, time_seconds=time_seconds, rms=rms, bass=bass, high=high)
+    _draw_rain(frame, time_seconds=time_seconds, high=high, beat=beat)
+
+    frame = _apply_finish(frame, time_seconds=time_seconds, rms=rms, bass=bass, high=high, style=template.style)
+    metadata = {
+        "frame_index": int(frame_state.get("frame_index", 0)),
+        "time_seconds": round(time_seconds, 6),
+        "scene_id": scene.get("scene_id"),
+        "visual_mode": template.visual_mode,
+        "layers": [
+            "storm_city_base",
+            "wet_pavement_reflections",
+            "density_field_fog",
+            "lonely_backlit_silhouette",
+            "ember_ash_particles",
+            "rain_streaks",
+            "bloom_grain",
+        ],
+        "audio_features": {
+            "rms": round(rms, 6),
+            "bass": round(bass, 6),
+            "mid": round(mid, 6),
+            "high": round(high, 6),
+            "beat": round(beat, 6),
+        },
+        "boundary": {
+            "generated_state_media": "synthetic_not_evidence",
+            "template_driven": True,
+            "no_lyric_overlay": True,
+            "no_external_visual_assets": True,
+            "fog_uses_density_field": True,
+        },
+    }
+    return frame, metadata
+
+
+def render_template_frame(
+    *,
+    template: RenderTemplate,
+    frame_state: dict[str, float],
+    duration_seconds: float,
+) -> tuple[np.ndarray, dict[str, Any]]:
+    if template.visual_mode == "mirror_maze_realism":
+        return render_mirror_maze_frame(template=template, frame_state=frame_state, duration_seconds=duration_seconds)
+    if template.visual_mode == "storm_ember_city":
+        return render_storm_ember_city_frame(template=template, frame_state=frame_state, duration_seconds=duration_seconds)
+    raise ValueError(f"Unsupported visual_mode: {template.visual_mode}")
+
+
 def _encoder_command(template: RenderTemplate, visual_path: Path, encoder: str) -> list[str]:
     base = [
         "ffmpeg",
@@ -565,7 +771,7 @@ def _render_visual(template: RenderTemplate, features: list[dict[str, float]], d
             for index, feature in enumerate(features):
                 frame_state = dict(feature)
                 frame_state["frame_index"] = index
-                frame, metadata = render_mirror_maze_frame(template=template, frame_state=frame_state, duration_seconds=duration_seconds)
+                frame, metadata = render_template_frame(template=template, frame_state=frame_state, duration_seconds=duration_seconds)
                 proc.stdin.write(frame.tobytes())
                 state_handle.write(json.dumps(metadata, allow_nan=False) + "\n")
                 if index % max(1, template.fps) == 0:
@@ -598,7 +804,7 @@ def render_template(template_path: Path, *, max_seconds: float | None = None, mu
         template = RenderTemplate(
             **{**template.__dict__, "max_seconds": max_seconds}
         )
-    if template.visual_mode != "mirror_maze_realism":
+    if template.visual_mode not in {"mirror_maze_realism", "storm_ember_city"}:
         raise ValueError(f"Unsupported visual_mode: {template.visual_mode}")
     if not template.audio_path.exists():
         raise FileNotFoundError(template.audio_path)
@@ -633,7 +839,7 @@ def render_template(template_path: Path, *, max_seconds: float | None = None, mu
     thumb_index = min(len(features) - 1, max(0, int(template.fps * min(8.0, duration_seconds * 0.4))))
     frame_state = dict(features[thumb_index])
     frame_state["frame_index"] = thumb_index
-    thumb_frame, _ = render_mirror_maze_frame(template=template, frame_state=frame_state, duration_seconds=duration_seconds)
+    thumb_frame, _ = render_template_frame(template=template, frame_state=frame_state, duration_seconds=duration_seconds)
     cv2.imwrite(str(thumb_path), thumb_frame)
     mark("thumbnail_write_seconds", phase)
 
@@ -679,7 +885,7 @@ def render_template(template_path: Path, *, max_seconds: float | None = None, mu
         "title": template.title,
         "started_at_utc": started_at,
         "completed_at_utc": utc_now(),
-        "claim": "template_driven_mirror_maze_realism_video",
+        "claim": f"template_driven_{template.visual_mode}_video",
         "boundary": {
             "generated_state_media": "synthetic_not_evidence",
             "template_driven": True,
@@ -759,12 +965,17 @@ def build_report(manifest: dict[str, Any]) -> str:
     machine = manifest["machine_cost"]
     memory_start = machine.get("memory_start", {})
     memory_end = machine.get("memory_end", {})
+    visual_mode = str(manifest["render"]["visual_mode"])
+    visual_label = {
+        "mirror_maze_realism": "mirror-maze realism",
+        "storm_ember_city": "storm ember city",
+    }.get(visual_mode, visual_mode.replace("_", " "))
     lines = [
         f"# {manifest['run_id']} Report",
         "",
         "## Claim",
         "",
-        "Template-driven mirror-maze realism video generated from audio features and explicit AV state.",
+        f"Template-driven {visual_label} video generated from audio features and explicit AV state.",
         "",
         "## Boundary",
         "",
@@ -801,7 +1012,7 @@ def build_report(manifest: dict[str, Any]) -> str:
     ]
     lines.extend(f"- {key}: `{value}` seconds" for key, value in manifest.get("component_timing_seconds", {}).items())
     lines.extend(["", "## System Components", ""])
-    lines.append("- Render path: `template -> audio features -> mirror_maze_realism frames -> ffmpeg encoder -> manifest`")
+    lines.append(f"- Render path: `template -> audio features -> {visual_mode} frames -> ffmpeg encoder -> manifest`")
     for gpu in manifest.get("hardware", {}).get("gpu", []):
         lines.append(f"- GPU detected: `{gpu.get('name')}` | RAM `{_format_bytes(gpu.get('adapter_ram_bytes'))}` | Driver `{gpu.get('driver_version')}`")
     return "\n".join(lines) + "\n"

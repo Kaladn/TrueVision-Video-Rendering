@@ -50,6 +50,10 @@ def validate_tool_call(call: dict[str, Any]) -> dict[str, Any]:
         args = {**args, "name": safe_flat_json_name(str(args["name"]))}
     if tool_name == "storage_list_artifacts" and args.get("lane") not in {None, *SAFE_MEDIA_LANES}:
         raise AVToolPolicyError("storage listing is limited to AV media lanes")
+    if tool_name == "render_preset_library":
+        action = str(args.get("action") or "list")
+        if action not in {"list", "load", "save", "promote_to_template"}:
+            raise AVToolPolicyError("render_preset_library action must be list, load, save, or promote_to_template")
     return {
         "tool": tool_name,
         "args": args,

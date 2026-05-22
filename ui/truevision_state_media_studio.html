@@ -550,7 +550,8 @@
       gap: 8px;
     }
 
-    .template-list {
+    .template-list,
+    .preset-list {
       display: grid;
       gap: 8px;
       max-height: 220px;
@@ -794,6 +795,12 @@
           <div class="status-line" id="templateStatus">Templates preserve generation data; renderer executes validated state.</div>
           <div style="height:10px"></div>
           <div class="template-list" id="templateList"></div>
+        </section>
+
+        <section class="section">
+          <div class="section-title">Render Preset Library <button class="secondary" id="refreshPresets">Refresh</button></div>
+          <div class="preset-list" id="presetList"></div>
+          <div class="status-line" id="presetStatus">Successful render lanes become reusable presets.</div>
         </section>
 
         <section class="section">
@@ -1058,6 +1065,8 @@
       busy: false,
       files: [],
       templates: [],
+      presets: [],
+      selectedPreset: null,
       chatLogReady: false
     };
 
@@ -1219,8 +1228,13 @@
         prompt,
         template_name: $("templateName").value.trim(),
         renderer: {
-          name: "edge_audio_river",
-          execution_target: "scripts/truevision_edge_audio_river.py",
+          name: state.selectedPreset?.renderer || "edge_audio_river",
+          preset_id: state.selectedPreset?.preset_id || null,
+          visual_mode: state.selectedPreset?.visual_mode || null,
+          scene_mode: state.selectedPreset?.scene_mode || null,
+          execution_target: state.selectedPreset?.renderer === "truevision_weird_occlusion_rs"
+            ? "native/truevision_capture_rs/src/bin/truevision_weird_occlusion_rs.rs"
+            : "scripts/truevision_edge_audio_river.py",
           status: "template_only_until_validated"
         },
         media: {
@@ -1315,6 +1329,7 @@
           depth_hint: checked("depthHint")
         },
         qwen_state_plan: state.lastQwenState,
+        render_preset: state.selectedPreset,
         generated_files: state.files.map((file) => file.name)
       };
     }
@@ -1353,6 +1368,7 @@
           path_tracing: request.path_tracing,
           computer_vision: request.computer_vision
         },
+        render_preset: request.render_preset || null,
         state_plan: request.qwen_state_plan || {},
         boundary: {
           synthetic_state_media: true,
@@ -1374,7 +1390,7 @@
         "Each numeric field should be deterministic and bounded when possible.",
         "AV-only validated tools are available through /api/av-tools and /api/av-tools/call.",
         "AI cannot execute directly; it may request tools only as JSON proposals.",
-        "Allowed Phase 1 examples: audio_probe_duration, audio_analyze_levels, audio_extract_features, template_create, template_from_audio_signals, template_save, template_load, template_patch, time_marker_add, recalibration_add_note, video_render_preview, video_prepare_full_render.",
+        "Allowed Phase 1 examples: audio_probe_duration, audio_analyze_levels, audio_extract_features, source_snap_tool, existing_state_animator, electric_glow_intensity_animator, spectrum_audio_reactive_city, frame_diff_replay_accuracy, manifest_browser, render_preset_library, local_qwen_controller, template_create, template_from_audio_signals, template_save, template_load, template_patch, time_marker_add, recalibration_add_note, video_render_preview, video_prepare_full_render.",
         "Never request non-audio/video tools, desktop automation, network browsing, security enforcement, autonomous clicking, or autonomous typing."
       ].join("\\n");
     }
@@ -1386,7 +1402,7 @@
         "You can discuss project ideas, explain current studio settings, and say what tools are available.",
         "Available tools are save_request, qwen_compile, qwen_chat, prepare_record, and refresh_files.",
         "AV-only validated tools are exposed separately through /api/av-tools and /api/av-tools/call.",
-        "Important AV tool names include audio_analyze_levels, audio_extract_features, template_from_audio_signals, video_render_preview, template_patch, time_marker_add, recalibration_add_note, and video_prepare_full_render.",
+        "Important AV tool names include audio_analyze_levels, audio_extract_features, source_snap_tool, existing_state_animator, electric_glow_intensity_animator, spectrum_audio_reactive_city, frame_diff_replay_accuracy, manifest_browser, render_preset_library, local_qwen_controller, template_from_audio_signals, video_render_preview, template_patch, time_marker_add, recalibration_add_note, and video_prepare_full_render.",
         "When AV work should run, return exactly one JSON object shaped like {\"tool\":\"video_render_preview\",\"args\":{...}} with no prose.",
         "For normal conversation, return prose and no tool JSON.",
         "Never pretend a tool ran unless the supplied tool_results say it ran.",
@@ -1782,6 +1798,46 @@
       });
     }
 
+    function renderPresets() {
+      const list = $("presetList");
+      list.innerHTML = "";
+      if (!state.presets.length) {
+        const empty = document.createElement("div");
+        empty.className = "message";
+        empty.textContent = "No render presets loaded.";
+        list.appendChild(empty);
+        return;
+      }
+      state.presets.forEach((preset, index) => {
+        const row = document.createElement("div");
+        row.className = "file";
+        const icon = document.createElement("div");
+        icon.className = "file-icon";
+        icon.textContent = String(index + 1);
+        const main = document.createElement("div");
+        main.className = "file-main";
+        const name = document.createElement("div");
+        name.className = "file-name";
+        name.textContent = preset.name || preset.preset_id || "preset";
+        const kind = document.createElement("div");
+        kind.className = "file-kind";
+        kind.textContent = `${preset.renderer || "renderer"} / ${preset.visual_mode || preset.scene_mode || "state"}`;
+        main.appendChild(name);
+        main.appendChild(kind);
+        const actions = document.createElement("div");
+        actions.className = "template-actions";
+        const load = document.createElement("button");
+        load.className = "secondary";
+        load.textContent = "Load";
+        load.addEventListener("click", () => loadPreset(preset));
+        actions.appendChild(load);
+        row.appendChild(icon);
+        row.appendChild(main);
+        row.appendChild(actions);
+        list.appendChild(row);
+      });
+    }
+
     function syncFilesFromServer(files) {
       if (!Array.isArray(files)) {
         return;
@@ -1802,6 +1858,14 @@
       renderTemplates();
     }
 
+    function syncPresetsFromServer(presets) {
+      if (!Array.isArray(presets)) {
+        return;
+      }
+      state.presets = presets;
+      renderPresets();
+    }
+
     async function refreshServerFiles() {
       const payload = await apiJson("/api/files");
       syncFilesFromServer(payload.files);
@@ -1814,6 +1878,13 @@
       syncTemplatesFromServer(payload.templates);
       $("templateStatus").textContent = `Loaded ${payload.templates.length} template${payload.templates.length === 1 ? "" : "s"}.`;
       return payload.templates;
+    }
+
+    async function refreshPresets() {
+      const payload = await apiJson("/api/render-presets");
+      syncPresetsFromServer(payload.presets);
+      $("presetStatus").textContent = `Loaded ${payload.presets.length} render preset${payload.presets.length === 1 ? "" : "s"}.`;
+      return payload.presets;
     }
 
     async function saveCurrentTemplate() {
@@ -1837,6 +1908,7 @@
 
     function loadTemplate(item) {
       const template = item.template || {};
+      state.selectedPreset = template.render_preset || null;
       $("templateName").value = template.name || item.name || "Loaded template";
       $("prompt").value = template.prompt || $("prompt").value;
       $("audioPath").value = template.media?.audio_path || "";
@@ -1851,6 +1923,18 @@
       state.lastQwenState = template.state_plan || null;
       $("templateStatus").textContent = `Loaded template: ${template.name || item.name}`;
       addMessage("templates", $("templateStatus").textContent);
+      update();
+    }
+
+    function loadPreset(preset) {
+      state.selectedPreset = preset;
+      $("templateName").value = preset.name || preset.preset_id || "Loaded preset";
+      $("prompt").value = preset.purpose || $("prompt").value;
+      if (preset.default_fps) {
+        $("fps").value = preset.default_fps;
+      }
+      $("presetStatus").textContent = `Loaded preset: ${preset.name || preset.preset_id}`;
+      addMessage("presets", `${$("presetStatus").textContent} / ${preset.renderer || "renderer"}`);
       update();
     }
 
@@ -2026,6 +2110,14 @@
           "audio_probe_duration",
           "audio_analyze_levels",
           "audio_extract_features",
+          "source_snap_tool",
+          "existing_state_animator",
+          "electric_glow_intensity_animator",
+          "spectrum_audio_reactive_city",
+          "frame_diff_replay_accuracy",
+          "manifest_browser",
+          "render_preset_library",
+          "local_qwen_controller",
           "template_from_audio_signals",
           "template_create",
           "template_save",
@@ -2169,6 +2261,13 @@
         addMessage("templates", `Refresh failed: ${error.message}`);
       }
     });
+    $("refreshPresets").addEventListener("click", async () => {
+      try {
+        await runBusy("Refreshing render presets...", refreshPresets);
+      } catch (error) {
+        addMessage("presets", `Refresh failed: ${error.message}`);
+      }
+    });
     $("saveTemplate").addEventListener("click", async () => {
       try {
         await runBusy("Saving render template...", saveCurrentTemplate);
@@ -2214,6 +2313,7 @@
     $("resetDefaults").addEventListener("click", () => {
       $("prompt").value = "A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.";
       $("templateName").value = "Edge audio river";
+      state.selectedPreset = null;
       $("audioPath").value = "C:\\Users\\mydyi\\OneDrive\\Documents\\Desktop\\Album_Builds\\Machine_Dread_Album_Sequenced\\01_ordered_audio\\01 - Edge Of The World (I Am Your Nightmare).mp3";
       $("audioDurationSeconds").value = "278.320";
       $("syncDurationToAudio").checked = true;
@@ -2247,6 +2347,7 @@
     update();
     loadDailyChat().catch((error) => addMessage("storage", `Daily chat log load failed: ${error.message}`, false, false));
     refreshTemplates().catch((error) => addMessage("templates", `Template refresh failed: ${error.message}`, false, false));
+    refreshPresets().catch((error) => addMessage("presets", `Preset refresh failed: ${error.message}`, false, false));
     refreshServerFiles().catch((error) => addMessage("storage", `Initial file refresh failed: ${error.message}`));
   </script>
 </body>
