@@ -62,6 +62,8 @@
 - [x] Public README explains the project boundary.
 - [x] Tool inventory exists.
 - [x] State generation primitive notes exist.
+- [x] Repo system guide documents what the project is, why it exists, and who talks to who.
+- [x] Third-party notices document direct dependencies, external tools, and credit guidance.
 - [ ] Add architecture diagram.
 - [ ] Add capture format specification for `.tvcells`.
 - [ ] Add TrueFrameGen algorithm notes with pseudocode.

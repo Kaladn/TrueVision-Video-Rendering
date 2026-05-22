@@ -187,6 +187,14 @@ The current lab status, proof ledger, rejected experiments, and TODO roundup are
 
 [docs/BEAST_MODE_LAB_REPORT_2026-05-22.md](docs/BEAST_MODE_LAB_REPORT_2026-05-22.md)
 
+The repo-level system map, communication flow, ownership boundaries, and plain-language explanation are documented here:
+
+[docs/REPO_SYSTEM_GUIDE.md](docs/REPO_SYSTEM_GUIDE.md)
+
+Third-party tools, direct dependencies, local model notes, and credit guidance are documented here:
+
+[docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md)
+
 ## Local Studio
 
 ```powershell
