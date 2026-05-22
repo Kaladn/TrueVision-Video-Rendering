@@ -75,3 +75,21 @@
 - [ ] Add small fixture capture for reproducible tests.
 - [ ] Add benchmark command for capture FPS, frame time, CPU, and RAM.
 - [ ] Add generated-video quality metrics that do not require external services.
+
+## 8. Cross-System Harness Pickup
+
+- [ ] Open the other workspace in SecureCore first.
+- [ ] Inventory what is actually on the SecureCore / AnchorWorks / TrueVision workbench.
+- [ ] Lock the cross-system harness shape before adding new features.
+- [ ] Prove AnchorWorks, SecureCore, and TrueVision health checks separately.
+- [ ] Bring TrueVision Generation in only as an optional state-media lane.
+
+Current handoff law:
+
+```text
+AnchorWorks = face and language/count brain
+SecureCore = safety, agents, logging, policy, system substrate
+TrueVision Generation = state-media render lab
+Harness = proof that they can cooperate without becoming one tangled thing
+Connector point = validated state packets
+```

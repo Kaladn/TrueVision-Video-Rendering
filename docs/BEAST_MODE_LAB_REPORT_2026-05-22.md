@@ -304,6 +304,7 @@ Current preset truth from `truevision_runtime/studio/studio_tooling.py`:
 
 ```text
 glitch_444_alive_poster: proven
+fade_away_memory_cathedral: ready
 house_remix_audio_city: ready
 abstract_symphony_soft_beams: needs_rework
 center_warp_laserfield: draft
@@ -652,4 +653,26 @@ Plan state.
 Transform state.
 Render pixels last.
 Prove every run.
+```
+
+## Weekend Cross-System Pickup
+
+Before this lab is connected back to the broader systems, the pickup order is:
+
+```text
+1. Open the other workspace in SecureCore.
+2. Inventory what is actually on the workbench.
+3. Lock the cross-system harness shape.
+4. Prove AnchorWorks / SecureCore / TrueVision health checks.
+5. Only then bring TrueVision Generation in as an optional state-media lane.
+```
+
+Current handoff law:
+
+```text
+AnchorWorks = face and language/count brain
+SecureCore = safety, agents, logging, policy, system substrate
+TrueVision Generation = state-media render lab
+Harness = proof that they can cooperate without becoming one tangled thing
+Connector point = validated state packets
 ```

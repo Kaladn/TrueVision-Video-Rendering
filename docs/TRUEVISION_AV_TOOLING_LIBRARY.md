@@ -162,6 +162,7 @@ Current reusable presets:
 
 ```text
 glitch_444_alive_poster
+fade_away_memory_cathedral
 house_remix_audio_city
 storm_ember_city
 mirror_maze_realism

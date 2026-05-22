@@ -707,6 +707,9 @@ fn render_frame(
     if args.scene_mode == "warp_laser_field" || args.scene_mode == "laser_warp" {
         return render_warp_laser_field_frame(args, time_seconds, frame_index, audio, frame, stats);
     }
+    if args.scene_mode == "memory_cathedral" || args.scene_mode == "fade_away_memory_cathedral" {
+        return render_memory_cathedral_frame(args, time_seconds, frame_index, audio, frame, stats);
+    }
     let width = args.width;
     let height = args.height;
     let horizon = (height as f32 * (0.45 + 0.025 * (time_seconds * 0.23).sin() as f32)) as i32;
@@ -2505,6 +2508,416 @@ fn warp_tunnel_rings(radius: f32, t: f32, audio: AudioFeature) -> f32 {
     (ring * gate * (0.060 + 0.22 * audio.beat + 0.12 * audio.high)).clamp(0.0, 0.40)
 }
 
+fn render_memory_cathedral_frame(
+    args: &Args,
+    time_seconds: f64,
+    frame_index: usize,
+    audio: AudioFeature,
+    frame: &mut [u8],
+    stats: &mut FrameStats,
+) -> String {
+    let width = args.width;
+    let height = args.height;
+    let t = time_seconds as f32;
+    let phase = (time_seconds / args.duration.max(0.000_001)).clamp(0.0, 1.0) as f32;
+    let threads = args.render_threads.min(height.max(1));
+    let rows_per_chunk = height.div_ceil(threads);
+    let row_stride = width * 3;
+    let mut glow_pixels = 0_u64;
+    let mut veil_accum = 0.0_f64;
+    let mut absence_accum = 0.0_f64;
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (chunk_index, chunk) in frame.chunks_mut(row_stride * rows_per_chunk).enumerate() {
+            let y_start = chunk_index * rows_per_chunk;
+            let rows = chunk.len() / row_stride;
+            handles.push(scope.spawn(move || {
+                let mut local_glow = 0_u64;
+                let mut local_veil = 0.0_f64;
+                let mut local_absence = 0.0_f64;
+                for local_y in 0..rows {
+                    let y = y_start + local_y;
+                    let yf = y as f32 / height as f32;
+                    for x in 0..width {
+                        let xf = x as f32 / width as f32;
+                        let sample =
+                            memory_cathedral_pixel(xf, yf, width, height, t, phase, audio);
+                        if sample.glow {
+                            local_glow += 1;
+                        }
+                        local_veil += sample.veil as f64;
+                        local_absence += sample.absence as f64;
+                        write_pixel_local(chunk, width, x, local_y, sample.color);
+                    }
+                }
+                (local_glow, local_veil, local_absence)
+            }));
+        }
+        for handle in handles {
+            let (local_glow, local_veil, local_absence) = handle.join().unwrap_or((0, 0.0, 0.0));
+            glow_pixels += local_glow;
+            veil_accum += local_veil;
+            absence_accum += local_absence;
+        }
+    });
+
+    let pixel_count = (width * height).max(1) as f64;
+    let veil_mean = veil_accum / pixel_count;
+    let absence_mean = absence_accum / pixel_count;
+    stats.fog_coverage_sum += veil_mean;
+    stats.fog_samples += 1;
+    stats.glow_pixels_sum += glow_pixels;
+
+    format!(
+        "{{\"frame_index\":{},\"time_seconds\":{:.6},\"scene\":\"memory_cathedral\",\"palette\":\"{}\",\"audio\":{{\"rms\":{:.6},\"bass\":{:.6},\"high\":{:.6},\"beat\":{:.6},\"vocal_presence\":{:.6}}},\"render_law\":\"state_fields_first_pixels_last_no_hard_edges\",\"phase\":{:.6},\"memory_veil_mean\":{:.6},\"absence_mean\":{:.6},\"glow_pixels\":{},\"state_layers\":[\"near_black_blue_memory_field\",\"soft_doorway_depth_windows\",\"central_human_absence_not_portrait\",\"left_right_voice_light_fields\",\"inward_memory_particles\",\"dream_snap_collapse_gate\",\"outro_heart_sink\",\"no_city\",\"no_fire\",\"no_hard_lasers\"]}}",
+        frame_index,
+        time_seconds,
+        json_escape(&args.palette),
+        audio.rms,
+        audio.bass,
+        audio.high,
+        audio.beat,
+        vocal_presence(audio),
+        phase,
+        veil_mean,
+        absence_mean,
+        glow_pixels
+    )
+}
+
+#[derive(Clone, Copy)]
+struct MemoryPixel {
+    color: Color,
+    glow: bool,
+    veil: f32,
+    absence: f32,
+}
+
+fn memory_cathedral_pixel(
+    x: f32,
+    y: f32,
+    width: usize,
+    height: usize,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> MemoryPixel {
+    let aspect = width as f32 / height as f32;
+    let cx = (x - 0.5) * aspect;
+    let cy = y - 0.5;
+    let radius = (cx * cx + cy * cy).sqrt();
+    let angle = cy.atan2(cx);
+    let vocal = vocal_presence(audio);
+    let intro = 1.0 - smoothstep(0.00, 0.10, phase);
+    let hook = phase_gate(phase, 0.27, 0.43) + phase_gate(phase, 0.78, 0.93);
+    let dream_snap = phase_pulse(phase, 0.655, 0.026);
+    let collapse = smoothstep(0.70, 0.91, phase);
+    let outro = smoothstep(0.90, 1.0, phase);
+    let breath = 0.5 + 0.5 * (t * (0.10 + 0.10 * audio.rms)).sin();
+
+    let mut color = memory_base_field(x, y, radius, t, audio, intro, outro);
+    let mut glow = false;
+
+    let depth = memory_doorway_depth(cx, cy, t, phase, audio);
+    if depth > 0.008 {
+        glow = true;
+        let door_color = lerp_color(
+            Color::new(74.0, 56.0, 38.0),
+            Color::new(116.0, 82.0 + 36.0 * vocal, 58.0 + 32.0 * audio.beat),
+            (0.35 + 0.45 * hook + 0.20 * breath).clamp(0.0, 1.0),
+        );
+        blend_add(
+            &mut color,
+            door_color,
+            depth * (0.24 + 0.18 * audio.rms + 0.22 * hook + 0.16 * collapse),
+        );
+    }
+
+    let pair = memory_voice_pair_light(cx, cy, t, phase, audio);
+    if pair > 0.010 {
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(106.0 + 54.0 * vocal, 96.0 + 38.0 * hook, 92.0 + 42.0 * audio.bass),
+            pair,
+        );
+    }
+
+    let waveform = memory_breath_wave(x, y, t, audio, hook);
+    if waveform > 0.012 {
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(150.0 + 40.0 * audio.high, 118.0 + 20.0 * vocal, 126.0 + 32.0 * hook),
+            waveform,
+        );
+    }
+
+    let tunnel = memory_collapse_tunnel(radius, angle, t, phase, audio);
+    if tunnel > 0.012 {
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(92.0 + 80.0 * audio.high, 70.0 + 48.0 * audio.rms, 104.0 + 70.0 * collapse),
+            tunnel,
+        );
+    }
+
+    let snap = memory_dream_snap(radius, angle, t, dream_snap, audio);
+    if snap > 0.010 {
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(162.0 + 42.0 * audio.high, 138.0 + 42.0 * dream_snap, 162.0),
+            snap,
+        );
+    }
+
+    let particles = memory_inward_particles(cx, cy, radius, angle, t, audio, collapse);
+    if particles > 0.014 {
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(154.0 + 38.0 * audio.high, 126.0 + 28.0 * audio.rms, 128.0 + 34.0 * hook),
+            particles,
+        );
+    }
+
+    let heart = memory_heart_sink(cx, cy, t, phase, audio);
+    if heart > 0.010 {
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(52.0 + 22.0 * audio.high, 78.0 + 60.0 * audio.bass, 142.0 + 58.0 * hook),
+            heart,
+        );
+    }
+
+    let absence = memory_human_absence(cx, cy, t, phase, audio);
+    if absence > 0.0 {
+        blend(&mut color, Color::new(0.5, 0.8, 1.2), absence * (0.58 + 0.18 * dream_snap));
+        let rim = memory_absence_rim(cx, cy, t, phase, audio);
+        if rim > 0.006 {
+            glow = true;
+            blend_add(
+                &mut color,
+                Color::new(92.0 + 40.0 * audio.high, 72.0 + 24.0 * vocal, 88.0 + 22.0 * hook),
+                rim,
+            );
+        }
+    }
+
+    let veil = memory_veil_field(x, y, t, audio, collapse, outro);
+    blend(
+        &mut color,
+        Color::new(32.0 + 18.0 * audio.high, 28.0 + 15.0 * vocal, 34.0 + 20.0 * hook),
+        veil,
+    );
+
+    let blackout = dream_snap * (0.16 + 0.22 * (1.0 - audio.beat));
+    blend(&mut color, Color::new(0.0, 0.0, 0.0), blackout);
+    let vignette = smoothstep(0.26, 0.94, radius) * (0.52 + 0.24 * outro);
+    blend(&mut color, Color::new(0.0, 0.0, 1.0), vignette);
+
+    MemoryPixel {
+        color,
+        glow,
+        veil,
+        absence,
+    }
+}
+
+fn phase_gate(phase: f32, start: f32, end: f32) -> f32 {
+    smoothstep(start, start + 0.055, phase) * (1.0 - smoothstep(end - 0.055, end, phase))
+}
+
+fn phase_pulse(phase: f32, center: f32, width: f32) -> f32 {
+    (-(((phase - center) / width.max(0.0001)).powf(2.0))).exp()
+}
+
+fn memory_base_field(
+    x: f32,
+    y: f32,
+    radius: f32,
+    t: f32,
+    audio: AudioFeature,
+    intro: f32,
+    outro: f32,
+) -> Color {
+    let vertical = smoothstep(0.02, 1.0, y);
+    let drift = value_noise(x * 2.4 + t * 0.010, y * 2.0 - t * 0.006);
+    let pulse = 0.10 + 0.22 * audio.rms + 0.08 * audio.bass;
+    let top = Color::new(
+        8.0 + 8.0 * drift + 8.0 * intro,
+        6.0 + 5.0 * pulse,
+        11.0 + 6.0 * drift,
+    );
+    let bottom = Color::new(
+        4.0 + 8.0 * audio.bass,
+        4.0 + 5.0 * drift,
+        7.0 + 8.0 * pulse,
+    );
+    let mut color = lerp_color(top, bottom, vertical);
+    let center_breath = (-((radius / (0.64 + 0.10 * audio.bass)).powf(2.0))).exp();
+    blend_add(
+        &mut color,
+        Color::new(12.0 + 18.0 * audio.high, 10.0 + 12.0 * audio.rms, 16.0 + 10.0 * intro),
+        center_breath * (0.07 + 0.12 * audio.rms) * (1.0 - 0.55 * outro),
+    );
+    color
+}
+
+fn memory_doorway_depth(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let mut sum = 0.0_f32;
+    let depth_drive = 0.32 + 0.20 * audio.bass + 0.16 * audio.rms;
+    for index in 0..7 {
+        let fi = index as f32;
+        let z = fi / 6.0;
+        let width = 0.15 + z * (0.58 + 0.16 * depth_drive);
+        let height = 0.18 + z * (0.42 + 0.08 * audio.rms);
+        let y_shift = -0.020 + 0.030 * (t * 0.035 + fi * 1.7).sin();
+        let drift = 0.018 * (t * (0.025 + 0.004 * fi) + fi).sin();
+        let d = (cx - drift).abs() / width.max(0.001);
+        let e = (cy - y_shift).abs() / height.max(0.001);
+        let border = (d.max(e) - 1.0).abs();
+        let line_width = 0.010 + 0.006 * audio.rms + 0.004 * (fi * 0.7 + t * 0.08).sin().abs();
+        let line = 1.0 - smoothstep(line_width * 0.30, line_width, border);
+        let gate = (1.0 - smoothstep(1.0, 1.22, d.max(e))) * smoothstep(0.36, 0.88, d.max(e));
+        let fade = (1.0 - z * 0.62) * (0.54 + 0.28 * (phase * std::f32::consts::PI).sin().abs());
+        sum += line * gate * fade;
+    }
+    (sum * (0.20 + 0.26 * audio.rms + 0.10 * audio.beat)).clamp(0.0, 1.0)
+}
+
+fn memory_voice_pair_light(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let hook = phase_gate(phase, 0.27, 0.43) + phase_gate(phase, 0.78, 0.93);
+    let separation = 0.30 - 0.11 * hook + 0.022 * (t * 0.07).sin();
+    let vertical = cy + 0.005 * (t * 0.11).sin();
+    let left = (-(((cx + separation) / 0.16).powf(2.0) + (vertical / 0.32).powf(2.0))).exp();
+    let right = (-(((cx - separation) / 0.16).powf(2.0) + (vertical / 0.32).powf(2.0))).exp();
+    let bridge = (-((cx / (0.25 + 0.07 * hook)).powf(2.0) + (vertical / 0.11).powf(2.0))).exp();
+    ((left + right) * (0.055 + 0.23 * hook + 0.10 * audio.rms)
+        + bridge * hook * (0.10 + 0.16 * audio.beat))
+        .clamp(0.0, 0.92)
+}
+
+fn memory_breath_wave(x: f32, y: f32, t: f32, audio: AudioFeature, hook: f32) -> f32 {
+    let wave = smoothed_waveform_at(audio, x);
+    let center = 0.515 + wave * (0.028 + 0.030 * hook + 0.018 * vocal_presence(audio));
+    let width = 0.025 + 0.018 * audio.rms + 0.010 * hook;
+    let base = 1.0 - smoothstep(0.0, width, (y - center).abs());
+    let echo_center = 0.515 - wave * (0.020 + 0.014 * audio.bass) + 0.020 * (x * 4.0 + t * 0.18).sin();
+    let echo = 1.0 - smoothstep(0.0, width * 2.2, (y - echo_center).abs());
+    (base * 0.22 + echo * 0.10) * (0.30 + 0.38 * audio.rms + 0.24 * hook)
+}
+
+fn memory_collapse_tunnel(
+    radius: f32,
+    angle: f32,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> f32 {
+    let collapse = smoothstep(0.70, 0.91, phase);
+    let ring_phase = radius * (18.0 + 12.0 * collapse + 2.0 * audio.bass)
+        - t * (0.20 + 0.38 * collapse + 0.10 * audio.rms);
+    let ring = 1.0 - smoothstep(0.018, 0.20, ring_phase.sin().abs());
+    let spokes = 1.0 - smoothstep(0.030, 0.17, (angle * 8.0 + t * 0.06).sin().abs());
+    let gate = smoothstep(0.08, 0.24, radius) * (1.0 - smoothstep(0.72, 1.16, radius));
+    (ring * gate * (0.08 + 0.34 * collapse + 0.20 * audio.beat)
+        + spokes * gate * collapse * (0.035 + 0.10 * audio.high))
+        .clamp(0.0, 0.84)
+}
+
+fn memory_dream_snap(
+    radius: f32,
+    angle: f32,
+    t: f32,
+    dream_snap: f32,
+    audio: AudioFeature,
+) -> f32 {
+    let crack = 1.0 - smoothstep(0.008, 0.070, (angle * 11.0 + t * 0.30).sin().abs());
+    let ring = 1.0 - smoothstep(0.0, 0.055, (radius - (0.18 + 0.10 * dream_snap)).abs());
+    let shock = 1.0 - smoothstep(0.22, 0.84, radius);
+    (dream_snap * (ring * 0.58 + crack * shock * 0.22) * (0.32 + 0.32 * audio.high + 0.24 * audio.beat))
+        .clamp(0.0, 1.0)
+}
+
+fn memory_inward_particles(
+    cx: f32,
+    cy: f32,
+    radius: f32,
+    angle: f32,
+    t: f32,
+    audio: AudioFeature,
+    collapse: f32,
+) -> f32 {
+    let lanes = 92.0;
+    let lane = ((angle + std::f32::consts::PI) / (std::f32::consts::PI * 2.0) * lanes).floor();
+    let lane_phase = hash2(lane, 77.0);
+    let lane_angle = lane / lanes * std::f32::consts::PI * 2.0 - std::f32::consts::PI;
+    let diff = angle_delta(angle, lane_angle).abs();
+    let line = 1.0 - smoothstep(0.004, 0.018 + 0.006 * audio.high, diff);
+    let speed = 0.10 + 0.26 * audio.rms + 0.24 * collapse + 0.08 * audio.beat;
+    let position = (radius * (1.4 + 0.20 * collapse) + t * speed + lane_phase).fract();
+    let head = 1.0 - smoothstep(0.0, 0.050 + 0.030 * audio.high, position);
+    let tail = 1.0 - smoothstep(0.05, 0.24, position);
+    let breakup = value_noise(cx * 9.0 + t * 0.03 + lane_phase, cy * 9.0 - t * 0.02);
+    let gate = smoothstep(0.10, 0.30, radius) * (1.0 - smoothstep(0.82, 1.30, radius));
+    (line * (head * 0.84 + tail * 0.20) * gate * breakup * (0.16 + 0.42 * audio.high + 0.22 * collapse))
+        .clamp(0.0, 0.78)
+}
+
+fn memory_heart_sink(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let outro = smoothstep(0.88, 1.0, phase);
+    let y = cy + 0.02 - 0.06 * outro + 0.006 * (t * 0.09).sin();
+    let x = cx + 0.004 * (t * 0.07).sin();
+    let lobe_l = (-((((x + 0.035) / 0.050).powf(2.0)) + (((y + 0.012) / 0.038).powf(2.0)))).exp();
+    let lobe_r = (-((((x - 0.035) / 0.050).powf(2.0)) + (((y + 0.012) / 0.038).powf(2.0)))).exp();
+    let lower = (-(((x / 0.075).powf(2.0)) + (((y - 0.040) / 0.078).powf(2.0)))).exp();
+    (lobe_l.max(lobe_r).max(lower) * (0.05 + 0.22 * outro + 0.16 * audio.bass + 0.10 * audio.rms))
+        .clamp(0.0, 0.78)
+}
+
+fn memory_human_absence(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let drift = 0.010 * (t * 0.055).sin();
+    let head = (-((((cx - drift) / 0.060).powf(2.0)) + (((cy + 0.170) / 0.085).powf(2.0)))).exp();
+    let torso = (-((((cx - drift) / 0.112).powf(2.0)) + (((cy + 0.010) / 0.245).powf(2.0)))).exp();
+    let vanish = smoothstep(0.88, 1.0, phase);
+    let snap_void = phase_pulse(phase, 0.655, 0.038);
+    ((head.max(torso * 0.92)) * (0.30 + 0.18 * vocal_presence(audio) + 0.20 * snap_void) * (1.0 - 0.62 * vanish))
+        .clamp(0.0, 0.78)
+}
+
+fn memory_absence_rim(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let a = memory_human_absence(cx, cy, t, phase, audio);
+    let b = memory_human_absence(cx + 0.010, cy, t, phase, audio)
+        .min(memory_human_absence(cx - 0.010, cy, t, phase, audio))
+        .min(memory_human_absence(cx, cy + 0.010, t, phase, audio))
+        .min(memory_human_absence(cx, cy - 0.010, t, phase, audio));
+    ((a - b).max(0.0) * (0.65 + 0.42 * audio.high + 0.22 * audio.beat)).clamp(0.0, 0.55)
+}
+
+fn memory_veil_field(
+    x: f32,
+    y: f32,
+    t: f32,
+    audio: AudioFeature,
+    collapse: f32,
+    outro: f32,
+) -> f32 {
+    let n1 = value_noise(x * 4.0 + t * 0.018, y * 3.5 - t * 0.012);
+    let n2 = value_noise(x * 8.5 - t * 0.026, y * 5.5 + t * 0.019);
+    let vertical = smoothstep(0.10, 0.82, y) * (1.0 - smoothstep(0.94, 1.0, y));
+    let inward = 1.0 - ((x - 0.5).abs() * 1.40).clamp(0.0, 1.0);
+    ((n1 * 0.16 + n2 * 0.10 + inward * 0.08)
+        * vertical
+        * (0.16 + 0.22 * audio.rms + 0.12 * collapse)
+        * (1.0 - 0.48 * outro))
+        .clamp(0.0, 0.36)
+}
+
 fn render_abstract_symphony_frame(
     args: &Args,
     time_seconds: f64,
@@ -3058,6 +3471,50 @@ fn process_memory_snapshot() -> (u64, u64) {
     }
 }
 
+fn manifest_claim(scene_mode: &str) -> &'static str {
+    match scene_mode {
+        "memory_cathedral" | "fade_away_memory_cathedral" => {
+            "deterministic synthetic state-media render for ambient memory, dream collapse, absence, voice light, and inward fade"
+        }
+        "warp_laser_field" | "laser_warp" => {
+            "deterministic synthetic state-media render for center-origin laser warp fields and audio-reactive beam pressure"
+        }
+        "lyric_city" => {
+            "deterministic synthetic state-media render for lyric-guided city silhouettes, audio windows, fog, glow, and emotional scene pressure"
+        }
+        "spectrum_backdrop" => {
+            "deterministic source-poster intensity animation for existing electric, analyzer, waveform, and soundfield regions"
+        }
+        "abstract_symphony" | "symphony" => {
+            "deterministic synthetic state-media render for abstract audio fields, soft beams, and soundfield pressure"
+        }
+        _ => "deterministic synthetic state-media demo for occlusion, mist, fog, glow, and depth",
+    }
+}
+
+fn scene_motifs_json(scene_mode: &str) -> &'static str {
+    match scene_mode {
+        "memory_cathedral" | "fade_away_memory_cathedral" => {
+            "[\"near-black blue memory field\", \"soft doorway depth windows\", \"central human absence\", \"paired voice light fields\", \"inward memory particles\", \"dream snap collapse\", \"outro heart sink\"]"
+        }
+        "warp_laser_field" | "laser_warp" => {
+            "[\"pure black background\", \"center-origin lasers\", \"radial warp starfield\", \"beat pulse core\", \"audio-reactive beam pressure\"]"
+        }
+        "lyric_city" => {
+            "[\"wide night sky\", \"black skyline silhouettes\", \"bottom-up audio windows\", \"memory fog\", \"wet reflections\", \"father-child emotional arc\"]"
+        }
+        "spectrum_backdrop" => {
+            "[\"full source poster\", \"existing electric intensity\", \"audio waveform panel\", \"spectrum analyzer panel\", \"headphone soundfield radar\", \"prototype status mark\"]"
+        }
+        "abstract_symphony" | "symphony" => {
+            "[\"soft volumetric field\", \"audio waveform ribbon\", \"electric glow pressure\", \"soundfield rings\", \"wet reflection pressure\"]"
+        }
+        _ => {
+            "[\"foreground occlusion pillars\", \"moving silhouette occlusion\", \"depth fog veils\", \"portal glow\", \"wet reflection\", \"ember pressure\"]"
+        }
+    }
+}
+
 fn write_manifest(
     args: &Args,
     video_path: &PathBuf,
@@ -3095,7 +3552,7 @@ fn write_manifest(
             "  \"schema\": \"truevision_weird_occlusion_rs.v1\",\n",
             "  \"run_id\": \"{}\",\n",
             "  \"created_at_unix\": {},\n",
-            "  \"claim\": \"deterministic synthetic state-media demo for occlusion, mist, fog, glow, and depth\",\n",
+            "  \"claim\": \"{}\",\n",
             "  \"boundary\": {{\n",
             "    \"synthetic_state_media\": true,\n",
             "    \"no_external_visual_assets\": true,\n",
@@ -3126,7 +3583,7 @@ fn write_manifest(
             "  \"scene_state\": {{\n",
             "    \"scene_mode\": \"{}\",\n",
             "    \"palette\": \"{}\",\n",
-            "    \"motifs\": [\"foreground occlusion pillars\", \"moving silhouette occlusion\", \"depth fog veils\", \"portal glow\", \"wet reflection\", \"ember pressure\"],\n",
+            "    \"motifs\": {},\n",
             "    \"average_fog_coverage\": {:.9},\n",
             "    \"average_occluded_pixels\": {:.3},\n",
             "    \"average_glow_pixels\": {:.3}\n",
@@ -3142,6 +3599,7 @@ fn write_manifest(
         ),
         json_escape(&args.run_id),
         unix_now(),
+        json_escape(manifest_claim(&args.scene_mode)),
         json_escape(&video_path.display().to_string()),
         json_escape(&visual_path.display().to_string()),
         json_escape(&state_path.display().to_string()),
@@ -3164,6 +3622,7 @@ fn write_manifest(
         args.audio.is_some() && args.mux_audio,
         json_escape(&args.scene_mode),
         json_escape(&args.palette),
+        scene_motifs_json(&args.scene_mode),
         avg_fog,
         avg_occluded,
         avg_glow,
