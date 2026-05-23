@@ -58,6 +58,60 @@ class TrueVisionStudioToolingTests(unittest.TestCase):
         self.assertIn("bottom_up_city_spectrum", template["visual_parameters"]["state_layers"])
         self.assertFalse(template["boundary"]["evidence"])
 
+    def test_state_presentation_preset_and_native_lane_are_registered(self):
+        preset = get_render_preset("state_presentation_truevision_labs")
+        template = preset_to_template(
+            preset,
+            name="State Presentation Test",
+            prompt="calm systems reveal",
+            audio_path="D:/voice/state_presentation.wav",
+            duration_seconds=240,
+            fps=30,
+        )
+
+        self.assertEqual(template["renderer"], "truevision_weird_occlusion_rs")
+        self.assertEqual(template["visual_mode"], "state_presentation")
+        self.assertEqual(template["timeline"]["frame_count"], 7200)
+        self.assertIn("validated_state_packets", template["visual_parameters"]["state_layers"])
+        self.assertIn("OpenAI Codex Workspace Agent", preset["credits"])
+        self.assertEqual(preset["presentation_outline"]["slide_count"], 12)
+        self.assertIn("When Media Becomes State", preset["presentation_outline"]["slides"][0]["title"])
+        self.assertIn("Record state", preset["presentation_outline"]["slides"][2]["body"])
+
+        rust_source = Path("native/truevision_capture_rs/src/bin/truevision_weird_occlusion_rs.rs").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("state_presentation", rust_source)
+        self.assertIn("TRUEVISION LABS STATE PRESENTATION", rust_source)
+        self.assertIn("WHEN MEDIA BECOMES STATE", rust_source)
+        self.assertIn("RECORD STATE PLAN STATE TRANSFORM STATE", rust_source)
+
+    def test_boardroom_presentation_preset_uses_gothic_industrial_panel_surface(self):
+        preset = get_render_preset("state_presentation_v3_boardroom")
+
+        self.assertEqual(preset["renderer"], "edge_headless_panel_export")
+        self.assertEqual(preset["visual_mode"], "gothic_industrial_systems_panels")
+        self.assertEqual(preset["presentation_outline"]["slide_count"], 12)
+        self.assertIn("architecture_overview", preset["panel_types"])
+        self.assertIn("proof_metrics", preset["panel_types"])
+        self.assertIn("trust_boundary", preset["panel_types"])
+
+        panel_html = Path("ui/state_presentation_boardroom.html").read_text(encoding="utf-8")
+        self.assertIn("Architecture Overview", panel_html)
+        self.assertIn("Known State A", panel_html)
+        self.assertIn("232.88s", panel_html)
+        self.assertIn("Observed", panel_html)
+        self.assertIn("Generated", panel_html)
+
+        exporter = Path("scripts/render_state_presentation_boardroom_panels.py").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("FINAL_RECEIPT_HOLD_SECONDS = 15.0", exporter)
+        self.assertIn("TRANSITION_SECONDS = 0.45", exporter)
+        self.assertIn("xfade=transition=fade", exporter)
+        self.assertIn("edge_audio_river_smoke", exporter)
+        self.assertIn("hide_backbone", exporter)
+
     def test_render_preset_library_tool_lists_and_promotes(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             storage = Path(tmpdir)

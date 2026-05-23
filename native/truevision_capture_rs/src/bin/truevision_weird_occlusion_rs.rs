@@ -710,6 +710,9 @@ fn render_frame(
     if args.scene_mode == "memory_cathedral" || args.scene_mode == "fade_away_memory_cathedral" {
         return render_memory_cathedral_frame(args, time_seconds, frame_index, audio, frame, stats);
     }
+    if args.scene_mode == "state_presentation" || args.scene_mode == "truevision_state_presentation" {
+        return render_state_presentation_frame(args, time_seconds, frame_index, audio, frame, stats);
+    }
     let width = args.width;
     let height = args.height;
     let horizon = (height as f32 * (0.45 + 0.025 * (time_seconds * 0.23).sin() as f32)) as i32;
@@ -1454,6 +1457,9 @@ fn glyph_5x7(ch: char) -> [&'static str; 7] {
         'A' => [
             "01110", "10001", "10001", "11111", "10001", "10001", "10001",
         ],
+        'B' => [
+            "11110", "10001", "10001", "11110", "10001", "10001", "11110",
+        ],
         'C' => [
             "01111", "10000", "10000", "10000", "10000", "10000", "01111",
         ],
@@ -1475,6 +1481,12 @@ fn glyph_5x7(ch: char) -> [&'static str; 7] {
         'I' => [
             "11111", "00100", "00100", "00100", "00100", "00100", "11111",
         ],
+        'J' => [
+            "00111", "00010", "00010", "00010", "10010", "10010", "01100",
+        ],
+        'K' => [
+            "10001", "10010", "10100", "11000", "10100", "10010", "10001",
+        ],
         'L' => [
             "10000", "10000", "10000", "10000", "10000", "10000", "11111",
         ],
@@ -1489,6 +1501,9 @@ fn glyph_5x7(ch: char) -> [&'static str; 7] {
         ],
         'P' => [
             "11110", "10001", "10001", "11110", "10000", "10000", "10000",
+        ],
+        'Q' => [
+            "01110", "10001", "10001", "10001", "10101", "10010", "01101",
         ],
         'R' => [
             "11110", "10001", "10001", "11110", "10100", "10010", "10001",
@@ -1505,8 +1520,17 @@ fn glyph_5x7(ch: char) -> [&'static str; 7] {
         'V' => [
             "10001", "10001", "10001", "10001", "10001", "01010", "00100",
         ],
+        'W' => [
+            "10001", "10001", "10001", "10101", "10101", "10101", "01010",
+        ],
+        'X' => [
+            "10001", "10001", "01010", "00100", "01010", "10001", "10001",
+        ],
         'Y' => [
             "10001", "10001", "01010", "00100", "00100", "00100", "00100",
+        ],
+        'Z' => [
+            "11111", "00001", "00010", "00100", "01000", "10000", "11111",
         ],
         '1' => [
             "00100", "01100", "00100", "00100", "00100", "00100", "01110",
@@ -1547,6 +1571,7 @@ fn glyph_5x7(ch: char) -> [&'static str; 7] {
     }
 }
 
+#[allow(dead_code)]
 fn spectrum_backdrop_haze(x: f32, y: f32, t: f64, rms: f32, high: f32) -> f32 {
     let noise = value_noise(x * 7.0 + t as f32 * 0.05, y * 5.0 - t as f32 * 0.025);
     let center = (1.0 - (x - 0.5).abs() * 1.7).clamp(0.0, 1.0);
@@ -2506,6 +2531,416 @@ fn warp_tunnel_rings(radius: f32, t: f32, audio: AudioFeature) -> f32 {
     let ring = 1.0 - smoothstep(0.018, 0.090 + 0.020 * audio.beat, phase.sin().abs());
     let gate = smoothstep(0.08, 0.28, radius) * (1.0 - smoothstep(0.74, 1.22, radius));
     (ring * gate * (0.060 + 0.22 * audio.beat + 0.12 * audio.high)).clamp(0.0, 0.40)
+}
+
+fn render_state_presentation_frame(
+    args: &Args,
+    time_seconds: f64,
+    frame_index: usize,
+    audio: AudioFeature,
+    frame: &mut [u8],
+    stats: &mut FrameStats,
+) -> String {
+    let width = args.width;
+    let height = args.height;
+    let t = time_seconds as f32;
+    let phase = (time_seconds / args.duration.max(0.000_001)).clamp(0.0, 1.0) as f32;
+    let threads = args.render_threads.min(height.max(1));
+    let rows_per_chunk = height.div_ceil(threads);
+    let row_stride = width * 3;
+    let mut glow_pixels = 0_u64;
+    let mut field_accum = 0.0_f64;
+    let mut text_pixels = 0_u64;
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (chunk_index, chunk) in frame.chunks_mut(row_stride * rows_per_chunk).enumerate() {
+            let y_start = chunk_index * rows_per_chunk;
+            let rows = chunk.len() / row_stride;
+            handles.push(scope.spawn(move || {
+                let mut local_glow = 0_u64;
+                let mut local_field = 0.0_f64;
+                let mut local_text = 0_u64;
+                for local_y in 0..rows {
+                    let y = y_start + local_y;
+                    let yf = y as f32 / height as f32;
+                    for x in 0..width {
+                        let xf = x as f32 / width as f32;
+                        let sample =
+                            state_presentation_pixel(xf, yf, width, height, t, phase, audio);
+                        if sample.glow {
+                            local_glow += 1;
+                        }
+                        if sample.text_alpha > 0.01 {
+                            local_text += 1;
+                        }
+                        local_field += sample.field as f64;
+                        write_pixel_local(chunk, width, x, local_y, sample.color);
+                    }
+                }
+                (local_glow, local_field, local_text)
+            }));
+        }
+        for handle in handles {
+            let (local_glow, local_field, local_text) = handle.join().unwrap_or((0, 0.0, 0));
+            glow_pixels += local_glow;
+            field_accum += local_field;
+            text_pixels += local_text;
+        }
+    });
+
+    stats.fog_samples += 1;
+    stats.fog_coverage_sum += field_accum / (width * height) as f64;
+    stats.glow_pixels_sum += glow_pixels;
+    stats.occluded_pixels_sum += text_pixels;
+    let section = state_presentation_section(phase);
+
+    format!(
+        "{{\"frame_index\":{},\"time_seconds\":{:.6},\"scene\":\"state_presentation\",\"palette\":\"{}\",\"section\":\"{}\",\"audio\":{{\"rms\":{:.6},\"bass\":{:.6},\"high\":{:.6},\"beat\":{:.6},\"vocal_presence\":{:.6}}},\"render_law\":\"state_fields_first_pixels_last\",\"field_mean\":{:.6},\"text_pixels\":{},\"glow_pixels\":{},\"credits\":[\"Lee Mercey Architect Engineer Lead Engineer\",\"OpenAI\",\"OpenAI Codex\",\"OpenAI Codex Workspace Agent\"],\"state_layers\":[\"black_field_single_pulse\",\"state_cell_grid\",\"validated_state_packets\",\"aw_sc_truevision_harness_nodes\",\"temporal_bridge_ab\",\"manifest_receipts_hashes\",\"third_party_credits\",\"system_voice_narration\"]}}",
+        frame_index,
+        time_seconds,
+        json_escape(&args.palette),
+        section,
+        audio.rms,
+        audio.bass,
+        audio.high,
+        audio.beat,
+        vocal_presence(audio),
+        field_accum / (width * height) as f64,
+        text_pixels,
+        glow_pixels
+    )
+}
+
+#[derive(Clone, Copy)]
+struct PresentationPixel {
+    color: Color,
+    glow: bool,
+    field: f32,
+    text_alpha: f32,
+}
+
+fn state_presentation_pixel(
+    x: f32,
+    y: f32,
+    width: usize,
+    height: usize,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> PresentationPixel {
+    let aspect = width as f32 / height as f32;
+    let cx = (x - 0.5) * aspect;
+    let cy = y - 0.5;
+    let radius = (cx * cx + cy * cy).sqrt();
+    let mut color = state_presentation_base(x, y, radius, t, phase, audio);
+    let mut glow = false;
+    let mut field = 0.0_f32;
+
+    let grid = state_presentation_grid(x, y, t, phase, audio);
+    if grid > 0.004 {
+        field += grid;
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(72.0 + 38.0 * audio.high, 62.0 + 24.0 * audio.rms, 90.0),
+            grid,
+        );
+    }
+
+    let packets = state_packet_flow(cx, cy, t, phase, audio);
+    if packets > 0.006 {
+        field += packets;
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(132.0 + 48.0 * audio.high, 116.0 + 36.0 * audio.rms, 118.0 + 28.0 * audio.beat),
+            packets,
+        );
+    }
+
+    let nodes = harness_nodes(cx, cy, t, phase, audio);
+    if nodes > 0.006 {
+        field += nodes;
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(104.0 + 44.0 * audio.high, 88.0 + 56.0 * audio.bass, 126.0 + 42.0 * audio.beat),
+            nodes,
+        );
+    }
+
+    let bridge = temporal_bridge_field(cx, cy, t, phase, audio);
+    if bridge > 0.006 {
+        field += bridge;
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(150.0 + 50.0 * audio.high, 116.0 + 42.0 * audio.rms, 92.0 + 34.0 * audio.bass),
+            bridge,
+        );
+    }
+
+    let receipt = manifest_receipt_field(x, y, t, phase, audio);
+    if receipt > 0.006 {
+        field += receipt;
+        glow = true;
+        blend_add(
+            &mut color,
+            Color::new(82.0, 132.0 + 58.0 * audio.bass, 178.0 + 38.0 * audio.beat),
+            receipt,
+        );
+    }
+
+    let (text_alpha, text_color) = state_presentation_text(x, y, t, phase, audio);
+    if text_alpha > 0.0 {
+        glow = true;
+        blend_add(&mut color, text_color, text_alpha);
+    }
+
+    let vignette = smoothstep(0.45, 1.10, radius);
+    blend(&mut color, Color::new(0.0, 0.0, 1.0), vignette * 0.68);
+
+    PresentationPixel {
+        color,
+        glow,
+        field: field.clamp(0.0, 1.0),
+        text_alpha,
+    }
+}
+
+fn state_presentation_section(phase: f32) -> &'static str {
+    match state_presentation_slide_index(phase) {
+        0 => "title",
+        1 => "problem",
+        2 => "core_rule",
+        3 => "records_state",
+        4 => "forward_reverse",
+        5 => "frame_generation",
+        6 => "logs_as_memory",
+        7 => "trust_boundary",
+        8 => "current_proof",
+        9 => "system_shape",
+        10 => "not_this",
+        _ => "closing",
+    }
+}
+
+fn state_presentation_slide_index(phase: f32) -> usize {
+    ((phase.clamp(0.0, 0.999_999) * 12.0).floor() as usize).min(11)
+}
+
+fn state_presentation_slide_local(phase: f32) -> f32 {
+    let slide = state_presentation_slide_index(phase) as f32;
+    (phase.clamp(0.0, 0.999_999) * 12.0 - slide).clamp(0.0, 1.0)
+}
+
+fn state_presentation_slide_gate(local: f32) -> f32 {
+    smoothstep(0.05, 0.16, local) * (1.0 - smoothstep(0.84, 0.98, local))
+}
+
+fn state_presentation_base(
+    x: f32,
+    y: f32,
+    radius: f32,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> Color {
+    let drift = value_noise(x * 2.0 + t * 0.010, y * 1.8 - t * 0.006);
+    let vertical = smoothstep(0.0, 1.0, y);
+    let wake = smoothstep(0.02, 0.12, phase);
+    let lower = Color::new(
+        4.0 + 6.0 * audio.bass,
+        4.0 + 5.0 * drift,
+        8.0 + 8.0 * audio.rms,
+    );
+    let upper = Color::new(
+        8.0 + 9.0 * drift,
+        6.0 + 4.0 * wake,
+        12.0 + 5.0 * audio.high,
+    );
+    let mut color = lerp_color(upper, lower, vertical);
+    let pulse = (-((radius / (0.16 + 0.12 * audio.bass)).powf(2.0))).exp()
+        * (0.05 + 0.16 * audio.rms + 0.10 * audio.beat);
+    blend_add(&mut color, Color::new(90.0, 72.0, 104.0), pulse);
+    color
+}
+
+fn state_presentation_grid(x: f32, y: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let appear = smoothstep(0.03, 0.20, phase) * (1.0 - smoothstep(0.78, 0.95, phase));
+    let gx = ((x * 24.0).fract() - 0.5).abs();
+    let gy = ((y * 13.5).fract() - 0.5).abs();
+    let line = (1.0 - smoothstep(0.010, 0.030, gx.min(gy))).clamp(0.0, 1.0);
+    let breath = 0.34 + 0.32 * audio.rms + 0.10 * (t * 0.22).sin().max(0.0);
+    line * appear * breath * 0.30
+}
+
+fn state_packet_flow(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let gate = smoothstep(0.16, 0.34, phase) * (1.0 - smoothstep(0.72, 0.88, phase));
+    let mut sum = 0.0_f32;
+    for index in 0..9 {
+        let fi = index as f32;
+        let lane_y = -0.28 + fi * 0.070 + 0.020 * (t * 0.05 + fi).sin();
+        let progress = (t * (0.040 + 0.016 * audio.rms) + fi * 0.137).fract();
+        let x_pos = -0.78 + progress * 1.56;
+        let dx = (cx - x_pos) / (0.025 + 0.010 * audio.beat);
+        let dy = (cy - lane_y) / 0.018;
+        let packet = (-(dx * dx + dy * dy)).exp();
+        let tail = (-(dx * dx * 0.12 + dy * dy)).exp() * smoothstep(-0.04, 0.18, cx - x_pos);
+        sum += packet * 0.60 + tail * 0.18;
+    }
+    (sum * gate * (0.30 + 0.32 * audio.rms + 0.22 * audio.high)).clamp(0.0, 1.0)
+}
+
+fn harness_nodes(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let gate = smoothstep(0.46, 0.57, phase) * (1.0 - smoothstep(0.70, 0.84, phase));
+    let nodes = [(-0.46, 0.02), (0.0, -0.20), (0.46, 0.02)];
+    let mut value = 0.0_f32;
+    for (index, (nx, ny)) in nodes.iter().enumerate() {
+        let dx = (cx - nx) / 0.095;
+        let dy = (cy - ny) / 0.095;
+        let core = (-(dx * dx + dy * dy)).exp();
+        let ring = 1.0 - smoothstep(0.010, 0.045, ((dx * dx + dy * dy).sqrt() - 0.78).abs());
+        value += core * 0.32 + ring * (0.36 + 0.14 * (t * 0.42 + index as f32).sin().max(0.0));
+    }
+    let connector = 1.0 - smoothstep(0.015, 0.055, (cy + 0.060 + 0.018 * (cx * 5.0).sin()).abs());
+    let connector_gate = smoothstep(-0.48, -0.10, cx) * (1.0 - smoothstep(0.10, 0.48, cx.abs()));
+    ((value + connector * connector_gate * 0.30) * gate * (0.44 + 0.32 * audio.rms + 0.18 * audio.beat))
+        .clamp(0.0, 1.0)
+}
+
+fn temporal_bridge_field(cx: f32, cy: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let gate = smoothstep(0.30, 0.43, phase) * (1.0 - smoothstep(0.58, 0.72, phase));
+    let line = 1.0 - smoothstep(0.010, 0.045, (cy - 0.04 * (cx * 4.0 + t * 0.12).sin()).abs());
+    let left = (-(((cx + 0.36) / 0.10).powf(2.0) + (cy / 0.13).powf(2.0))).exp();
+    let right = (-(((cx - 0.36) / 0.10).powf(2.0) + (cy / 0.13).powf(2.0))).exp();
+    let midpoint = (-((cx / (0.12 + 0.04 * audio.bass)).powf(2.0) + (cy / 0.15).powf(2.0))).exp();
+    (gate * (line * 0.28 + left * 0.34 + right * 0.34 + midpoint * (0.24 + 0.22 * audio.beat)))
+        .clamp(0.0, 1.0)
+}
+
+fn manifest_receipt_field(x: f32, y: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let gate = smoothstep(0.62, 0.72, phase) * (1.0 - smoothstep(0.86, 0.96, phase));
+    let px = (x - 0.62) / 0.28;
+    let py = (y - 0.18) / 0.52;
+    if px < 0.0 || px > 1.0 || py < 0.0 || py > 1.0 {
+        return 0.0;
+    }
+    let border = (px.min(1.0 - px).min(py.min(1.0 - py)) / 0.025).clamp(0.0, 1.0);
+    let scan = 1.0 - smoothstep(0.010, 0.042, ((py * 12.0 + t * 0.25).fract() - 0.5).abs());
+    let hash_marks = 1.0 - smoothstep(0.010, 0.050, ((px * 8.0 + py * 5.0).fract() - 0.5).abs());
+    (gate * ((1.0 - border) * 0.32 + scan * 0.16 + hash_marks * 0.12) * (0.42 + 0.26 * audio.high + 0.20 * audio.beat))
+        .clamp(0.0, 0.72)
+}
+
+fn state_presentation_text(
+    x: f32,
+    y: f32,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> (f32, Color) {
+    let pulse = 0.72 + 0.16 * audio.rms + 0.10 * (t * 0.70).sin().max(0.0);
+    let mut alpha = 0.0_f32;
+    let slide = state_presentation_slide_index(phase);
+    let local = state_presentation_slide_local(phase);
+    let gate = state_presentation_slide_gate(local);
+    let color = match slide {
+        0 => Color::new(146.0, 132.0, 170.0),
+        1 => Color::new(146.0, 120.0, 144.0),
+        2 => Color::new(170.0, 142.0, 110.0),
+        3 => Color::new(124.0, 132.0, 176.0),
+        4 => Color::new(130.0, 118.0, 166.0),
+        5 => Color::new(156.0, 126.0, 112.0),
+        6 => Color::new(116.0, 138.0, 174.0),
+        7 => Color::new(128.0, 130.0, 182.0),
+        8 => Color::new(154.0, 132.0, 112.0),
+        9 => Color::new(120.0, 136.0, 172.0),
+        10 => Color::new(146.0, 116.0, 132.0),
+        _ => Color::new(146.0, 132.0, 170.0),
+    };
+
+    alpha = match slide {
+        0 => alpha
+            .max(block_text_alpha(x, y, "TRUEVISION", 0.39, 0.20, 0.0082))
+            .max(block_text_alpha(x, y, "WHEN MEDIA BECOMES STATE", 0.27, 0.37, 0.0052))
+            .max(block_text_alpha(x, y, "STATE NATIVE MEDIA", 0.33, 0.54, 0.0048))
+            .max(block_text_alpha(x, y, "FOR MACHINE UNDERSTANDING", 0.27, 0.64, 0.0043)),
+        1 => alpha
+            .max(block_text_alpha(x, y, "THE PROBLEM", 0.39, 0.16, 0.0062))
+            .max(block_text_alpha(x, y, "MOST MEDIA AI", 0.20, 0.34, 0.0046))
+            .max(block_text_alpha(x, y, "STORES PIXELS", 0.20, 0.44, 0.0046))
+            .max(block_text_alpha(x, y, "GUESSES FRAMES", 0.20, 0.54, 0.0046))
+            .max(block_text_alpha(x, y, "HIDES PROCESS", 0.20, 0.64, 0.0046))
+            .max(block_text_alpha(x, y, "NO TRUST NO PROVENANCE", 0.20, 0.78, 0.0040)),
+        2 => alpha
+            .max(block_text_alpha(x, y, "THE CORE RULE", 0.37, 0.20, 0.0060))
+            .max(block_text_alpha(x, y, "RECORD STATE PLAN STATE TRANSFORM STATE", 0.14, 0.43, 0.0042))
+            .max(block_text_alpha(x, y, "RENDER PIXELS LAST", 0.31, 0.58, 0.0052)),
+        3 => alpha
+            .max(block_text_alpha(x, y, "WHAT TRUEVISION DOES", 0.30, 0.16, 0.0054))
+            .max(block_text_alpha(x, y, "OBSERVED AUDIO VIDEO", 0.18, 0.34, 0.0045))
+            .max(block_text_alpha(x, y, "BECOMES STRUCTURED STATE", 0.18, 0.44, 0.0045))
+            .max(block_text_alpha(x, y, "AUDIO FEATURES GRID CELL FIELDS", 0.18, 0.58, 0.0039))
+            .max(block_text_alpha(x, y, "TEMPORAL TRANSITIONS", 0.18, 0.68, 0.0041))
+            .max(block_text_alpha(x, y, "MANIFESTS RECEIPTS FRAME STATE LOGS", 0.18, 0.80, 0.0037)),
+        4 => alpha
+            .max(block_text_alpha(x, y, "FORWARD REVERSE", 0.36, 0.16, 0.0060))
+            .max(block_text_alpha(x, y, "FORWARD RECORDS OBSERVED STATE", 0.21, 0.34, 0.0042))
+            .max(block_text_alpha(x, y, "REVERSE REPLAYS REGENERATES", 0.21, 0.48, 0.0041))
+            .max(block_text_alpha(x, y, "OR DEMONSTRATES STATE", 0.21, 0.58, 0.0041))
+            .max(block_text_alpha(x, y, "GENERATED MEDIA IS SYNTHETIC STATE MEDIA", 0.14, 0.74, 0.0038))
+            .max(block_text_alpha(x, y, "NOT EVIDENCE", 0.41, 0.84, 0.0048)),
+        5 => alpha
+            .max(block_text_alpha(x, y, "FRAME GENERATION", 0.35, 0.14, 0.0060))
+            .max(block_text_alpha(x, y, "KNOWN STATE A", 0.18, 0.32, 0.0047))
+            .max(block_text_alpha(x, y, "TRANSITION FIELD", 0.36, 0.43, 0.0047))
+            .max(block_text_alpha(x, y, "MIDPOINT STATE", 0.58, 0.54, 0.0047))
+            .max(block_text_alpha(x, y, "RECURSE TO SMOOTH PLAYBACK", 0.27, 0.72, 0.0042))
+            .max(block_text_alpha(x, y, "ONE A TO B BRIDGE MANY FRAMES WALK IT", 0.18, 0.84, 0.0038)),
+        6 => alpha
+            .max(block_text_alpha(x, y, "WHY LOGS MATTER", 0.36, 0.20, 0.0060))
+            .max(block_text_alpha(x, y, "LOGS ARE NOT JUST PLACES TO LOOK", 0.21, 0.43, 0.0043))
+            .max(block_text_alpha(x, y, "STRUCTURED LOGS BECOME", 0.25, 0.58, 0.0047))
+            .max(block_text_alpha(x, y, "RECOVERABLE STATE MEMORY", 0.25, 0.69, 0.0047)),
+        7 => alpha
+            .max(block_text_alpha(x, y, "THE TRUST BOUNDARY", 0.31, 0.16, 0.0060))
+            .max(block_text_alpha(x, y, "OBSERVED", 0.19, 0.38, 0.0052))
+            .max(block_text_alpha(x, y, "RECONSTRUCTED", 0.42, 0.38, 0.0052))
+            .max(block_text_alpha(x, y, "GENERATED", 0.68, 0.38, 0.0052))
+            .max(block_text_alpha(x, y, "EVERY RUN LEAVES RECEIPTS", 0.22, 0.66, 0.0041))
+            .max(block_text_alpha(x, y, "MANIFESTS REPORTS STATE RECORDS", 0.22, 0.77, 0.0041)),
+        8 => alpha
+            .max(block_text_alpha(x, y, "CURRENT PROOF", 0.38, 0.15, 0.0060))
+            .max(block_text_alpha(x, y, "NATIVE FULL SONG LANE", 0.31, 0.31, 0.0048))
+            .max(block_text_alpha(x, y, "232 88 SECONDS", 0.36, 0.43, 0.0048))
+            .max(block_text_alpha(x, y, "6986 FRAMES AND STATE RECORDS", 0.24, 0.55, 0.0042))
+            .max(block_text_alpha(x, y, "1280 BY 720 30 FPS", 0.33, 0.67, 0.0044))
+            .max(block_text_alpha(x, y, "32 RENDER THREADS ABOUT 1 5X REALTIME", 0.17, 0.80, 0.0038)),
+        9 => alpha
+            .max(block_text_alpha(x, y, "SYSTEM SHAPE", 0.39, 0.14, 0.0060))
+            .max(block_text_alpha(x, y, "HUMAN DIRECTION AUDIO", 0.18, 0.31, 0.0045))
+            .max(block_text_alpha(x, y, "STUDIO CLI", 0.18, 0.41, 0.0045))
+            .max(block_text_alpha(x, y, "STATE DRAFT", 0.18, 0.51, 0.0045))
+            .max(block_text_alpha(x, y, "SCHEMA VALIDATOR AV POLICY", 0.18, 0.61, 0.0042))
+            .max(block_text_alpha(x, y, "RENDERER FFMPEG", 0.18, 0.71, 0.0043))
+            .max(block_text_alpha(x, y, "MP4 MANIFEST FRAME STATE JSONL REPORT", 0.18, 0.83, 0.0037)),
+        10 => alpha
+            .max(block_text_alpha(x, y, "WHAT THIS IS NOT", 0.34, 0.16, 0.0060))
+            .max(block_text_alpha(x, y, "NOT CLOUD VIDEO GENERATION", 0.24, 0.34, 0.0045))
+            .max(block_text_alpha(x, y, "NOT PROMPT MAGIC", 0.24, 0.46, 0.0045))
+            .max(block_text_alpha(x, y, "NOT FORENSIC PROOF SOFTWARE", 0.24, 0.58, 0.0042))
+            .max(block_text_alpha(x, y, "NOT RAW VIDEO STORAGE", 0.24, 0.70, 0.0045))
+            .max(block_text_alpha(x, y, "NOT UNCONTROLLED MODEL OUTPUT", 0.24, 0.82, 0.0040)),
+        _ => alpha
+            .max(block_text_alpha(x, y, "THE FUTURE OF MACHINE MEDIA", 0.22, 0.18, 0.0053))
+            .max(block_text_alpha(x, y, "IS NOT MYSTERY", 0.36, 0.34, 0.0060))
+            .max(block_text_alpha(x, y, "THE FUTURE IS TRACEABLE STATE", 0.23, 0.52, 0.0053))
+            .max(block_text_alpha(x, y, "TRUEVISION LABS STATE PRESENTATION", 0.18, 0.72, 0.0042))
+            .max(block_text_alpha(x, y, "LEE MERCEY OPENAI CODEX WORKSPACE AGENT", 0.15, 0.84, 0.0037)),
+    } * gate;
+    ((alpha * pulse).clamp(0.0, 0.86), color)
 }
 
 fn render_memory_cathedral_frame(
@@ -3476,6 +3911,9 @@ fn manifest_claim(scene_mode: &str) -> &'static str {
         "memory_cathedral" | "fade_away_memory_cathedral" => {
             "deterministic synthetic state-media render for ambient memory, dream collapse, absence, voice light, and inward fade"
         }
+        "state_presentation" | "truevision_state_presentation" => {
+            "deterministic state presentation by TrueVision Labs explaining state media, validated packets, manifests, receipts, and credits"
+        }
         "warp_laser_field" | "laser_warp" => {
             "deterministic synthetic state-media render for center-origin laser warp fields and audio-reactive beam pressure"
         }
@@ -3496,6 +3934,9 @@ fn scene_motifs_json(scene_mode: &str) -> &'static str {
     match scene_mode {
         "memory_cathedral" | "fade_away_memory_cathedral" => {
             "[\"near-black blue memory field\", \"soft doorway depth windows\", \"central human absence\", \"paired voice light fields\", \"inward memory particles\", \"dream snap collapse\", \"outro heart sink\"]"
+        }
+        "state_presentation" | "truevision_state_presentation" => {
+            "[\"state fields\", \"validated state packets\", \"system harness nodes\", \"temporal bridge\", \"manifest receipts\", \"third-party credits\", \"calm narration\"]"
         }
         "warp_laser_field" | "laser_warp" => {
             "[\"pure black background\", \"center-origin lasers\", \"radial warp starfield\", \"beat pulse core\", \"audio-reactive beam pressure\"]"

@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TrueVision Gothic Industrial Presentation Panels</title>
+  <style>
+    :root {
+      --bg: #020407;
+      --panel: #080c13;
+      --ink: #edf2fb;
+      --muted: #8995a7;
+      --navy: #070b12;
+      --blue: #375d86;
+      --cyan: #2a9bad;
+      --teal: #1c6964;
+      --green: #4d8154;
+      --gold: #c79a4b;
+      --orange: #9b562b;
+      --red: #7e2b2e;
+      --purple: #6c4aa5;
+      --line: #445168;
+      --soft: #182233;
+      --grid: rgba(184, 198, 224, 0.052);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      width: 1280px;
+      height: 720px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+        linear-gradient(0deg, var(--grid) 1px, transparent 1px) 0 0 / 40px 40px,
+        radial-gradient(circle at 22% 18%, rgba(42, 155, 173, 0.13), transparent 34%),
+        radial-gradient(circle at 72% 68%, rgba(199, 154, 75, 0.12), transparent 34%),
+        linear-gradient(135deg, rgba(255,255,255,.035), transparent 32%, rgba(0,0,0,.48)),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Bahnschrift", "Segoe UI", Arial, sans-serif;
+      letter-spacing: 0;
+    }
+
+    .slide {
+      display: none;
+      width: 1280px;
+      height: 720px;
+      padding: 38px 54px;
+      position: relative;
+    }
+
+    .slide.active { display: block; }
+
+    .frame {
+      width: 100%;
+      height: 100%;
+      background: var(--panel);
+      border: 5px solid #252d3a;
+      box-shadow: 0 26px 70px rgba(0, 0, 0, 0.76), inset 0 0 0 1px rgba(199, 154, 75, 0.14);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .frame.dark {
+      background:
+        linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px) 0 0 / 42px 42px,
+        linear-gradient(0deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px) 0 0 / 42px 42px,
+        #05080d;
+      color: #edf3ff;
+      border-color: #252d3a;
+    }
+
+    .topbar {
+      height: 64px;
+      background: #04070c;
+      color: #f8fbff;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      font-weight: 700;
+      font-size: 22px;
+      border-bottom: 3px solid #2e394b;
+    }
+
+    .topbar .count {
+      color: #9fb2d8;
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    .content {
+      padding: 30px;
+      height: calc(100% - 64px);
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 58px;
+      line-height: 1.02;
+      color: #eef3fb;
+      font-weight: 800;
+    }
+
+    h2 {
+      margin: 0 0 18px;
+      font-size: 36px;
+      line-height: 1.05;
+      color: #eef3fb;
+      font-weight: 800;
+    }
+
+    .dark h1, .dark h2 { color: #eef5ff; }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 23px;
+      line-height: 1.25;
+      max-width: 880px;
+      margin-top: 14px;
+    }
+
+    .dark .subtitle { color: #aab8cf; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      height: 34px;
+      padding: 0 13px;
+      background: #111822;
+      border: 2px solid #4b586e;
+      color: #dce6f6;
+      font-weight: 700;
+      font-size: 15px;
+      text-transform: uppercase;
+    }
+
+    .dark .tag {
+      background: #121d31;
+      color: #cbd7ef;
+      border-color: #34445f;
+    }
+
+    .row { display: flex; gap: 20px; }
+    .col { flex: 1; }
+
+    .card {
+      background: #0b111a;
+      border: 3px solid #3f4b60;
+      color: #edf2fb;
+      padding: 18px;
+    }
+
+    .card.dark-card {
+      background: #101827;
+      border-color: #31435f;
+      color: #e7eefc;
+    }
+
+    .card-title {
+      color: #f0c66a;
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .dark-card .card-title { color: #dbe7ff; }
+
+    .small {
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.25;
+    }
+
+    .dark-card .small { color: #9fb2d8; }
+
+    .node {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 74px;
+      background: #111926;
+      border: 3px solid #4d5b72;
+      color: #edf2fb;
+      font-size: 18px;
+      font-weight: 800;
+      text-align: center;
+      padding: 10px;
+    }
+
+    .node.gold { background: #322716; border-color: #b68a3d; color:#f4d58b; }
+    .node.green { background: #142216; border-color: #527f55; color:#dcefdc; }
+    .node.orange { background: #301a10; border-color: #9b562b; color:#f0c19a; }
+    .node.purple { background: #1d172c; border-color: #7559ad; color:#e4d8ff; }
+    .node.red { background: #2a1114; border-color: #803036; color:#f0c6c8; }
+    .node.dark-node { background: #17233a; border-color: #5d78aa; color: #eef5ff; }
+
+    .arrow {
+      position: relative;
+      height: 4px;
+      background: #7e8ca1;
+      margin: 36px 0;
+    }
+
+    .arrow::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -9px;
+      border-left: 18px solid #7e8ca1;
+      border-top: 11px solid transparent;
+      border-bottom: 11px solid transparent;
+    }
+
+    .metric-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+
+    .metric {
+      background: #0b121d;
+      border: 4px solid #3f4d63;
+      padding: 18px 18px 14px;
+      min-height: 132px;
+    }
+
+    .metric .value {
+      font-size: 45px;
+      color: #f0c66a;
+      font-weight: 900;
+      line-height: 1;
+    }
+
+    .metric .label {
+      color: #a7b3c4;
+      font-size: 17px;
+      font-weight: 700;
+      margin-top: 8px;
+    }
+
+    .bar {
+      height: 15px;
+      margin-top: 15px;
+      background: #111a28;
+      border: 2px solid #3c4b63;
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #7f612d, #2a9bad);
+    }
+
+    .swimlane {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr 1fr;
+      border: 4px solid #3b4658;
+      height: 505px;
+      background: #090f18;
+    }
+
+    .lane {
+      border-right: 3px solid #2b3545;
+      padding: 18px;
+      position: relative;
+    }
+
+    .lane:last-child { border-right: none; }
+
+    .lane-title {
+      height: 34px;
+      background: #05070b;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      margin: -18px -18px 18px;
+    }
+
+    .flow-box {
+      min-height: 52px;
+      margin: 15px auto;
+      padding: 9px 12px;
+      color: #ffffff;
+      background: #2f95aa;
+      border: 3px solid #1e6576;
+      font-size: 16px;
+      font-weight: 700;
+      text-align: center;
+      width: 78%;
+    }
+
+    .flow-box.orange { background: #81441f; border-color: #b56e34; }
+    .flow-box.blue { background: #244b75; border-color: #5d7fa5; }
+    .flow-box.green { background: #315f38; border-color: #628f66; }
+    .flow-box.red { background: #67262c; border-color: #a15a5f; }
+
+    .diagram-canvas {
+      position: relative;
+      height: 455px;
+      background: #070c14;
+      border: 4px solid #3b4658;
+      overflow: hidden;
+    }
+
+    .diagram-canvas.dark-canvas {
+      background: #0e1626;
+      border-color: #31435f;
+    }
+
+    .abs { position: absolute; }
+
+    .link {
+      position: absolute;
+      height: 4px;
+      background: #7e8ca1;
+      transform-origin: left center;
+    }
+
+    .link::after {
+      content: "";
+      position: absolute;
+      right: -1px;
+      top: -8px;
+      border-left: 15px solid #7e8ca1;
+      border-top: 10px solid transparent;
+      border-bottom: 10px solid transparent;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+
+    .status {
+      min-height: 114px;
+      border: 3px solid #3c4658;
+      background: #0b111a;
+      padding: 13px;
+    }
+
+    .status .lamp {
+      width: 18px;
+      height: 18px;
+      background: var(--green);
+      border: 3px solid #0b3b1a;
+      display: inline-block;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    .status .name {
+      color: #edf2fb;
+      font-size: 18px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .status .data {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      margin-top: 12px;
+      color: #9daabd;
+      font-size: 14px;
+      line-height: 1.35;
+    }
+
+    .pill-row { display: flex; gap: 16px; align-items: center; }
+
+    .boundary-pill {
+      flex: 1;
+      min-height: 170px;
+      border: 4px solid #3b4658;
+      background: #0b111a;
+      padding: 22px;
+      position: relative;
+    }
+
+    .boundary-pill h3 {
+      margin: 0 0 16px;
+      font-size: 26px;
+      color: #f0c66a;
+    }
+
+    .boundary-pill .stamp {
+      position: absolute;
+      right: 18px;
+      bottom: 16px;
+      color: #ffffff;
+      background: #070a10;
+      padding: 8px 11px;
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .04em;
+    }
+
+    .foot {
+      position: absolute;
+      left: 30px;
+      right: 30px;
+      bottom: 18px;
+      display: flex;
+      justify-content: space-between;
+      color: #7d899a;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .dark .foot { color: #7184a4; }
+
+    .watermark {
+      position: absolute;
+      right: 34px;
+      bottom: 32px;
+      color: rgba(255, 255, 255, 0.09);
+      font-size: 86px;
+      font-weight: 900;
+      letter-spacing: -0.04em;
+    }
+
+    .chart-title {
+      font-size: 18px;
+      color: #edf2fb;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+
+    .proof-chart {
+      height: 330px;
+      display: flex;
+      align-items: end;
+      gap: 28px;
+      padding: 16px 26px 22px;
+      border: 4px solid #3b4658;
+      background:
+        linear-gradient(0deg, rgba(146, 165, 198, 0.10) 1px, transparent 1px) 0 0 / 100% 55px,
+        #070c14;
+    }
+
+    .proof-bar {
+      flex: 1;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+      position: relative;
+    }
+
+    .proof-bar span {
+      width: 62px;
+      background: linear-gradient(180deg, #2a9bad, #7f612d);
+      border: 3px solid #3b4658;
+      display: block;
+    }
+
+    .proof-bar label {
+      position: absolute;
+      bottom: -18px;
+      color: #a7b3c4;
+      font-size: 12px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .proof-bar b {
+      position: absolute;
+      top: -24px;
+      color: #f0c66a;
+      font-size: 15px;
+      font-weight: 900;
+      white-space: nowrap;
+    }
+
+    .title-panel {
+      height: 100%;
+      display: grid;
+      grid-template-columns: 1.05fr 0.95fr;
+    }
+
+    .title-copy {
+      padding: 70px 54px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .hero-diagram {
+      position: relative;
+      margin: 54px 42px 54px 0;
+      border: 4px solid #31435f;
+      background: #0f1728;
+      overflow: hidden;
+    }
+
+    .hero-diagram::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        linear-gradient(90deg, rgba(126, 157, 218, 0.12) 1px, transparent 1px) 0 0 / 36px 36px,
+        linear-gradient(0deg, rgba(126, 157, 218, 0.10) 1px, transparent 1px) 0 0 / 36px 36px;
+    }
+
+    .packet {
+      width: 72px;
+      height: 38px;
+      background: #f4c152;
+      border: 3px solid #956307;
+      position: absolute;
+      box-shadow: 0 0 0 6px rgba(244, 193, 82, 0.12);
+    }
+
+    .packet.p1 { left: 68px; top: 116px; }
+    .packet.p2 { left: 250px; top: 236px; background: #57c7df; border-color: #11677a; }
+    .packet.p3 { left: 410px; top: 370px; background: #8b5cf6; border-color: #4c1d95; }
+
+    .hero-line {
+      position: absolute;
+      height: 5px;
+      background: #d6e4ff;
+      transform-origin: left center;
+      box-shadow: 0 0 18px rgba(214, 228, 255, 0.35);
+    }
+
+    .hero-line.l1 { left: 130px; top: 150px; width: 220px; transform: rotate(32deg); }
+    .hero-line.l2 { left: 315px; top: 270px; width: 195px; transform: rotate(39deg); }
+  </style>
+</head>
+<body>
+  <section class="slide active" data-slide="1">
+    <div class="frame dark">
+      <div class="title-panel">
+        <div class="title-copy">
+          <div class="tag">State Presentation</div>
+          <h1 style="margin-top: 38px;">TrueVision</h1>
+          <div class="subtitle" style="font-size: 32px; max-width: 560px; color:#e9f0ff;">When Media Becomes State</div>
+          <div class="subtitle" style="margin-top: 42px;">State-native media for machine understanding.</div>
+        </div>
+        <div class="hero-diagram">
+          <div class="hero-line l1"></div>
+          <div class="hero-line l2"></div>
+          <div class="packet p1"></div>
+          <div class="packet p2"></div>
+          <div class="packet p3"></div>
+          <div class="watermark">TV</div>
+        </div>
+      </div>
+      <div class="foot"><span>TrueVision Labs</span><span>Lee Mercey | OpenAI Codex Workspace Agent</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="2">
+    <div class="frame">
+      <div class="topbar"><span>The Problem</span><span class="count">02 / 12</span></div>
+      <div class="content">
+        <div class="row" style="height: 500px;">
+          <div class="card" style="flex: 1;">
+            <div class="card-title">Opaque Media Pipeline</div>
+            <div class="node red">Pixels In</div>
+            <div class="arrow"></div>
+            <div class="node orange">Model Guess</div>
+            <div class="arrow"></div>
+            <div class="node red">Output With Hidden Process</div>
+            <p class="small">Weak provenance. Blurred boundary. Hard to audit.</p>
+          </div>
+          <div class="card" style="flex: 1;">
+            <div class="card-title">TrueVision State Pipeline</div>
+            <div class="node green">Observed State</div>
+            <div class="arrow"></div>
+            <div class="node gold">Validated Transition</div>
+            <div class="arrow"></div>
+            <div class="node green">Manifested Output</div>
+            <p class="small">State trail. Receipts. Explicit synthetic boundary.</p>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>Comparison panel</span><span>No external visual assets</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="3">
+    <div class="frame">
+      <div class="topbar"><span>The Core Rule</span><span class="count">03 / 12</span></div>
+      <div class="content">
+        <h2>Record state. Plan state. Transform state. Render pixels last.</h2>
+        <div class="diagram-canvas">
+          <div class="node abs blue" style="left: 44px; top: 178px; width: 178px;">Record State</div>
+          <div class="link" style="left:222px; top:215px; width:128px;"></div>
+          <div class="node abs gold" style="left: 362px; top: 178px; width: 178px;">Plan State</div>
+          <div class="link" style="left:540px; top:215px; width:128px;"></div>
+          <div class="node abs green" style="left: 680px; top: 178px; width: 178px;">Transform State</div>
+          <div class="link" style="left:858px; top:215px; width:78px;"></div>
+          <div class="node abs purple" style="left: 950px; top: 178px; width: 118px;">Pixels Last</div>
+          <div class="card abs" style="left: 102px; bottom: 48px; width: 980px;">
+            <div class="card-title">Presentation Law</div>
+            <div class="small">The renderer is the final surface. The authority is the state packet, the policy result, and the manifest trail.</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>Control rule</span><span>State first, pixels last</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="4">
+    <div class="frame">
+      <div class="topbar"><span>Architecture Overview</span><span class="count">04 / 12</span></div>
+      <div class="content">
+        <div class="diagram-canvas">
+          <div class="node abs gold" style="left: 46px; top: 76px; width: 170px;">Human Direction</div>
+          <div class="node abs purple" style="left: 46px; top: 266px; width: 170px;">Audio / Video</div>
+          <div class="node abs blue" style="left: 312px; top: 76px; width: 205px;">Studio / CLI</div>
+          <div class="node abs green" style="left: 312px; top: 266px; width: 205px;">State Draft</div>
+          <div class="node abs orange" style="left: 604px; top: 76px; width: 205px;">Schema Validator</div>
+          <div class="node abs red" style="left: 604px; top: 266px; width: 205px;">AV Policy</div>
+          <div class="node abs blue" style="left: 902px; top: 76px; width: 150px;">Renderer</div>
+          <div class="node abs green" style="left: 902px; top: 266px; width: 150px;">MP4 + Manifest</div>
+          <div class="link" style="left:216px; top:113px; width:96px;"></div>
+          <div class="link" style="left:216px; top:303px; width:96px;"></div>
+          <div class="link" style="left:517px; top:113px; width:87px;"></div>
+          <div class="link" style="left:517px; top:303px; width:87px;"></div>
+          <div class="link" style="left:809px; top:113px; width:93px;"></div>
+          <div class="link" style="left:809px; top:303px; width:93px;"></div>
+          <div class="card abs" style="left: 334px; bottom: 32px; width: 580px;">
+            <div class="card-title">Runtime Boundary</div>
+            <div class="small">The app trusts validated state JSON and receipts, not free-form model text.</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>Architecture Overview</span><span>Validated state packets connect the pieces</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="5">
+    <div class="frame">
+      <div class="topbar"><span>Execution Pipeline Panel</span><span class="count">05 / 12</span></div>
+      <div class="content">
+        <div class="swimlane">
+          <div class="lane">
+            <div class="lane-title">User + AI</div>
+            <div class="flow-box orange">Human intent</div>
+            <div class="flow-box blue">Local Qwen plan</div>
+            <div class="flow-box">Tool request</div>
+            <div class="flow-box green">Recalibration notes</div>
+          </div>
+          <div class="lane">
+            <div class="lane-title">TrueVision Runtime</div>
+            <div class="flow-box blue">Schema validation</div>
+            <div class="flow-box red">AV-only policy gate</div>
+            <div class="flow-box">Template / state packet</div>
+            <div class="flow-box green">Receipt written</div>
+          </div>
+          <div class="lane">
+            <div class="lane-title">Output Lane</div>
+            <div class="flow-box blue">Renderer</div>
+            <div class="flow-box">FFmpeg encode</div>
+            <div class="flow-box green">MP4</div>
+            <div class="flow-box orange">Manifest + report</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>Flow of control</span><span>No generic automation, AV tools only</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="6">
+    <div class="frame">
+      <div class="topbar"><span>Frame Generation Bridge</span><span class="count">06 / 12</span></div>
+      <div class="content">
+        <div class="diagram-canvas dark-canvas">
+          <div class="node abs dark-node" style="left: 44px; top: 184px; width: 176px;">Known State A</div>
+          <div class="node abs gold" style="left: 292px; top: 96px; width: 176px;">Transition Field</div>
+          <div class="node abs purple" style="left: 488px; top: 252px; width: 176px;">Midpoint State</div>
+          <div class="node abs gold" style="left: 690px; top: 96px; width: 176px;">Recursive Fill</div>
+          <div class="node abs dark-node" style="left: 920px; top: 184px; width: 176px;">Known State B</div>
+          <div class="link" style="left:220px; top:221px; width:150px; transform: rotate(-25deg); background:#d6e4ff;"></div>
+          <div class="link" style="left:462px; top:146px; width:132px; transform: rotate(44deg); background:#d6e4ff;"></div>
+          <div class="link" style="left:664px; top:294px; width:132px; transform: rotate(-47deg); background:#d6e4ff;"></div>
+          <div class="link" style="left:862px; top:146px; width:112px; transform: rotate(34deg); background:#d6e4ff;"></div>
+          <div class="card dark-card abs" style="left: 320px; bottom: 40px; width: 640px;">
+            <div class="card-title">One bridge, many frames</div>
+            <div class="small">No isolated frame solving. No uncontrolled semantic split. The generated frames walk a shared A-to-B transition field.</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>TrueFrameGen concept</span><span>Continuous forecast, not simple blend</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="7">
+    <div class="frame">
+      <div class="topbar"><span>Why Logs Matter</span><span class="count">07 / 12</span></div>
+      <div class="content">
+        <div class="row">
+          <div class="card" style="flex: .9;">
+            <div class="card-title">Unstructured Log</div>
+            <div class="small" style="font-family:Cascadia Mono, Consolas, monospace; font-size: 18px; line-height: 1.55;">
+              frame ok<br>
+              render ok<br>
+              maybe changed<br>
+              output done
+            </div>
+          </div>
+          <div class="card" style="flex: 1.2;">
+            <div class="card-title">Recoverable State Memory</div>
+            <div class="status-grid" style="grid-template-columns: repeat(2, 1fr);">
+              <div class="status"><span class="lamp"></span><span class="name">frame</span><div class="data">index: 3480<br>time: 116.0s</div></div>
+              <div class="status"><span class="lamp"></span><span class="name">audio</span><div class="data">rms: 0.42<br>bass: 0.61</div></div>
+              <div class="status"><span class="lamp"></span><span class="name">state</span><div class="data">cells: 6986<br>field: A->B</div></div>
+              <div class="status"><span class="lamp"></span><span class="name">receipt</span><div class="data">policy: pass<br>hash: stored</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>Log memory panel</span><span>State records are useful data, not residue</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="8">
+    <div class="frame">
+      <div class="topbar"><span>The Trust Boundary</span><span class="count">08 / 12</span></div>
+      <div class="content">
+        <div class="pill-row" style="margin-top: 54px;">
+          <div class="boundary-pill">
+            <h3>Observed</h3>
+            <p class="small">Captured from a real source into structured state.</p>
+            <div class="stamp">FORWARD</div>
+          </div>
+          <div class="boundary-pill">
+            <h3>Reconstructed</h3>
+            <p class="small">Replayed or filled from stored state and temporal continuity.</p>
+            <div class="stamp">REVERSE</div>
+          </div>
+          <div class="boundary-pill">
+            <h3>Generated</h3>
+            <p class="small">Synthetic state media from prompt, template, or plan.</p>
+            <div class="stamp">NOT EVIDENCE</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top: 46px;">
+          <div class="card-title">Every run leaves a trail</div>
+          <div class="small">Receipts, manifests, reports, frame-state JSONL, template identity, and renderer boundary.</div>
+        </div>
+      </div>
+      <div class="foot"><span>Boundary map</span><span>Observed != reconstructed != generated</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="9">
+    <div class="frame">
+      <div class="topbar"><span>Current Proof</span><span class="count">09 / 12</span></div>
+      <div class="content">
+        <div class="metric-grid" style="margin-bottom: 18px;">
+          <div class="metric"><div class="value">232.88s</div><div class="label">Native full-song lane</div><div class="bar"><span style="width: 94%;"></span></div></div>
+          <div class="metric"><div class="value">6,986</div><div class="label">Frames and state records</div><div class="bar"><span style="width: 87%;"></span></div></div>
+          <div class="metric"><div class="value">1.5x</div><div class="label">Approx realtime speed</div><div class="bar"><span style="width: 72%;"></span></div></div>
+        </div>
+        <div class="proof-chart">
+          <div class="proof-bar"><b>1280x720</b><span style="height: 210px;"></span><label>Resolution</label></div>
+          <div class="proof-bar"><b>30 FPS</b><span style="height: 160px;"></span><label>Timeline</label></div>
+          <div class="proof-bar"><b>32</b><span style="height: 260px;"></span><label>Threads</label></div>
+          <div class="proof-bar"><b>MP4</b><span style="height: 190px;"></span><label>Output</label></div>
+          <div class="proof-bar"><b>JSONL</b><span style="height: 230px;"></span><label>State log</label></div>
+        </div>
+      </div>
+      <div class="foot"><span>Proof metric cards</span><span>Real numbers, not hype copy</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="10">
+    <div class="frame">
+      <div class="topbar"><span>System Shape</span><span class="count">10 / 12</span></div>
+      <div class="content">
+        <div class="diagram-canvas">
+          <div class="node abs gold" style="left: 34px; top: 178px; width: 136px;">Human Input</div>
+          <div class="link" style="left:170px; top:215px; width:58px;"></div>
+          <div class="node abs blue" style="left: 238px; top: 178px; width: 126px;">Studio CLI</div>
+          <div class="link" style="left:364px; top:215px; width:52px;"></div>
+          <div class="node abs purple" style="left: 426px; top: 178px; width: 126px;">State Draft</div>
+          <div class="link" style="left:552px; top:215px; width:52px;"></div>
+          <div class="node abs red" style="left: 614px; top: 178px; width: 126px;">Validator</div>
+          <div class="link" style="left:740px; top:215px; width:52px;"></div>
+          <div class="node abs green" style="left: 802px; top: 178px; width: 126px;">Renderer</div>
+          <div class="link" style="left:928px; top:215px; width:46px;"></div>
+          <div class="node abs orange" style="left: 984px; top: 178px; width: 84px;">MP4</div>
+          <div class="status-grid abs" style="left: 72px; right: 72px; bottom: 42px; grid-template-columns: repeat(4, 1fr);">
+            <div class="status"><span class="lamp"></span><span class="name">Manifest</span><div class="data">run id<br>paths<br>boundary</div></div>
+            <div class="status"><span class="lamp"></span><span class="name">Receipts</span><div class="data">tool<br>args<br>hashes</div></div>
+            <div class="status"><span class="lamp"></span><span class="name">State JSONL</span><div class="data">frame<br>audio<br>layers</div></div>
+            <div class="status"><span class="lamp"></span><span class="name">Report</span><div class="data">limits<br>proof<br>cost</div></div>
+          </div>
+        </div>
+      </div>
+      <div class="foot"><span>Data path schematic</span><span>Human direction to manifest-backed output</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="11">
+    <div class="frame">
+      <div class="topbar"><span>What This Is Not</span><span class="count">11 / 12</span></div>
+      <div class="content">
+        <div class="status-grid" style="grid-template-columns: repeat(2, 1fr); gap: 22px;">
+          <div class="status" style="min-height: 150px;"><span class="lamp" style="background:#dc2626;"></span><span class="name">Not cloud video generation</span><div class="data">Local first. Tool-limited. Manifest-backed.</div></div>
+          <div class="status" style="min-height: 150px;"><span class="lamp" style="background:#dc2626;"></span><span class="name">Not prompt magic</span><div class="data">Prompts become validated state requests.</div></div>
+          <div class="status" style="min-height: 150px;"><span class="lamp" style="background:#dc2626;"></span><span class="name">Not forensic proof software</span><div class="data">Generated output is synthetic unless observed state says otherwise.</div></div>
+          <div class="status" style="min-height: 150px;"><span class="lamp" style="background:#dc2626;"></span><span class="name">Not uncontrolled model output</span><div class="data">The local policy layer decides what can run.</div></div>
+        </div>
+      </div>
+      <div class="foot"><span>Scope control</span><span>Sharper product, fewer lies</span></div>
+    </div>
+  </section>
+
+  <section class="slide" data-slide="12">
+    <div class="frame dark">
+      <div class="content" style="height: 100%; display:flex; flex-direction:column; justify-content:center; padding:76px;">
+        <div class="tag">Closing</div>
+        <h1 style="font-size: 50px; margin-top: 36px; color:#eef5ff;">The future of machine media is not opaque.</h1>
+        <h1 style="font-size: 54px; margin-top: 30px; color:#d8bc77;">The future is traceable state.</h1>
+        <div class="subtitle" style="margin-top: 48px;">TrueVision Labs State Presentation</div>
+        <div class="subtitle" style="font-size: 19px; margin-top: 16px;">Lee Mercey | OpenAI Codex Workspace Agent</div>
+      </div>
+      <div class="watermark">STATE</div>
+    </div>
+  </section>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const requested = Number(params.get("slide") || "1");
+    const slide = Math.min(12, Math.max(1, Number.isFinite(requested) ? requested : 1));
+    document.querySelectorAll(".slide").forEach((node) => {
+      node.classList.toggle("active", Number(node.dataset.slide) === slide);
+    });
+  </script>
+</body>
+</html>
