@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Log replayable TrueAudio state from the local machine output mix."""
+
+from __future__ import annotations
+
+import argparse
+import json
+from pathlib import Path
+
+from trueaudio_runtime.replayable import log_machine_replayable_audio_state
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Write replayable TrueAudio machine state.")
+    parser.add_argument("--storage-root", default="storage", help="Storage root for artifacts/manifests/receipts")
+    parser.add_argument("--run-id", default="", help="Optional deterministic run id")
+    parser.add_argument("--duration-seconds", type=float, default=10.0)
+    parser.add_argument("--frame-size", type=int, default=2048)
+    parser.add_argument("--hop-size", type=int, default=512)
+    args = parser.parse_args()
+
+    result = log_machine_replayable_audio_state(
+        storage_root=Path(args.storage_root),
+        run_id=args.run_id or None,
+        duration_seconds=args.duration_seconds,
+        frame_size=args.frame_size,
+        hop_size=args.hop_size,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

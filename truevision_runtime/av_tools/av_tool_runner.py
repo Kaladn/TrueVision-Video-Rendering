@@ -9,6 +9,15 @@ from typing import Any
 
 import numpy as np
 
+from trueaudio_runtime.logging import log_machine_pre_sound_state, log_pre_sound_state
+from trueaudio_runtime.lyrics import align_lyrics_to_speech_segments
+from trueaudio_runtime.replay import replay_trueaudio_state
+from trueaudio_runtime.replayable import (
+    log_file_replayable_audio_state,
+    log_machine_replayable_audio_state,
+    replay_replayable_audio_state,
+)
+from trueaudio_runtime.speech import detect_speech_segments_from_replayable_state
 from truevision_runtime.state_patterns.audio_video_patterns import choose_patterns_for_signal
 from truevision_runtime.studio.studio_tooling import (
     build_studio_tool_plan,
@@ -640,6 +649,70 @@ def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> di
         return _write_audio_level_signals(storage_root, args)
     if tool == "audio_extract_features":
         return _write_audio_features(storage_root, args)
+    if tool == "trueaudio_log_pre_sound":
+        return log_pre_sound_state(
+            Path(str(args.get("path") or args.get("audio_path") or "")),
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            fps=int(args.get("fps") or 30),
+            sample_rate=int(args.get("sample_rate") or 48000),
+            max_seconds=float(args["max_seconds"]) if args.get("max_seconds") not in {None, ""} else None,
+        )
+    if tool == "trueaudio_log_machine_pre_sound":
+        return log_machine_pre_sound_state(
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            duration_seconds=float(args.get("duration_seconds") or args.get("seconds") or 10.0),
+            fps=int(args.get("fps") or 30),
+        )
+    if tool == "trueaudio_replay_state":
+        return replay_trueaudio_state(
+            Path(str(args.get("state") or args.get("state_path") or "")),
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            sample_rate=int(args.get("sample_rate") or 48000),
+        )
+    if tool == "trueaudio_log_machine_replayable":
+        return log_machine_replayable_audio_state(
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            duration_seconds=float(args.get("duration_seconds") or args.get("seconds") or 10.0),
+            frame_size=int(args.get("frame_size") or 2048),
+            hop_size=int(args.get("hop_size") or 512),
+        )
+    if tool == "trueaudio_log_file_replayable":
+        return log_file_replayable_audio_state(
+            Path(str(args.get("path") or args.get("audio_path") or args.get("audio") or "")),
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            sample_rate=int(args.get("sample_rate") or 48000),
+            max_seconds=float(args["max_seconds"]) if args.get("max_seconds") not in {None, ""} else None,
+            frame_size=int(args.get("frame_size") or 2048),
+            hop_size=int(args.get("hop_size") or 512),
+        )
+    if tool == "trueaudio_replay_replayable":
+        result = replay_replayable_audio_state(
+            Path(str(args.get("state") or args.get("state_npz") or "")),
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+        )
+        return {key: value for key, value in result.items() if key != "samples"}
+    if tool == "truespeech_detect_segments":
+        return detect_speech_segments_from_replayable_state(
+            Path(str(args.get("state") or args.get("state_npz") or "")),
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            speech_threshold=float(args.get("speech_threshold") or 0.48),
+            min_segment_seconds=float(args.get("min_segment_seconds") or 0.12),
+        )
+    if tool == "truespeech_align_lyrics_candidate":
+        return align_lyrics_to_speech_segments(
+            Path(str(args.get("segments") or args.get("segments_json") or "")),
+            lyrics_text=str(args["lyrics_text"]) if args.get("lyrics_text") not in {None, ""} else None,
+            lyrics_path=Path(str(args["lyrics_path"])) if args.get("lyrics_path") not in {None, ""} else None,
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+        )
     if tool == "template_from_audio_signals":
         return _template_from_audio_signals(storage_root, args)
     if tool == "template_create":

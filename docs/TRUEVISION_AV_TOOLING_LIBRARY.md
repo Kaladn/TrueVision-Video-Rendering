@@ -90,6 +90,137 @@ git
 
 These are implementation utilities. They are not general autonomous tools.
 
+## TrueAudio Boundary
+
+TrueAudio is a sibling audio-state lane used alongside TrueVision.
+
+```text
+TrueVision = visual state.
+TrueAudio = audio state before playback/output.
+Renderer = consumes validated state from both when needed.
+```
+
+TrueAudio now has two capture paths:
+
+```text
+file pre-output:
+  source WAV/MP3/etc
+  -> FFmpeg PCM decode
+  -> derived state
+
+file replayable:
+  source WAV/MP3/etc
+  -> FFmpeg PCM decode
+  -> replayable spectral state
+  -> raw PCM discarded
+
+machine pre-output:
+  local machine output mix
+  -> Windows WASAPI loopback
+  -> derived state
+```
+
+Both paths derive compact audio state, then discard the PCM. They do not save
+raw audio, do not claim speech recognition, and do not identify speakers.
+
+TrueAudio state can be replayed only as sonification:
+
+```text
+state JSONL
+-> deterministic level/band/stereo/transient sonification
+-> WAV proof
+```
+
+This is useful for hearing whether the log carried rhythm, pressure, and stereo
+shape. It is not source-audio recovery.
+
+Close audio replay uses a different contract:
+
+```text
+machine output mix
+-> replayable spectral state
+-> WAV reconstruction
+```
+
+This still does not save raw PCM or a source audio file, but it does save enough
+derived spectral state to make audio replay possible. The manifest must mark
+this as replayable derived audio state.
+
+Current TrueAudio state channels include:
+
+```text
+rms_left
+rms_right
+rms_norm
+dbfs
+peak_abs
+stereo_balance
+stereo_width
+zero_crossing_rate
+bass
+mid
+high
+attack
+decay
+transient
+silence
+```
+
+Hard law:
+
+```text
+Decode before sound.
+Log derived state.
+Replay logs as sonification only, not as recovered original audio.
+Close replay requires the explicit replayable spectral-state tool and must say so.
+```
+
+## TrueSpeech Boundary
+
+TrueSpeech is a state conversion lane built on TrueAudio.
+
+Current implemented lane:
+
+```text
+replayable TrueAudio state
+-> spectral speech/background detector
+-> frame confidence JSONL
+-> timestamped speech-like segments
+-> manifest + receipt
+```
+
+Candidate lyric timing can then use provided lyrics:
+
+```text
+speech-like segments
++ provided lyrics
+-> candidate line timings
+-> manifest + receipt
+```
+
+This is not speech-to-text yet. It does not produce ASR transcripts,
+verified word timings, speaker identity, or semantic claims. Candidate lyric
+alignment means the words came from the provided lyrics and the timing came
+from audio state.
+
+Planned split:
+
+```text
+TrueSpeech In:
+audio state -> speech/background timing -> phoneme/word candidates later
+
+TrueSpeech Out:
+text/anchors -> phoneme plan -> voice state -> replayable audio state later
+```
+
+Fast ingestion law:
+
+```text
+Machine loopback capture is realtime.
+Replayable state analysis can run faster than realtime.
+FFmpeg decode can run faster than realtime for file ingestion.
+```
+
 ## Studio And Runtime Tools
 
 | Tool | Path | Status | Purpose |
@@ -104,6 +235,15 @@ These are implementation utilities. They are not general autonomous tools.
 | Studio tooling | `truevision_runtime/studio/studio_tooling.py` | exists | Reusable Studio tool contracts and render preset library. |
 | Storage library | `truevision_runtime/storage_library.py` | exists | Keeps repo storage and external vault layout tidy. |
 | Template renderer | `truevision_runtime/rendering/template_renderer.py` | exists | Generic template-driven renderer. |
+| TrueAudio runtime | `trueaudio_runtime/` | exists | Logs derived pre-output audio state from decoded PCM. |
+| TrueAudio CLI | `scripts/trueaudio_log_pre_sound.py` | exists | Command-line entry point for TrueAudio state logging. |
+| TrueAudio machine CLI | `scripts/trueaudio_log_machine_pre_sound.py` | exists | Command-line entry point for local machine output-mix logging. |
+| TrueAudio state replay CLI | `scripts/trueaudio_replay_state.py` | exists | Renders deterministic WAV sonification from TrueAudio state logs. |
+| TrueAudio file replayable CLI | `scripts/trueaudio_log_file_replayable.py` | exists | Builds replayable spectral state from a source audio file through FFmpeg decode. |
+| TrueAudio replayable capture CLI | `scripts/trueaudio_log_machine_replayable.py` | exists | Captures machine output as replayable spectral state, not raw PCM. |
+| TrueAudio replayable replay CLI | `scripts/trueaudio_replay_replayable.py` | exists | Reconstructs close WAV audio from replayable spectral state. |
+| TrueSpeech detection CLI | `scripts/truespeech_detect_segments.py` | exists | Detects speech/background segments from replayable TrueAudio state. |
+| TrueSpeech lyric alignment CLI | `scripts/truespeech_align_lyrics_candidate.py` | exists | Aligns provided lyrics to speech-state windows as candidates, not ASR truth. |
 
 ## AV Tool Bus Names
 
@@ -113,6 +253,14 @@ These are the current validated tool names in the runtime registry:
 audio_probe_duration
 audio_analyze_levels
 audio_extract_features
+trueaudio_log_pre_sound
+trueaudio_log_machine_pre_sound
+trueaudio_replay_state
+trueaudio_log_file_replayable
+trueaudio_log_machine_replayable
+trueaudio_replay_replayable
+truespeech_detect_segments
+truespeech_align_lyrics_candidate
 template_from_audio_signals
 template_create
 template_load

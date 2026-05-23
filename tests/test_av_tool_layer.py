@@ -4,6 +4,7 @@ import wave
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from truevision_runtime.av_tools.av_tool_policy import AVToolPolicyError, validate_tool_call
 from truevision_runtime.av_tools.av_tool_registry import list_av_tools
@@ -18,6 +19,14 @@ class AVToolLayerTests(unittest.TestCase):
         self.assertIn("audio_probe_duration", names)
         self.assertIn("audio_analyze_levels", names)
         self.assertIn("audio_extract_features", names)
+        self.assertIn("trueaudio_log_pre_sound", names)
+        self.assertIn("trueaudio_log_machine_pre_sound", names)
+        self.assertIn("trueaudio_replay_state", names)
+        self.assertIn("trueaudio_log_file_replayable", names)
+        self.assertIn("trueaudio_log_machine_replayable", names)
+        self.assertIn("trueaudio_replay_replayable", names)
+        self.assertIn("truespeech_detect_segments", names)
+        self.assertIn("truespeech_align_lyrics_candidate", names)
         self.assertIn("template_from_audio_signals", names)
         self.assertIn("video_render_preview", names)
         self.assertIn("template_patch", names)
@@ -248,6 +257,165 @@ class AVToolLayerTests(unittest.TestCase):
             self.assertEqual(template["result"]["template"]["time_distance"]["source"], "ffmpeg_audio_signal")
             self.assertIn("signal_source", template["result"]["template"])
             self.assertTrue(Path(template["result"]["path"]).exists())
+
+    def test_trueaudio_log_pre_sound_writes_state_manifest_and_receipt(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = Path(tmpdir)
+            wav_path = storage / "pre_sound.wav"
+            sample_rate = 8000
+            samples = bytearray()
+            for index in range(sample_rate // 2):
+                left = int(math.sin(index / sample_rate * math.tau * 220) * 16000)
+                right = int(math.sin(index / sample_rate * math.tau * 330) * 8000)
+                samples.extend(left.to_bytes(2, "little", signed=True))
+                samples.extend(right.to_bytes(2, "little", signed=True))
+            with wave.open(str(wav_path), "wb") as handle:
+                handle.setnchannels(2)
+                handle.setsampwidth(2)
+                handle.setframerate(sample_rate)
+                handle.writeframes(bytes(samples))
+
+            result = run_av_tool_call(
+                {
+                    "tool": "trueaudio_log_pre_sound",
+                    "args": {
+                        "audio_path": str(wav_path),
+                        "run_id": "tool_trueaudio",
+                        "fps": 10,
+                        "sample_rate": sample_rate,
+                    },
+                },
+                storage_root=storage,
+            )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["result"]["frame_count"], 5)
+            self.assertTrue(Path(result["result"]["state_jsonl"]).exists())
+            self.assertTrue(Path(result["result"]["manifest_json"]).exists())
+            manifest = json.loads(Path(result["result"]["manifest_json"]).read_text(encoding="utf-8"))
+            self.assertEqual(manifest["decode_stage"], "decoded_pcm_pre_output")
+            self.assertFalse(manifest["boundary"]["raw_audio_saved"])
+            self.assertTrue(Path(result["receipt"]["path"]).exists())
+
+    def test_trueaudio_machine_pre_sound_routes_through_tool_bus(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = Path(tmpdir)
+            with patch("truevision_runtime.av_tools.av_tool_runner.log_machine_pre_sound_state") as mocked:
+                mocked.return_value = {
+                    "schema_version": "trueaudio_machine_pre_sound_log_result_v1",
+                    "run_id": "machine_tool",
+                    "frame_count": 3,
+                    "manifest_json": str(storage / "manifests" / "machine.json"),
+                    "receipt_json": str(storage / "receipts" / "machine.json"),
+                }
+
+                result = run_av_tool_call(
+                    {
+                        "tool": "trueaudio_log_machine_pre_sound",
+                        "args": {
+                            "run_id": "machine_tool",
+                            "duration_seconds": 0.1,
+                            "fps": 30,
+                        },
+                    },
+                    storage_root=storage,
+                )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["result"]["schema_version"], "trueaudio_machine_pre_sound_log_result_v1")
+            mocked.assert_called_once()
+            self.assertEqual(mocked.call_args.kwargs["duration_seconds"], 0.1)
+
+    def test_truespeech_detect_segments_routes_through_tool_bus(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = Path(tmpdir)
+            state_path = storage / "voice.trueaudio.npz"
+            state_path.write_bytes(b"placeholder")
+            with patch("truevision_runtime.av_tools.av_tool_runner.detect_speech_segments_from_replayable_state") as mocked:
+                mocked.return_value = {
+                    "schema_version": "truespeech_detection_result_v1",
+                    "run_id": "voice_detect",
+                    "segments": [],
+                    "summary": {"speech_segment_count": 0},
+                    "manifest_json": str(storage / "manifests" / "voice.json"),
+                    "receipt_json": str(storage / "receipts" / "voice.json"),
+                }
+
+                result = run_av_tool_call(
+                    {
+                        "tool": "truespeech_detect_segments",
+                        "args": {
+                            "state": str(state_path),
+                            "run_id": "voice_detect",
+                            "speech_threshold": 0.52,
+                            "min_segment_seconds": 0.2,
+                        },
+                    },
+                    storage_root=storage,
+                )
+
+            self.assertTrue(result["ok"])
+            self.assertEqual(result["result"]["schema_version"], "truespeech_detection_result_v1")
+            mocked.assert_called_once()
+            self.assertEqual(mocked.call_args.args[0], state_path)
+            self.assertEqual(mocked.call_args.kwargs["speech_threshold"], 0.52)
+            self.assertEqual(mocked.call_args.kwargs["min_segment_seconds"], 0.2)
+
+    def test_replayable_file_and_lyric_alignment_route_through_tool_bus(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            storage = Path(tmpdir)
+            audio_path = storage / "song.wav"
+            audio_path.write_bytes(b"placeholder")
+            with patch("truevision_runtime.av_tools.av_tool_runner.log_file_replayable_audio_state") as mocked_file:
+                mocked_file.return_value = {
+                    "schema_version": "trueaudio_file_replayable_state_log_result_v1",
+                    "run_id": "song_state",
+                    "state_npz": str(storage / "song.trueaudio.npz"),
+                }
+
+                result = run_av_tool_call(
+                    {
+                        "tool": "trueaudio_log_file_replayable",
+                        "args": {
+                            "audio_path": str(audio_path),
+                            "run_id": "song_state",
+                            "sample_rate": 48000,
+                            "max_seconds": 12,
+                        },
+                    },
+                    storage_root=storage,
+                )
+
+            self.assertTrue(result["ok"])
+            mocked_file.assert_called_once()
+            self.assertEqual(mocked_file.call_args.args[0], audio_path)
+            self.assertEqual(mocked_file.call_args.kwargs["max_seconds"], 12.0)
+
+            segments_path = storage / "segments.json"
+            segments_path.write_text('{"segments":[]}', encoding="utf-8")
+            with patch("truevision_runtime.av_tools.av_tool_runner.align_lyrics_to_speech_segments") as mocked_align:
+                mocked_align.return_value = {
+                    "schema_version": "truespeech_lyric_alignment_result_v1",
+                    "run_id": "song_align",
+                    "line_count": 0,
+                }
+
+                aligned = run_av_tool_call(
+                    {
+                        "tool": "truespeech_align_lyrics_candidate",
+                        "args": {
+                            "segments": str(segments_path),
+                            "lyrics_text": "Baby come and rescue me",
+                            "run_id": "song_align",
+                        },
+                    },
+                    storage_root=storage,
+                )
+
+            self.assertTrue(aligned["ok"])
+            mocked_align.assert_called_once()
+            self.assertEqual(mocked_align.call_args.args[0], segments_path)
+            self.assertEqual(mocked_align.call_args.kwargs["lyrics_text"], "Baby come and rescue me")
 
 
 if __name__ == "__main__":

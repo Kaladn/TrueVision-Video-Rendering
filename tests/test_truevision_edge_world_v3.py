@@ -7,6 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from truevision_edge_world_v3 import (
+    build_edge_world_v3_ffmpeg_cmd,
     build_edge_world_v3_schedule,
     generate_edge_world_v3,
     render_edge_world_v3_frame,
@@ -115,6 +116,22 @@ class TrueVisionEdgeWorldV3Tests(unittest.TestCase):
         self.assertFalse(np.array_equal(plain, styled))
         self.assertEqual(styled_meta["signature_style"]["profile_id"], "unit_signature")
 
+    def test_gpu_encoder_command_uses_qsv_and_nv12_conversion(self):
+        cmd = build_edge_world_v3_ffmpeg_cmd(
+            width=1280,
+            height=720,
+            fps=360,
+            visual_path=Path("out.mp4"),
+            video_codec="h264_qsv",
+            encoder_preset="veryfast",
+            quality=18,
+        )
+
+        self.assertIn("h264_qsv", cmd)
+        self.assertIn("format=nv12", cmd)
+        self.assertEqual(cmd[cmd.index("-r") + 1], "360")
+        self.assertEqual(cmd[-1], "out.mp4")
+
     def test_generate_edge_world_v3_writes_tiny_bundle(self):
         sample_rate = 8000
         samples = (0.5 * np.sin(2 * np.pi * 100 * np.arange(sample_rate) / sample_rate)).astype(np.float32)
@@ -167,6 +184,38 @@ class TrueVisionEdgeWorldV3Tests(unittest.TestCase):
             self.assertIn("## Component Timing", report_text)
             self.assertIn("## System Components", report_text)
             self.assertIn("GPU acceleration used", report_text)
+
+    def test_missing_signature_profile_is_disabled(self):
+        sample_rate = 8000
+        samples = (0.5 * np.sin(2 * np.pi * 100 * np.arange(sample_rate) / sample_rate)).astype(np.float32)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            audio_path = root / "edge_tiny.wav"
+            lyrics_path = root / "lyrics.txt"
+            lyrics_path.write_text("Edge Of The World\nriver under smoke", encoding="utf-8")
+            with wave.open(str(audio_path), "wb") as handle:
+                handle.setnchannels(1)
+                handle.setsampwidth(2)
+                handle.setframerate(sample_rate)
+                handle.writeframes(np.clip(samples * 32767, -32768, 32767).astype("<i2").tobytes())
+
+            result = generate_edge_world_v3(
+                audio_path=audio_path,
+                lyrics_path=lyrics_path,
+                output_root=root / "out",
+                run_id="unit_edge_v3_missing_signature",
+                width=160,
+                height=90,
+                fps=6,
+                sample_rate=sample_rate,
+                max_seconds=0.6,
+                mux_audio=False,
+                signature_profile_path=root / "missing_signature.json",
+            )
+            manifest = json.loads(Path(result["manifest_json"]).read_text(encoding="utf-8"))
+
+            self.assertFalse(manifest["render"]["signature_profile"]["enabled"])
+            self.assertIsNone(manifest["render"]["signature_profile"]["path"])
 
 
 if __name__ == "__main__":

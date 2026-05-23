@@ -507,12 +507,100 @@ def capture_gpu_entries() -> list[dict[str, Any]]:
     return normalized
 
 
+def build_edge_world_v3_ffmpeg_cmd(
+    *,
+    width: int,
+    height: int,
+    fps: int,
+    visual_path: Path,
+    video_codec: str = "libx264",
+    encoder_preset: str = "veryfast",
+    quality: int = 18,
+) -> list[str]:
+    """Build the raw-frame ffmpeg encoder command for this render lane."""
+    cmd = [
+        "ffmpeg",
+        "-y",
+        "-v",
+        "error",
+        "-f",
+        "rawvideo",
+        "-pix_fmt",
+        "bgr24",
+        "-s",
+        f"{width}x{height}",
+        "-r",
+        str(fps),
+        "-i",
+        "-",
+        "-an",
+    ]
+    if video_codec == "libx264":
+        cmd.extend(
+            [
+                "-c:v",
+                "libx264",
+                "-preset",
+                encoder_preset,
+                "-crf",
+                str(quality),
+                "-pix_fmt",
+                "yuv420p",
+            ]
+        )
+    elif video_codec in {"h264_qsv", "hevc_qsv", "av1_qsv"}:
+        cmd.extend(
+            [
+                "-vf",
+                "format=nv12",
+                "-c:v",
+                video_codec,
+                "-preset",
+                encoder_preset,
+                "-global_quality",
+                str(quality),
+                "-pix_fmt",
+                "nv12",
+            ]
+        )
+    elif video_codec in {"h264_amf", "hevc_amf", "av1_amf"}:
+        cmd.extend(
+            [
+                "-vf",
+                "format=nv12",
+                "-c:v",
+                video_codec,
+                "-quality",
+                "quality",
+                "-rc",
+                "cqp",
+                "-qp_i",
+                str(quality),
+                "-qp_p",
+                str(quality),
+                "-pix_fmt",
+                "nv12",
+            ]
+        )
+    else:
+        raise ValueError(f"Unsupported video codec for edge_world_v3: {video_codec}")
+    cmd.append(str(visual_path))
+    return cmd
+
+
 def _write_report(path: Path, manifest: dict[str, Any]) -> None:
     machine = manifest["machine_cost"]
     memory_start = machine.get("memory_start", {})
     memory_end = machine.get("memory_end", {})
     timing = manifest.get("component_timing_seconds", {})
     gpu_entries = manifest.get("hardware", {}).get("gpu", [])
+    encoder = manifest.get("render", {}).get("encoder", {})
+    gpu_used = bool(encoder.get("gpu_acceleration_requested"))
+    render_path = (
+        f"Python + OpenCV/Numpy frame synthesis -> ffmpeg {encoder.get('video_codec')} hardware encode request -> ffmpeg AAC mux"
+        if gpu_used
+        else "Python + OpenCV/Numpy frame synthesis -> ffmpeg libx264 CPU encode -> ffmpeg AAC mux"
+    )
     lines = [
         f"# {manifest['run_id']} Report",
         "",
@@ -556,8 +644,12 @@ def _write_report(path: Path, manifest: dict[str, Any]) -> None:
         f"- Processor: `{manifest['hardware'].get('processor')}`",
         f"- RAM total: `{_format_bytes(manifest['hardware'].get('ram', {}).get('total_physical_bytes'))}`",
         f"- RAM available at capture: `{_format_bytes(manifest['hardware'].get('ram', {}).get('available_physical_bytes'))}`",
-        "- GPU acceleration used: `false`",
-        "- Render path: `Python + OpenCV/Numpy frame synthesis -> ffmpeg libx264 CPU encode -> ffmpeg AAC mux`",
+        f"- GPU acceleration used: `{str(gpu_used).lower()}`",
+        f"- Video codec: `{encoder.get('video_codec', 'libx264')}`",
+        f"- Encoder preset: `{encoder.get('encoder_preset', 'veryfast')}`",
+        f"- Encoder quality: `{encoder.get('quality', 18)}`",
+        f"- Render path: `{render_path}`",
+        "- GPU scope: `encode acceleration only; frame synthesis remains deterministic OpenCV/Numpy state rendering`",
     ]
     if gpu_entries:
         lines.extend(["", "## Detected GPU Entries", ""])
@@ -582,6 +674,9 @@ def generate_edge_world_v3(
     mux_audio: bool = True,
     signature_profile_path: Path | None = None,
     program_stamp: str | None = "TrueVision Generation Lab / edge_world_v3",
+    video_codec: str = "libx264",
+    encoder_preset: str = "veryfast",
+    encode_quality: int = 18,
 ) -> dict[str, Any]:
     start_wall = time.perf_counter()
     start_cpu = time.process_time()
@@ -597,6 +692,8 @@ def generate_edge_world_v3(
     if not audio_path.exists():
         raise FileNotFoundError(audio_path)
     lyrics_path = lyrics_path.resolve() if lyrics_path is not None else None
+    if signature_profile_path and not signature_profile_path.exists():
+        signature_profile_path = None
     signature_profile = load_signature_profile(signature_profile_path) if signature_profile_path else None
     run_id = slug(run_id)
     run_dir = output_root / run_id
@@ -611,32 +708,15 @@ def generate_edge_world_v3(
     report_path = run_dir / f"{run_id}_report.md"
 
     phase_start = time.perf_counter()
-    ffmpeg_cmd = [
-        "ffmpeg",
-        "-y",
-        "-v",
-        "error",
-        "-f",
-        "rawvideo",
-        "-pix_fmt",
-        "bgr24",
-        "-s",
-        f"{width}x{height}",
-        "-r",
-        str(fps),
-        "-i",
-        "-",
-        "-an",
-        "-c:v",
-        "libx264",
-        "-preset",
-        "veryfast",
-        "-crf",
-        "18",
-        "-pix_fmt",
-        "yuv420p",
-        str(visual_path),
-    ]
+    ffmpeg_cmd = build_edge_world_v3_ffmpeg_cmd(
+        width=width,
+        height=height,
+        fps=fps,
+        visual_path=visual_path,
+        video_codec=video_codec,
+        encoder_preset=encoder_preset,
+        quality=encode_quality,
+    )
     mark_component("video_encoder_command_build_seconds", phase_start)
 
     phase_start = time.perf_counter()
@@ -767,6 +847,13 @@ def generate_edge_world_v3(
             "frames": len(features),
             "duration_seconds": round(duration_seconds, 6),
             "style": "edge_world_v3_edge_smoke_river_below",
+            "encoder": {
+                "video_codec": video_codec,
+                "encoder_preset": encoder_preset,
+                "quality": encode_quality,
+                "gpu_acceleration_requested": video_codec != "libx264",
+                "gpu_acceleration_scope": "ffmpeg hardware encode only; deterministic frame synthesis remains OpenCV/Numpy",
+            },
             "scene_schedule": build_edge_world_v3_schedule(duration_seconds),
             "signature_profile": {
                 "enabled": bool(signature_profile),
@@ -836,6 +923,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--program-stamp", default="TrueVision Generation Lab / edge_world_v3")
     parser.add_argument("--no-program-stamp", action="store_true")
     parser.add_argument("--visual-only", action="store_true")
+    parser.add_argument("--video-codec", default="libx264", choices=["libx264", "h264_qsv", "hevc_qsv", "av1_qsv", "h264_amf", "hevc_amf", "av1_amf"])
+    parser.add_argument("--encoder-preset", default="veryfast")
+    parser.add_argument("--encode-quality", type=int, default=18)
     return parser
 
 
@@ -854,6 +944,9 @@ def main() -> None:
         mux_audio=not args.visual_only,
         signature_profile_path=Path(args.signature_profile) if args.signature_profile else None,
         program_stamp=None if args.no_program_stamp else args.program_stamp,
+        video_codec=args.video_codec,
+        encoder_preset=args.encoder_preset,
+        encode_quality=args.encode_quality,
     )
     print(json.dumps(result, indent=2, allow_nan=False))
 

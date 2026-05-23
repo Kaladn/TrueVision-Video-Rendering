@@ -84,6 +84,7 @@ Instead of asking an AI to invent every frame from scratch, TrueVision keeps tra
 - Rust native screen-state capture that writes compact `.tvcells` chunks.
 - Rust streaming TrueFrameGen renderer for bounded-memory high-FPS reconstruction.
 - AV-only tool bus for local audio/video template, render, and recalibration workflows.
+- TrueAudio sibling runtime for logging derived audio state from decoded PCM before playback/output.
 - Local model adapter shape for prompt-to-state translation behind schema validation.
 - TrueVision Studio control-plane tools for source snaps, existing-state animation, glow intensity animation, spectrum/city rendering, frame diff, manifest browsing, preset reuse, and local Qwen orchestration.
 - Document-state reader for treating page frames and glyph cells as replayable visual state.
@@ -97,6 +98,7 @@ native/truevision_capture_rs/ Rust capture and streaming frame generation
 scripts/                      Research CLIs and studio server
 tests/                        Unit and integration tests
 trueframegen/                 Python temporal reconstruction modules
+trueaudio_runtime/            TrueAudio pre-output audio-state logging
 truevision_runtime/           AV tools, document state, storage, renderer, and LLM adapter
 ui/                           Local studio HTML
 storage/                      Ignored runtime lanes with tracked placeholders
@@ -186,6 +188,114 @@ The operator path from human intent to rendered video is documented here:
 The current lab status, proof ledger, rejected experiments, and TODO roundup are documented here:
 
 [docs/BEAST_MODE_LAB_REPORT_2026-05-22.md](docs/BEAST_MODE_LAB_REPORT_2026-05-22.md)
+
+## TrueAudio
+
+TrueAudio is a sibling system for audio state. It logs derived state from
+decoded PCM before playback/output, or from the local machine output mix before
+speakers through Windows WASAPI loopback. It does not save raw audio or PCM by
+default.
+
+TrueAudio state replay is bounded sonification. It can make the logged rhythm,
+pressure, band energy, stereo shape, and transients audible, but it is not
+source-audio recovery.
+
+Close audio replay uses replayable spectral state. That path still does not
+save raw PCM or a source audio file, but it intentionally saves enough derived
+state to reconstruct a close WAV. Manifests mark this as replayable derived
+audio state.
+
+TrueSpeech currently starts with speech/background detection from replayable
+TrueAudio state. It writes timestamped speech-like segments and confidence
+frames. It does not claim speech-to-text, word timing, or speaker identity.
+
+Example:
+
+```powershell
+python scripts\trueaudio_log_pre_sound.py `
+  --audio "C:\path\to\song.wav" `
+  --storage-root "E:\TruEVision Generation" `
+  --fps 30
+```
+
+Example machine-output capture:
+
+```powershell
+python scripts\trueaudio_log_machine_pre_sound.py `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "machine_song_test" `
+  --duration-seconds 30 `
+  --fps 30
+```
+
+Example state replay:
+
+```powershell
+python scripts\trueaudio_replay_state.py `
+  --state "E:\TruEVision Generation\artifacts\trueaudio\run_machine_state.jsonl" `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "run_state_replay"
+```
+
+Example close replay from machine output:
+
+```powershell
+python scripts\trueaudio_log_machine_replayable.py `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "song_replayable" `
+  --duration-seconds 10
+
+python scripts\trueaudio_replay_replayable.py `
+  --state "E:\TruEVision Generation\artifacts\trueaudio\replayable\song_replayable.trueaudio.npz" `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "song_replay"
+```
+
+Example close replay state from a source audio file:
+
+```powershell
+python scripts\trueaudio_log_file_replayable.py `
+  --audio "C:\path\to\song.wav" `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "song_file_replayable" `
+  --max-seconds 60
+```
+
+Example speech/background detection:
+
+```powershell
+python scripts\truespeech_detect_segments.py `
+  --state "E:\TruEVision Generation\artifacts\trueaudio\replayable\song_replayable.trueaudio.npz" `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "song_speech_detect"
+```
+
+Example candidate lyric alignment:
+
+```powershell
+python scripts\truespeech_align_lyrics_candidate.py `
+  --segments "E:\TruEVision Generation\artifacts\truespeech\song_speech_detect_segments.json" `
+  --lyrics "C:\path\to\lyrics.txt" `
+  --storage-root "E:\TruEVision Generation" `
+  --run-id "song_lyric_candidate_align"
+```
+
+Outputs:
+
+```text
+storage/artifacts/trueaudio/*_state.jsonl
+storage/artifacts/trueaudio/replayable/*.trueaudio.npz
+storage/artifacts/trueaudio/replay/*.wav
+storage/artifacts/truespeech/*_frames.jsonl
+storage/artifacts/truespeech/*_segments.json
+storage/artifacts/truespeech/*_lyric_alignment.json
+storage/manifests/*_trueaudio_manifest.json
+storage/manifests/*_truespeech_detection_manifest.json
+storage/manifests/*_truespeech_lyric_alignment_manifest.json
+storage/receipts/*_trueaudio_receipt.json
+storage/receipts/*_truespeech_detection_receipt.json
+storage/receipts/*_truespeech_lyric_alignment_receipt.json
+```
 
 The repo-level system map, communication flow, ownership boundaries, and plain-language explanation are documented here:
 
