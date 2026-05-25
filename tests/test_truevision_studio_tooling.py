@@ -58,6 +58,75 @@ class TrueVisionStudioToolingTests(unittest.TestCase):
         self.assertIn("bottom_up_city_spectrum", template["visual_parameters"]["state_layers"])
         self.assertFalse(template["boundary"]["evidence"])
 
+    def test_dead_memory_vice_chamber_preset_is_registered_for_native_render(self):
+        preset = get_render_preset("dead_memory_vice_chamber")
+        template = preset_to_template(
+            preset,
+            name="Dead Memory Vice Chamber Test",
+            prompt="heartbreak and deception as mechanical pressure",
+            audio_path="D:/music/dead_memory_bleed.mp4",
+            duration_seconds=239.616,
+            fps=30,
+        )
+
+        self.assertEqual(template["renderer"], "truevision_weird_occlusion_rs")
+        self.assertEqual(template["visual_mode"], "dead_memory_vice_chamber")
+        self.assertEqual(template["timeline"]["frame_count"], 7188)
+        self.assertIn("black_iron_vice_jaws", template["visual_parameters"]["state_layers"])
+        self.assertIn("thin_gold_white_survival_fracture", template["visual_parameters"]["state_layers"])
+        self.assertTrue(template["boundary"]["no_literal_gore"])
+        self.assertTrue(template["boundary"]["no_cartoon_devil"])
+
+    def test_daughter_star_locket_sea_preset_is_registered_for_native_render(self):
+        preset = get_render_preset("daughter_star_locket_sea")
+        template = preset_to_template(
+            preset,
+            name="What Did They Daughter Star Test",
+            prompt="heartbroken father to daughter as star, cracked heart locket, night water, and hope",
+            audio_path="D:/music/what_did_they.mp4",
+            duration_seconds=240.0,
+            fps=30,
+        )
+
+        self.assertEqual(template["renderer"], "truevision_weird_occlusion_rs")
+        self.assertEqual(template["visual_mode"], "daughter_star_locket_sea")
+        self.assertEqual(template["timeline"]["frame_count"], 7200)
+        self.assertIn("daughter_star_glow", template["visual_parameters"]["state_layers"])
+        self.assertIn("cracked_father_heart_locket", template["visual_parameters"]["state_layers"])
+        self.assertIn("perspective_depth_plane", template["visual_parameters"]["state_layers"])
+        self.assertIn("dimensional_heart_locket_shading", template["visual_parameters"]["state_layers"])
+        self.assertIn("controlled_roiling_fog_field", template["visual_parameters"]["state_layers"])
+        self.assertIn("geometric_state_transform_switching", template["visual_parameters"]["state_layers"])
+        self.assertIn("plane_depth_pulse", template["visual_parameters"]["state_layers"])
+        self.assertIn("fade_shimmer_gate", template["visual_parameters"]["state_layers"])
+        self.assertIn("soft_distortion_haze", template["visual_parameters"]["state_layers"])
+        self.assertTrue(template["boundary"]["no_external_visual_assets"])
+        self.assertTrue(template["boundary"]["no_literal_faces"])
+        self.assertTrue(template["boundary"]["fog_is_effect_not_story"])
+        self.assertTrue(template["boundary"]["arc_solver_operator_discipline"])
+
+    def test_edge_nightmare_world_preset_is_registered_for_native_render(self):
+        preset = get_render_preset("edge_nightmare_world")
+        template = preset_to_template(
+            preset,
+            name="Edge Nightmare World Test",
+            prompt="nightmare cliff world with full POV motion and human silhouettes",
+            audio_path="D:/music/edge_nightmare.wav",
+            duration_seconds=278.32,
+            fps=60,
+        )
+
+        self.assertEqual(template["renderer"], "truevision_weird_occlusion_rs")
+        self.assertEqual(template["visual_mode"], "edge_nightmare_world")
+        self.assertEqual(template["timeline"]["frame_count"], 16699)
+        self.assertIn("nightmare_cliff_rim", template["visual_parameters"]["state_layers"])
+        self.assertIn("top_down_abyss_view", template["visual_parameters"]["state_layers"])
+        self.assertIn("falling_camera_spiral", template["visual_parameters"]["state_layers"])
+        self.assertIn("human_silhouette_motion", template["visual_parameters"]["state_layers"])
+        self.assertIn("arc_learning_transform_mix", template["visual_parameters"]["state_layers"])
+        self.assertTrue(template["boundary"]["full_motion_camera_pov"])
+        self.assertTrue(template["boundary"]["arc_solver_operator_discipline"])
+
     def test_state_presentation_preset_and_native_lane_are_registered(self):
         preset = get_render_preset("state_presentation_truevision_labs")
         template = preset_to_template(

@@ -1,0 +1,135 @@
+{
+  "schema_version": "truevision_source_surface_contract_v1",
+  "surface_id": "youtube_source_surface_v1",
+  "surface_label": "YouTube approved source surface",
+  "purpose": "Describe the limited YouTube page regions that may be observed or exposed as operator-approved controls for Elemental Learning Intake.",
+  "authority_boundary": {
+    "mode": "approved_source_observation",
+    "default_action": "observe_only",
+    "mutation_policy": "operator_confirmed_only",
+    "no_backend_binding": "disabled",
+    "no_policy_gate": "disabled",
+    "no_receipt_target": "disabled"
+  },
+  "display_ids": [
+    {
+      "display_id": "yt.display.page_url",
+      "role": "source_identity",
+      "html_hint": "browser address bar / canonical watch URL",
+      "allowed_use": "record source candidate identity"
+    },
+    {
+      "display_id": "yt.display.search_query",
+      "role": "source_search_context",
+      "html_hint": "search input value",
+      "allowed_use": "record operator-visible search context"
+    },
+    {
+      "display_id": "yt.display.player_region",
+      "role": "video_observation_region",
+      "html_hint": "primary video player bounding box",
+      "allowed_use": "define capture target and preflight framing"
+    },
+    {
+      "display_id": "yt.display.title",
+      "role": "source_title",
+      "html_hint": "visible video title",
+      "allowed_use": "receipt metadata only"
+    },
+    {
+      "display_id": "yt.display.channel",
+      "role": "source_channel",
+      "html_hint": "visible channel/owner label",
+      "allowed_use": "receipt metadata only"
+    },
+    {
+      "display_id": "yt.display.elapsed_time",
+      "role": "playback_time",
+      "html_hint": "player elapsed time display",
+      "allowed_use": "operator alignment and capture receipt"
+    },
+    {
+      "display_id": "yt.display.duration",
+      "role": "playback_duration",
+      "html_hint": "player duration display",
+      "allowed_use": "capture duration planning"
+    },
+    {
+      "display_id": "yt.display.fullscreen_state",
+      "role": "layout_state",
+      "html_hint": "fullscreen/theater/browser layout observation",
+      "allowed_use": "preflight layout receipt"
+    }
+  ],
+  "button_ids": [
+    {
+      "button_id": "yt.button.play_pause",
+      "role": "playback_control",
+      "allowed_action": "operator_confirmed_play_or_pause",
+      "receipt_required": true
+    },
+    {
+      "button_id": "yt.button.seek_to_start",
+      "role": "playback_alignment",
+      "allowed_action": "operator_confirmed_seek_to_zero",
+      "receipt_required": true
+    },
+    {
+      "button_id": "yt.button.fullscreen",
+      "role": "capture_layout_control",
+      "allowed_action": "operator_confirmed_fullscreen_toggle",
+      "receipt_required": true
+    },
+    {
+      "button_id": "yt.button.settings_speed",
+      "role": "playback_speed_control",
+      "allowed_action": "operator_confirmed_speed_selection",
+      "allowed_values": [0.25, 0.5, 1.0],
+      "receipt_required": true
+    }
+  ],
+  "forbidden_controls": [
+    "yt.button.like",
+    "yt.button.dislike",
+    "yt.button.subscribe",
+    "yt.button.comment",
+    "yt.button.share",
+    "yt.button.download",
+    "yt.button.upload",
+    "yt.button.notifications",
+    "yt.button.account_menu",
+    "yt.link.recommendation",
+    "yt.link.external_ad",
+    "yt.input.comment"
+  ],
+  "preflight_checks": [
+    "source approved by operator",
+    "source title recorded if visible",
+    "player region identified",
+    "capture resolution and grid declared",
+    "audio setting declared",
+    "raw frame policy declared",
+    "retention intent declared",
+    "no forbidden controls requested"
+  ],
+  "receipt_fields": [
+    "surface_id",
+    "intake_id",
+    "element_id",
+    "source_url_or_note",
+    "visible_title",
+    "visible_channel",
+    "operator_approval",
+    "display_ids_observed",
+    "button_ids_requested",
+    "button_ids_approved",
+    "capture_plan_hash",
+    "receipt_hash"
+  ],
+  "queue_binding": {
+    "queue_kind": "element_intake_queue",
+    "jsonl_name": "elemental_learning_intake_queue.jsonl",
+    "status_on_create": "queued",
+    "status_before_capture": "operator_ready"
+  }
+}

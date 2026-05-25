@@ -244,6 +244,7 @@ FFmpeg decode can run faster than realtime for file ingestion.
 | TrueAudio replayable replay CLI | `scripts/trueaudio_replay_replayable.py` | exists | Reconstructs close WAV audio from replayable spectral state. |
 | TrueSpeech detection CLI | `scripts/truespeech_detect_segments.py` | exists | Detects speech/background segments from replayable TrueAudio state. |
 | TrueSpeech lyric alignment CLI | `scripts/truespeech_align_lyrics_candidate.py` | exists | Aligns provided lyrics to speech-state windows as candidates, not ASR truth. |
+| Atmosphere tools CLI | `scripts/truevision_atmosphere_tools.py` | exists | Lists, profiles, and writes reusable fog/mist/cloud/rain-glass state toolsets. |
 
 ## AV Tool Bus Names
 
@@ -284,6 +285,12 @@ source_snap_tool
 existing_state_animator
 electric_glow_intensity_animator
 spectrum_audio_reactive_city
+atmosphere_profile_from_capture
+atmosphere_toolset_create
+source_surface_capture_plan
+source_surface_multi_sample_plan
+source_surface_video_state_receipt
+element_creation_profile_from_capture
 frame_diff_replay_accuracy
 manifest_browser
 render_preset_library
@@ -301,6 +308,12 @@ throwaway scripts.
 | Existing-State Animator | Animates only existing source-state regions without adding composition. |
 | Electric/Glow Intensity Animator | Pulses existing lightning, glow, halo, tower, waveform, or analyzer regions by intensity. |
 | Spectrum/Audio-Reactive City Tool | Maps audio pressure to skyline, windows, glow, fog, and beat-synced frame pressure. |
+| Atmosphere Capture Profiler | Reads native `.tvcells` captures and derives fog/mist/cloud/rain-glass profiles with 6-1-6 windows. |
+| Weather / Atmosphere Toolset | Creates reusable state tools for fog, mist, cloud volume, and rain drops on glass. |
+| Source-Surface Capture Planner | Builds deterministic approved-source capture plans where recording starts before play and stops from source video time. |
+| Source-Surface Multi-Sample Planner | Splits large approved videos into four section samples so the system learns across the source without retaining bulky teacher state. |
+| Source-Surface Video-State Receipt | Verifies canonical address-bar navigation, resolved URL/title/duration, nonblank state, profile creation, and teacher-state purge before capture can count. |
+| Element Creation Profile Tool | Converts temporary teacher state into compact creation-useful behavior signatures, then purges bulky observed state after verification. |
 | Frame Diff / Replay Accuracy Tool | Measures source-vs-regenerated drift through manifests, state, or frame artifacts. |
 | Manifest Browser | Reads render/capture manifests through the Studio instead of manual folder digging. |
 | Render Preset Library | Promotes successful render lanes into reusable presets and templates. |
@@ -340,6 +353,170 @@ edge_audio_river
 | Edge audio river | `scripts/truevision_edge_audio_river.py` | exists | Audio-reactive river visualizer. |
 | Edge v3 | `scripts/truevision_edge_world_v3.py` | exists | Edge/smoke/river thematic renderer. |
 | Basement narrative | `scripts/truevision_basement_stick_narrative.py` | exists | Story/lyrics/audio narrative renderer. |
+| Atmosphere weather tools | `scripts/truevision_atmosphere_tools.py` | exists | Creates reusable fog, mist, cloud, and rain-glass state toolsets from defaults or native capture profiles. |
+
+## Atmosphere / Weather Toolset
+
+This lane turns reference captures and successful experiments into reusable
+state tools. It is not object detection and it is not a fluid simulator yet.
+It produces deterministic state profiles that renderers can consume.
+
+Current elements:
+
+```text
+fog_density_field
+mist_veil_field
+cloud_volume_field
+rain_glass_field
+```
+
+Core state channels:
+
+```text
+density
+veil_opacity
+scatter_bloom
+edge_softness
+motion_pressure
+curl_pressure
+occlusion_pressure
+droplet_density
+droplet_streak
+refraction
+surface_wetness
+```
+
+Capture-learning flow:
+
+```text
+native TrueVision .tvcells capture
+-> limited state-frame sample
+-> density / softness / motion / bloom profile
+-> 6-1-6 temporal windows
+-> reusable atmosphere toolset template
+-> manifest
+```
+
+Hard boundary:
+
+```text
+No raw frames required.
+No semantic labels required.
+No claim that generated atmosphere is evidence.
+Grid/state is storage and planning. Pixels come last.
+```
+
+## Elemental Learning Intake
+
+Elemental Learning Intake is the controlled self-training loop for visual
+elements. It lets TrueVision gather observed video state, build 6-1-6 profiles,
+and promote compact signatures into reusable render state.
+
+It is not a browser bot and not a general automation layer.
+
+```text
+element list
+-> approved source candidate
+-> capture plan
+-> native TrueVision capture
+-> 6-1-6 profile
+-> compact learned signature
+-> renderer binding
+-> manifest + receipt
+```
+
+Today the lane is visual only. Correlated sound signatures come later after the
+visual element profiles are stable.
+
+Cross-system shape:
+
+```text
+TrueVision Generation = capture/profile/render
+AnchorWorks = later names, counts, lexicons, neighborhood meaning
+SecureCore = later policy, approvals, retention, receipts
+connector = validated state packets
+```
+
+Source-surface timing law:
+
+```text
+approved visible source
+-> declare player region
+-> start native capture
+-> wait pre-roll
+-> hit approved play button
+-> run until source video duration plus post-roll
+-> write plan and receipt
+```
+
+The source-surface planner is:
+
+```text
+source_surface_capture_plan
+```
+
+It accepts a visible source URL/title, video duration, player region, FPS,
+state resolution, grid, pre-roll, and post-roll. It outputs a native capture
+command with `--region`, a timeline, a manifest plan, and a receipt. It does
+not click account controls, comments, downloads, likes, subscriptions, or
+recommendations.
+
+Creation-profile closeout law:
+
+```text
+temporary teacher capture
+-> element_creation_profile_from_capture
+-> creation-useful behavior signature
+-> profile hash verification
+-> purge bulky observed teacher chunks
+-> keep profile, manifest, receipt, purge report
+```
+
+The creation profile keeps fields useful for rendering an element from scratch:
+
+```text
+shape behavior
+growth/decay
+edge softness
+density/opacity
+bloom/intensity
+occlusion behavior
+rhythm/pulse
+transition behavior
+camera relation
+renderer binding
+```
+
+It does not keep the observed movie as durable memory. The durable result is
+how to create the element, not state recall of the teacher source.
+
+Smoke teacher default:
+
+```text
+42s source video
+0.25x playback
+~168s observed duration
+~180s capture window
+15 FPS native capture
+640x360 grid
+no audio
+```
+
+See:
+
+```text
+docs/ELEMENTAL_LEARNING_INTAKE_PLAN.md
+```
+
+Example:
+
+```powershell
+$env:PYTHONPATH='.'
+python scripts\truevision_atmosphere_tools.py create `
+  --storage-root storage `
+  --run-id fog_mist_density_field_v1 `
+  --capture-manifest "E:\TruEVision Generation\library\capture_units\fog_mist_density_field_v1\incoming\<run>\<run>_manifest.json"
+```
 
 ## Signature And TrueFrameGen Tools
 

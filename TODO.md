@@ -37,10 +37,66 @@
 - [x] Document-state reader exists for page-frame and glyph-cell recall.
 - [x] Render Law is documented: state/grid/primitive first, pixels last.
 - [ ] Formalize the AV state template schema.
-- [ ] Add material channels for fog, smoke, water, glass, glow, and lighting pressure.
+- [x] Add first material channels for fog, mist, clouds, and rain-on-glass state tools.
+- [ ] Add remaining material channels for smoke, water, glow, and lighting pressure.
 - [ ] Add camera-motion primitives.
 - [ ] Add time-marker recalibration patches.
 - [ ] Connect document-state packets to shape/language rules for tutorials, charts, and graph generation.
+
+### Atmosphere / Weather State Lane
+
+- [x] Add reusable atmosphere element contracts for `fog_density_field`, `mist_veil_field`, `cloud_volume_field`, and `rain_glass_field`.
+- [x] Add state channels: `density`, `veil_opacity`, `scatter_bloom`, `edge_softness`, `motion_pressure`, `curl_pressure`, `occlusion_pressure`, `droplet_density`, `droplet_streak`, `refraction`, `surface_wetness`.
+- [x] Add native `.tvcells` capture profiler that samples state and builds 6-1-6 windows.
+- [x] Add `atmosphere_toolset_create` to write reusable templates and manifests.
+- [x] Add `atmosphere_profile_from_capture` to the AV-only tool bus.
+- [ ] Run the new profiler on the full fog/mist teacher capture and review density windows.
+- [ ] Add renderer hooks that consume atmosphere profiles without hardcoding one script.
+- [ ] Add rain-on-glass reference capture and compare droplet/streak/refraction channels.
+- [ ] Add cloud-volume reference capture and compare curl/occlusion channels.
+
+### Elemental Learning Intake
+
+- [x] Add `docs/ELEMENTAL_LEARNING_INTAKE_PLAN.md`.
+- [x] Add YouTube source-surface safe-ops contract with declared display IDs, button IDs, and forbidden controls.
+- [x] Add `source_surface_capture_plan` for deterministic non-fullscreen source trials: capture starts before play and stops from source video time.
+- [x] Add `source_surface_multi_sample_plan` for large videos: four section samples instead of one long capture.
+- [x] Require browser address-bar navigation for approved YouTube URLs; strip playlist/search noise before capture.
+- [x] Add `source_surface_video_state_receipt` so a completed macro cannot count unless URL/title/duration/state/profile/purge checks pass.
+- [x] Require a saved coordinate map before every coordinate intake run; no map, no run, and map hash must appear in queue, summary, and receipt.
+- [ ] Add `smoke_curl_field` and `smoke_dissipation_field` element contracts.
+- [ ] Add an `element_intake_queue` JSONL format for approved visual-only teacher tasks.
+- [ ] Add source candidate records with `element_id`, search terms, source URL/path, approval state, capture settings, and retention intent.
+- [ ] Add capture-plan builder for intake tasks without free desktop/browser control.
+- [x] Add `element_creation_profile_from_capture` to convert teacher state into compact creation signatures.
+- [x] Add purge-after-profile receipt path so bulky observed teacher chunks expire after profile verification.
+- [ ] Add 42s smoke source plan: `0.25x` playback, about `180s` capture, visual-only, 15 FPS, `640x360` grid.
+- [x] Add 3-source process regression test proving profile/receipt/report survive while teacher chunks expire.
+- [ ] Run the 3-video process test: capture, profile, verify, purge teacher state, then move to next source.
+- [ ] Add profile quality scoring for element captures.
+- [ ] Add profile comparison for fog vs smoke vs mist vs clouds.
+- [ ] Add renderer-profile binding so renderers consume learned element profiles instead of hardcoded script parameters.
+- [ ] Add retention closeout: keep profile/manifest/receipt/proof preview, then expire heavy teacher chunks unless marked gold.
+- [x] Add open-license dataset intake policy for prototype learning sources.
+- [x] Attribute `faridlab/deepaction_v1` in third-party notices as a human-action motion-profile candidate.
+- [ ] Add Hugging Face DeepAction intake queue that selects only CC BY 4.0 generated folders by default.
+- [ ] Add DeepAction cache guard so downloaded clips live outside the repo and are purged after profile verification.
+- [ ] Add DeepAction motion-profile receipt fields: source folder, action class, clip count, license family, profile hash, purge proof.
+- [ ] Run a tiny DeepAction proof: 5 actions, 2 generated source families, 3 clips each, profile then purge raw clips.
+
+### Terrain Realism Teacher
+
+- [x] Add `docs/TERRAIN_REALISM_TEACHER_PLAN.md`.
+- [x] Add bounded `terrain_teacher` workspace contract for real-world structure before cinematography.
+- [x] Seed source classes for oceans/cliffs, canyons, volcanoes, storm oceans, and mountain fog layers.
+- [x] Add terrain candidate ranking that prefers 30-90 minute real geography sources with transcripts.
+- [x] Add disk guard and cleanup receipt shape so raw teacher media/cache flushes after each job.
+- [x] Add terrain human-review packets and block auto-promotion of learned rules.
+- [ ] Initialize the morning terrain workspace outside git before the first source run.
+- [ ] Process one ocean-cliff source first and extract horizon, edge, scale, texture, depth, and occlusion rules.
+- [ ] Render only a 12-second `edge_nightmare_world --shot-type wide_edge_intro` proof after the first promoted terrain rule.
+- [ ] Add terrain realism QA comparison against the current wide-edge proof before any full-song render.
+- [ ] Add future raytracing/pathtracing alternative capture/learn/transform logger contracts after terrain rules prove useful.
 
 ### TrueAudio Pre-Output Lane
 

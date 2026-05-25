@@ -1,0 +1,26 @@
+{
+  "schema_version": "truevision_coordinate_surface_map_v1",
+  "created_by": "truevision_coordinate_map_screen.py",
+  "template": true,
+  "screen_size": [
+    2560,
+    1440
+  ],
+  "points": {
+    "address_bar": [
+      0,
+      0
+    ],
+    "video_play": [
+      0,
+      0
+    ]
+  },
+  "capture_region": [
+    0,
+    0,
+    2560,
+    1440
+  ],
+  "operator_law": "Fill coordinates before execute. Template coordinates are not valid."
+}

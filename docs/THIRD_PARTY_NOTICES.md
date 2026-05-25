@@ -414,6 +414,67 @@ E:\TruEVision Generation
 Do not commit personal media, downloaded songs, generated MP4s, or capture
 chunks unless a small fixture is deliberately created and cleared for inclusion.
 
+## External Research Datasets / Learning Intake Sources
+
+Learning-intake sources are not bundled with this repository. They may be used
+locally as temporary teacher material only when their license allows the
+intended prototype use. TrueVision should retain compact creation profiles,
+manifests, receipts, and attribution records; bulky teacher media should be
+purged after profile verification unless a source is deliberately marked as a
+licensed gold teacher.
+
+Prototype source policy:
+
+```text
+open-license source first
+profile behavior
+verify receipt
+purge raw teacher media
+keep attribution
+```
+
+### Hugging Face `faridlab/deepaction_v1`
+
+Use in this repo:
+
+```text
+human action motion-profile research
+real-vs-generated movement comparison
+silhouette timing and transform stress tests
+compact behavioral render signatures
+```
+
+Credit:
+
+```text
+DeepAction / Human Action CLIPS dataset
+UCB Farid Lab
+https://huggingface.co/datasets/faridlab/deepaction_v1
+```
+
+Paper citation:
+
+```text
+Matyas Bohacek and Hany Farid.
+Human Action CLIPS: Detecting AI-generated Human Motion.
+arXiv:2412.00526, 2024.
+https://arxiv.org/abs/2412.00526
+```
+
+License note:
+
+The dataset card states that the AI-generated video folders are released under
+CC BY 4.0 and the real-video `Pexels` folder is released under the Pexels
+license. For the open-source/open-licensed prototype lane, use only the
+CC BY 4.0 generated folders unless the Pexels license is separately reviewed
+and accepted for the exact use case.
+
+Retention note:
+
+Do not commit this dataset, downloaded clips, extracted frames, or raw teacher
+state. Store any temporary cache outside the repository, then keep only compact
+profiles, manifests, receipts, and attribution records.
+
 ## Redistribution Checklist
 
 Before publishing a packaged release:

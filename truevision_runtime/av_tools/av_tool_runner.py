@@ -19,6 +19,17 @@ from trueaudio_runtime.replayable import (
 )
 from trueaudio_runtime.speech import detect_speech_segments_from_replayable_state
 from truevision_runtime.state_patterns.audio_video_patterns import choose_patterns_for_signal
+from truevision_runtime.state_patterns.atmosphere_weather import (
+    build_atmosphere_profile_from_native_capture,
+    build_atmosphere_toolset,
+    list_atmosphere_elements,
+)
+from truevision_runtime.learning_intake.source_surface import (
+    write_source_surface_capture_plan,
+    write_source_surface_multi_sample_plan,
+    write_source_surface_video_state_receipt,
+)
+from truevision_runtime.learning_intake.element_creation_profile import write_element_creation_profile_from_capture
 from truevision_runtime.studio.studio_tooling import (
     build_studio_tool_plan,
     get_render_preset,
@@ -776,6 +787,50 @@ def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> di
             )
             return _write_template(storage_root, str(args.get("template_name") or "house_remix_audio_city.json"), template)
         return {"plan": plan}
+    if tool == "atmosphere_profile_from_capture":
+        profile = build_atmosphere_profile_from_native_capture(
+            Path(str(args.get("manifest") or args.get("manifest_json") or "")),
+            element_id=str(args.get("element_id") or "fog_density_field"),
+            max_frames=int(args.get("max_frames") or 180),
+            sample_stride=int(args.get("sample_stride") or 1),
+            radius=int(args.get("radius") or 6),
+            max_windows=int(args.get("max_windows") or 200),
+        )
+        weather_root = storage_root / "artifacts" / "weather"
+        weather_root.mkdir(parents=True, exist_ok=True)
+        run = str(args.get("run_id") or profile["source"].get("run_id") or "atmosphere_profile")
+        safe_run = "".join(char if char.isalnum() or char in {"-", "_"} else "_" for char in run).strip("_") or "atmosphere_profile"
+        path = weather_root / f"{safe_run}_{profile['element_id']}_profile.json"
+        path.write_text(json.dumps(profile, indent=2, allow_nan=False), encoding="utf-8")
+        return {
+            "profile_json": str(path),
+            "profile_sha256": profile["profile_sha256"],
+            "element_id": profile["element_id"],
+            "sampled_frames": profile["sampled_frames"],
+            "six_one_six_windows": profile["six_one_six"]["window_count"],
+            "summary": profile["summary"],
+        }
+    if tool == "atmosphere_toolset_create":
+        element_ids = args.get("elements") or args.get("element_ids")
+        if element_ids is None:
+            element_ids = [element["element_id"] for element in list_atmosphere_elements()]
+        if not isinstance(element_ids, list):
+            raise ValueError("elements must be a list of atmosphere element ids")
+        return build_atmosphere_toolset(
+            storage_root=storage_root,
+            run_id=str(args.get("run_id") or "") or None,
+            capture_manifest=Path(str(args["capture_manifest"])) if args.get("capture_manifest") not in {None, ""} else None,
+            element_ids=[str(element_id) for element_id in element_ids],
+            max_profile_frames=int(args.get("max_profile_frames") or 180),
+        )
+    if tool == "source_surface_capture_plan":
+        return write_source_surface_capture_plan(args, storage_root=storage_root)
+    if tool == "source_surface_multi_sample_plan":
+        return write_source_surface_multi_sample_plan(args, storage_root=storage_root)
+    if tool == "source_surface_video_state_receipt":
+        return write_source_surface_video_state_receipt(args, storage_root=storage_root)
+    if tool == "element_creation_profile_from_capture":
+        return write_element_creation_profile_from_capture(args, storage_root=storage_root)
     if tool == "frame_diff_replay_accuracy":
         return _frame_diff_replay_accuracy(args)
     if tool == "manifest_browser":

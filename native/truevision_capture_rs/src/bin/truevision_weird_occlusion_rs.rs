@@ -57,6 +57,8 @@ struct Args {
     bitrate: String,
     render_threads: usize,
     state_log_every: usize,
+    shot_type: String,
+    chaos_budget: f32,
 }
 
 #[derive(Clone, Copy, Default)]
@@ -269,6 +271,8 @@ fn parse_args() -> Result<Args, String> {
             .map(|value| value.get())
             .unwrap_or(1),
         state_log_every: 30,
+        shot_type: "auto".to_string(),
+        chaos_budget: -1.0,
     };
     let mut iter = env::args().skip(1);
     while let Some(flag) = iter.next() {
@@ -309,6 +313,10 @@ fn parse_args() -> Result<Args, String> {
                 args.state_log_every = value
                     .parse()
                     .map_err(|_| "bad state log interval".to_string())?
+            }
+            "--shot-type" => args.shot_type = slug(&value),
+            "--chaos-budget" => {
+                args.chaos_budget = value.parse().map_err(|_| "bad chaos budget".to_string())?
             }
             other => return Err(format!("unknown argument: {other}")),
         }
@@ -709,6 +717,46 @@ fn render_frame(
     }
     if args.scene_mode == "memory_cathedral" || args.scene_mode == "fade_away_memory_cathedral" {
         return render_memory_cathedral_frame(args, time_seconds, frame_index, audio, frame, stats);
+    }
+    if args.scene_mode == "daughter_star_locket_sea" || args.scene_mode == "star_locket_sea" {
+        return render_daughter_star_locket_sea_frame(
+            args,
+            time_seconds,
+            frame_index,
+            audio,
+            frame,
+            stats,
+        );
+    }
+    if args.scene_mode == "edge_nightmare_world" || args.scene_mode == "edge_nightmare" {
+        if args.shot_type == "wide_edge_intro" {
+            return render_edge_nightmare_wide_edge_intro_frame(
+                args,
+                time_seconds,
+                frame_index,
+                audio,
+                frame,
+                stats,
+            );
+        }
+        return render_edge_nightmare_world_frame(
+            args,
+            time_seconds,
+            frame_index,
+            audio,
+            frame,
+            stats,
+        );
+    }
+    if args.scene_mode == "dead_memory_vice_chamber" || args.scene_mode == "vice_chamber" {
+        return render_dead_memory_vice_chamber_frame(
+            args,
+            time_seconds,
+            frame_index,
+            audio,
+            frame,
+            stats,
+        );
     }
     if args.scene_mode == "state_presentation" || args.scene_mode == "truevision_state_presentation" {
         return render_state_presentation_frame(args, time_seconds, frame_index, audio, frame, stats);
@@ -3021,6 +3069,2316 @@ fn render_memory_cathedral_frame(
     )
 }
 
+fn render_dead_memory_vice_chamber_frame(
+    args: &Args,
+    time_seconds: f64,
+    frame_index: usize,
+    audio: AudioFeature,
+    frame: &mut [u8],
+    stats: &mut FrameStats,
+) -> String {
+    let width = args.width;
+    let height = args.height;
+    let t = time_seconds as f32;
+    let phase = (time_seconds / args.duration.max(0.000_001)).clamp(0.0, 1.0) as f32;
+    let threads = args.render_threads.min(height.max(1));
+    let rows_per_chunk = height.div_ceil(threads);
+    let row_stride = width * 3;
+    let mut glow_pixels = 0_u64;
+    let mut fog_accum = 0.0_f64;
+    let mut vice_accum = 0.0_f64;
+    let mut core_accum = 0.0_f64;
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (chunk_index, chunk) in frame.chunks_mut(row_stride * rows_per_chunk).enumerate() {
+            let y_start = chunk_index * rows_per_chunk;
+            let rows = chunk.len() / row_stride;
+            handles.push(scope.spawn(move || {
+                let mut local_glow = 0_u64;
+                let mut local_fog = 0.0_f64;
+                let mut local_vice = 0.0_f64;
+                let mut local_core = 0.0_f64;
+                for local_y in 0..rows {
+                    let y = y_start + local_y;
+                    let yf = y as f32 / height as f32;
+                    for x in 0..width {
+                        let xf = x as f32 / width as f32;
+                        let sample = dead_memory_vice_pixel(xf, yf, width, height, t, phase, audio);
+                        if sample.glow {
+                            local_glow += 1;
+                        }
+                        local_fog += sample.fog as f64;
+                        local_vice += sample.vice as f64;
+                        local_core += sample.core as f64;
+                        write_pixel_local(chunk, width, x, local_y, sample.color);
+                    }
+                }
+                (local_glow, local_fog, local_vice, local_core)
+            }));
+        }
+        for handle in handles {
+            let (local_glow, local_fog, local_vice, local_core) =
+                handle.join().unwrap_or((0, 0.0, 0.0, 0.0));
+            glow_pixels += local_glow;
+            fog_accum += local_fog;
+            vice_accum += local_vice;
+            core_accum += local_core;
+        }
+    });
+
+    let pixel_count = (width * height).max(1) as f64;
+    let fog_mean = fog_accum / pixel_count;
+    let vice_mean = vice_accum / pixel_count;
+    let core_mean = core_accum / pixel_count;
+    stats.fog_coverage_sum += fog_mean;
+    stats.fog_samples += 1;
+    stats.occluded_pixels_sum += (vice_mean * pixel_count) as u64;
+    stats.glow_pixels_sum += glow_pixels;
+    let stage = dead_memory_stage(phase);
+
+    format!(
+        "{{\"frame_index\":{},\"time_seconds\":{:.6},\"scene\":\"dead_memory_vice_chamber\",\"stage\":\"{}\",\"palette\":\"{}\",\"audio\":{{\"rms\":{:.6},\"bass\":{:.6},\"high\":{:.6},\"beat\":{:.6},\"vocal_presence\":{:.6}}},\"render_law\":\"trauma_pressure_as_mechanical_state_no_literal_gore_no_monster\",\"phase\":{:.6},\"fog_mean\":{:.6},\"vice_pressure_mean\":{:.6},\"memory_core_mean\":{:.6},\"glow_pixels\":{},\"state_layers\":[\"black_industrial_cathedral_machine\",\"black_iron_vice_jaws\",\"cracked_glowing_memory_core\",\"cold_density_field_fog\",\"chalk_outline_ghosts\",\"burned_photo_fragments\",\"rain_glass_deception_distortion\",\"red_neon_vice_pressure\",\"white_lightning_truth_cuts\",\"ember_ash_memory_bleed\",\"thin_gold_white_survival_fracture\"]}}",
+        frame_index,
+        time_seconds,
+        json_escape(stage.name),
+        json_escape(&args.palette),
+        audio.rms,
+        audio.bass,
+        audio.high,
+        audio.beat,
+        vocal_presence(audio),
+        phase,
+        fog_mean,
+        vice_mean,
+        core_mean,
+        glow_pixels
+    )
+}
+
+fn render_daughter_star_locket_sea_frame(
+    args: &Args,
+    time_seconds: f64,
+    frame_index: usize,
+    audio: AudioFeature,
+    frame: &mut [u8],
+    stats: &mut FrameStats,
+) -> String {
+    let width = args.width;
+    let height = args.height;
+    let t = time_seconds as f32;
+    let phase = (time_seconds / args.duration.max(0.000_001)).clamp(0.0, 1.0) as f32;
+    let threads = args.render_threads.min(height.max(1));
+    let rows_per_chunk = height.div_ceil(threads);
+    let row_stride = width * 3;
+    let mut glow_pixels = 0_u64;
+    let mut fog_accum = 0.0_f64;
+    let mut water_accum = 0.0_f64;
+    let mut star_accum = 0.0_f64;
+    let mut crack_accum = 0.0_f64;
+    let mut hope_accum = 0.0_f64;
+    let mut plane_accum = 0.0_f64;
+    let mut distortion_accum = 0.0_f64;
+    let mut haze_accum = 0.0_f64;
+    let mut shimmer_accum = 0.0_f64;
+    let mut red_accum = 0.0_f64;
+    let mut silhouette_accum = 0.0_f64;
+    let mut abyss_accum = 0.0_f64;
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (chunk_index, chunk) in frame.chunks_mut(row_stride * rows_per_chunk).enumerate() {
+            let y_start = chunk_index * rows_per_chunk;
+            let rows = chunk.len() / row_stride;
+            handles.push(scope.spawn(move || {
+                let mut local_glow = 0_u64;
+                let mut local_fog = 0.0_f64;
+                let mut local_water = 0.0_f64;
+                let mut local_star = 0.0_f64;
+                let mut local_crack = 0.0_f64;
+                let mut local_hope = 0.0_f64;
+                let mut local_plane = 0.0_f64;
+                let mut local_distortion = 0.0_f64;
+                let mut local_haze = 0.0_f64;
+                let mut local_shimmer = 0.0_f64;
+                let mut local_red = 0.0_f64;
+                let mut local_silhouette = 0.0_f64;
+                let mut local_abyss = 0.0_f64;
+                for local_y in 0..rows {
+                    let y = y_start + local_y;
+                    let yf = y as f32 / height as f32;
+                    for x in 0..width {
+                        let xf = x as f32 / width as f32;
+                        let sample = daughter_star_locket_pixel(xf, yf, width, height, t, phase, audio);
+                        if sample.glow {
+                            local_glow += 1;
+                        }
+                        local_fog += sample.fog as f64;
+                        local_water += sample.water as f64;
+                        local_star += sample.star as f64;
+                        local_crack += sample.crack as f64;
+                        local_hope += sample.hope as f64;
+                        local_plane += sample.plane_depth as f64;
+                        local_distortion += sample.distortion as f64;
+                        local_haze += sample.haze as f64;
+                        local_shimmer += sample.shimmer as f64;
+                        local_red += sample.red_pressure as f64;
+                        local_silhouette += sample.silhouette as f64;
+                        local_abyss += sample.abyss as f64;
+                        write_pixel_local(chunk, width, x, local_y, sample.color);
+                    }
+                }
+                (
+                    local_glow,
+                    local_fog,
+                    local_water,
+                    local_star,
+                    local_crack,
+                    local_hope,
+                    local_plane,
+                    local_distortion,
+                    local_haze,
+                    local_shimmer,
+                    local_red,
+                    local_silhouette,
+                    local_abyss,
+                )
+            }));
+        }
+        for handle in handles {
+            let (
+                local_glow,
+                local_fog,
+                local_water,
+                local_star,
+                local_crack,
+                local_hope,
+                local_plane,
+                local_distortion,
+                local_haze,
+                local_shimmer,
+                local_red,
+                local_silhouette,
+                local_abyss,
+            ) = handle.join().unwrap_or((0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
+            glow_pixels += local_glow;
+            fog_accum += local_fog;
+            water_accum += local_water;
+            star_accum += local_star;
+            crack_accum += local_crack;
+            hope_accum += local_hope;
+            plane_accum += local_plane;
+            distortion_accum += local_distortion;
+            haze_accum += local_haze;
+            shimmer_accum += local_shimmer;
+            red_accum += local_red;
+            silhouette_accum += local_silhouette;
+            abyss_accum += local_abyss;
+        }
+    });
+
+    let pixel_count = (width * height).max(1) as f64;
+    let fog_mean = fog_accum / pixel_count;
+    let water_mean = water_accum / pixel_count;
+    let star_mean = star_accum / pixel_count;
+    let crack_mean = crack_accum / pixel_count;
+    let hope_mean = hope_accum / pixel_count;
+    let plane_mean = plane_accum / pixel_count;
+    let distortion_mean = distortion_accum / pixel_count;
+    let haze_mean = haze_accum / pixel_count;
+    let shimmer_mean = shimmer_accum / pixel_count;
+    let red_mean = red_accum / pixel_count;
+    let silhouette_mean = silhouette_accum / pixel_count;
+    let abyss_mean = abyss_accum / pixel_count;
+    stats.fog_coverage_sum += fog_mean;
+    stats.fog_samples += 1;
+    stats.occluded_pixels_sum += (water_mean * pixel_count) as u64;
+    stats.glow_pixels_sum += glow_pixels;
+    let stage = daughter_star_stage(phase);
+    let transform = daughter_transform_state(t, phase, audio, stage);
+
+    format!(
+        "{{\"frame_index\":{},\"time_seconds\":{:.6},\"scene\":\"daughter_star_locket_sea\",\"stage\":\"{}\",\"transform_state\":\"{}\",\"palette\":\"{}\",\"audio\":{{\"rms\":{:.6},\"bass\":{:.6},\"high\":{:.6},\"beat\":{:.6},\"vocal_presence\":{:.6}}},\"render_law\":\"father_daughter_symbolic_state_pseudo_3d_arc_operator_transforms_controlled_fog_no_external_assets_no_literal_faces\",\"phase\":{:.6},\"fog_mean\":{:.6},\"water_reflection_mean\":{:.6},\"star_glow_mean\":{:.6},\"heart_crack_mean\":{:.6},\"hope_light_mean\":{:.6},\"plane_depth_mean\":{:.6},\"distortion_mean\":{:.6},\"haze_mean\":{:.6},\"shimmer_mean\":{:.6},\"red_pressure_mean\":{:.6},\"silhouette_mean\":{:.6},\"abyss_role_mean\":{:.6},\"glow_pixels\":{},\"state_layers\":[\"midnight_water_reflection\",\"daughter_star_glow\",\"cracked_father_heart_locket\",\"perspective_depth_plane\",\"dimensional_heart_locket_shading\",\"unbroken_chain_arc\",\"controlled_roiling_fog_field\",\"tear_ripple_field\",\"distant_horizon_blue\",\"gold_white_hope_fill\",\"red_cracked_world_pressure\",\"human_silhouette_emergence\",\"dual_silhouette_anthem\",\"abyss_role_river_spiral\",\"geometric_state_transform_switching\",\"plane_depth_pulse\",\"fade_shimmer_gate\",\"soft_distortion_haze\"]}}",
+        frame_index,
+        time_seconds,
+        json_escape(stage.name),
+        json_escape(transform.name),
+        json_escape(&args.palette),
+        audio.rms,
+        audio.bass,
+        audio.high,
+        audio.beat,
+        vocal_presence(audio),
+        phase,
+        fog_mean,
+        water_mean,
+        star_mean,
+        crack_mean,
+        hope_mean,
+        plane_mean,
+        distortion_mean,
+        haze_mean,
+        shimmer_mean,
+        red_mean,
+        silhouette_mean,
+        abyss_mean,
+        glow_pixels
+    )
+}
+
+#[derive(Clone, Copy)]
+struct DaughterPixel {
+    color: Color,
+    glow: bool,
+    fog: f32,
+    water: f32,
+    star: f32,
+    crack: f32,
+    hope: f32,
+    plane_depth: f32,
+    distortion: f32,
+    haze: f32,
+    shimmer: f32,
+    red_pressure: f32,
+    silhouette: f32,
+    abyss: f32,
+}
+
+#[derive(Clone, Copy)]
+struct DaughterStage {
+    name: &'static str,
+    grief: f32,
+    distance: f32,
+    fracture: f32,
+    reach: f32,
+    answer: f32,
+    hope: f32,
+}
+
+#[derive(Clone, Copy)]
+struct DaughterTransform {
+    name: &'static str,
+    plane_depth: f32,
+    fade: f32,
+    shimmer: f32,
+    distortion: f32,
+    haze: f32,
+}
+
+fn daughter_star_stage(phase: f32) -> DaughterStage {
+    if phase < 0.115 {
+        DaughterStage { name: "dark_water_waiting", grief: 1.0, distance: 0.75, fracture: 0.08, reach: 0.0, answer: 0.0, hope: 0.02 }
+    } else if phase < 0.250 {
+        DaughterStage { name: "first_memory_light", grief: 0.86, distance: 0.70, fracture: 0.16, reach: 0.08, answer: 0.18, hope: 0.06 }
+    } else if phase < 0.380 {
+        DaughterStage { name: "distance_opens", grief: 0.92, distance: 1.0, fracture: 0.24, reach: 0.10, answer: 0.12, hope: 0.05 }
+    } else if phase < 0.520 {
+        DaughterStage { name: "heart_fracture", grief: 0.94, distance: 0.86, fracture: 0.70, reach: 0.20, answer: 0.12, hope: 0.08 }
+    } else if phase < 0.665 {
+        DaughterStage { name: "what_did_they_take", grief: 1.0, distance: 0.92, fracture: 0.86, reach: 0.28, answer: 0.10, hope: 0.10 }
+    } else if phase < 0.800 {
+        DaughterStage { name: "father_reaches", grief: 0.82, distance: 0.64, fracture: 0.72, reach: 0.75, answer: 0.20, hope: 0.24 }
+    } else if phase < 0.935 {
+        DaughterStage { name: "daughter_star_answers", grief: 0.64, distance: 0.44, fracture: 0.52, reach: 0.88, answer: 0.84, hope: 0.56 }
+    } else {
+        DaughterStage { name: "hope_holds", grief: 0.56, distance: 0.34, fracture: 0.36, reach: 0.70, answer: 0.72, hope: 1.0 }
+    }
+}
+
+fn daughter_star_locket_pixel(
+    x: f32,
+    y: f32,
+    width: usize,
+    height: usize,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> DaughterPixel {
+    let aspect = width as f32 / height as f32;
+    let stage = daughter_star_stage(phase);
+    let transform = daughter_transform_state(t, phase, audio, stage);
+    let camera_zoom = 1.0 + 0.020 * stage.reach + 0.018 * stage.answer + 0.006 * (t * 0.030).sin();
+    let camera_x = 0.006 * (t * 0.018).sin() - 0.004 * stage.distance;
+    let camera_y = 0.004 * (t * 0.013).cos() - 0.006 * stage.hope;
+    let raw_sx = (x - 0.5) / camera_zoom + 0.5 + camera_x;
+    let raw_sy = (y - 0.5) / camera_zoom + 0.5 + camera_y;
+    let (sx, sy) = daughter_apply_geometric_transform(raw_sx, raw_sy, t, transform);
+    let cx = (sx - 0.5) * aspect;
+    let cy = sy - 0.5;
+    let radius = (cx * cx + cy * cy).sqrt();
+    let vocal = vocal_presence(audio);
+    let horizon = 0.585 + 0.010 * (t * 0.045).sin() + 0.010 * stage.distance;
+    let closeness = 1.0 - stage.distance.clamp(0.0, 1.0);
+    let star_x = 0.292 + closeness * 0.020;
+    let star_y = 0.326 + stage.answer * 0.006;
+    let heart_x = 0.704 - closeness * 0.030;
+    let heart_y = 0.395 - stage.hope * 0.018;
+    let mut color = daughter_night_base(sx, sy, radius, t, audio, stage);
+    let mut glow = false;
+
+    let water = daughter_water_field(sx, sy, horizon, t, audio, stage);
+    if water > 0.0 {
+        blend(
+            &mut color,
+            Color::new(24.0 + 18.0 * audio.high, 13.0 + 8.0 * stage.hope, 7.0 + 6.0 * stage.hope),
+            water * (0.88 + 0.12 * stage.distance),
+        );
+    }
+
+    let symbol_protection = daughter_symbol_protection(sx, sy, star_x, star_y, heart_x, heart_y);
+    let fog = daughter_memory_fog(sx, sy, horizon, t, audio, stage) * (1.0 - 0.58 * symbol_protection);
+    let haze = daughter_soft_transform_haze(sx, sy, horizon, transform, stage) * (1.0 - 0.48 * symbol_protection);
+    if fog > 0.0 {
+        blend(&mut color, Color::new(50.0 + 26.0 * vocal, 42.0 + 20.0 * stage.hope, 48.0 + 28.0 * stage.grief), fog);
+    }
+    if haze > 0.0 {
+        blend(&mut color, Color::new(42.0 + 18.0 * stage.hope, 34.0 + 16.0 * stage.answer, 46.0 + 22.0 * stage.grief), haze);
+    }
+
+    let shadow = daughter_depth_shadow(sx, sy, horizon, star_x, star_y, heart_x, heart_y, stage);
+    if shadow > 0.0 {
+        blend(&mut color, Color::new(2.0, 1.0, 1.0), shadow);
+    }
+
+    let star = daughter_star_shape(sx, sy, star_x, star_y, t, audio, stage);
+    if star.glow > 0.0 {
+        blend_add(&mut color, star.color, star.glow);
+        glow = true;
+    }
+
+    let heart = daughter_heart_locket(sx, sy, heart_x, heart_y, t, audio, stage);
+    if heart.body > 0.0 {
+        blend_add(&mut color, heart.color, heart.body);
+        glow = true;
+    }
+
+    let chain = daughter_chain_arc(sx, sy, star_x, star_y, heart_x, heart_y, t, audio, stage);
+    if chain > 0.0 {
+        blend_add(&mut color, Color::new(140.0 + 35.0 * audio.high, 130.0 + 36.0 * stage.hope, 180.0 + 45.0 * stage.answer), chain);
+        glow = true;
+    }
+
+    let reflection = daughter_reflection_field(sx, sy, horizon, star_x, star_y, heart_x, heart_y, t, audio, stage);
+    if reflection.glow > 0.0 {
+        blend_add(&mut color, reflection.color, reflection.glow);
+        glow = true;
+    }
+
+    let ripples = daughter_tear_ripples(sx, sy, horizon, star_x, heart_x, t, audio, stage);
+    if ripples > 0.0 {
+        blend_add(&mut color, Color::new(78.0, 84.0 + 42.0 * stage.hope, 108.0 + 70.0 * stage.answer), ripples);
+        glow = true;
+    }
+
+    let hope = daughter_hope_bridge(sx, sy, star_x, star_y, heart_x, heart_y, t, audio, stage);
+    if hope > 0.0 {
+        blend_add(&mut color, Color::new(96.0 + 22.0 * audio.high, 218.0 + 22.0 * stage.hope, 255.0), hope);
+        glow = true;
+    }
+
+    let shimmer_lift = transform.shimmer * (0.018 + 0.040 * audio.high + 0.020 * stage.answer) * (0.38 + 0.62 * symbol_protection);
+    if shimmer_lift > 0.0 {
+        blend_add(&mut color, Color::new(82.0, 94.0 + 42.0 * stage.hope, 126.0 + 64.0 * stage.answer), shimmer_lift);
+        glow = true;
+    }
+    if transform.fade > 0.0 {
+        blend(&mut color, Color::new(2.0, 3.0, 8.0), transform.fade * 0.10 * (1.0 - stage.hope * 0.40));
+    }
+
+    let vignette = smoothstep(0.42, 0.94, radius) * (0.50 + 0.18 * stage.grief);
+    blend(&mut color, Color::new(1.0, 1.0, 4.0), vignette);
+
+    DaughterPixel {
+        color,
+        glow,
+        fog,
+        water,
+        star: star.glow,
+        crack: heart.crack,
+        hope,
+        plane_depth: transform.plane_depth,
+        distortion: transform.distortion,
+        haze,
+        shimmer: shimmer_lift,
+        red_pressure: 0.0,
+        silhouette: 0.0,
+        abyss: 0.0,
+    }
+}
+
+fn daughter_transform_state(t: f32, phase: f32, audio: AudioFeature, stage: DaughterStage) -> DaughterTransform {
+    let driver = t * 0.72 + phase * 3.0 + audio.beat * 1.9;
+    let local = driver.fract();
+    let switch_env = smoothstep(0.06, 0.24, local) * (1.0 - smoothstep(0.76, 0.96, local));
+    let pressure = (audio.rms * 0.42 + audio.beat * 0.58 + stage.fracture * 0.18 + stage.answer * 0.12).clamp(0.0, 1.0);
+    let gate = (pressure * switch_env).clamp(0.0, 1.0);
+    let lane = (driver.floor() as i32).rem_euclid(5);
+    match lane {
+        0 => DaughterTransform {
+            name: "plane_depth_pulse",
+            plane_depth: gate,
+            fade: 0.05 * gate,
+            shimmer: 0.18 * gate,
+            distortion: 0.08 * gate,
+            haze: 0.10 * gate,
+        },
+        1 => DaughterTransform {
+            name: "fade_shimmer_gate",
+            plane_depth: 0.25 * gate,
+            fade: 0.42 * gate,
+            shimmer: 0.95 * gate,
+            distortion: 0.14 * gate,
+            haze: 0.08 * gate,
+        },
+        2 => DaughterTransform {
+            name: "soft_distortion_haze",
+            plane_depth: 0.20 * gate,
+            fade: 0.12 * gate,
+            shimmer: 0.22 * gate,
+            distortion: 0.68 * gate,
+            haze: 0.55 * gate,
+        },
+        3 => DaughterTransform {
+            name: "reflection_plane_shear",
+            plane_depth: 0.70 * gate,
+            fade: 0.06 * gate,
+            shimmer: 0.30 * gate,
+            distortion: 0.28 * gate,
+            haze: 0.18 * gate,
+        },
+        _ => DaughterTransform {
+            name: "symbol_hold_release",
+            plane_depth: 0.18 * gate,
+            fade: 0.04 * gate,
+            shimmer: 0.36 * gate,
+            distortion: 0.10 * gate,
+            haze: 0.10 * gate,
+        },
+    }
+}
+
+fn daughter_apply_geometric_transform(x: f32, y: f32, t: f32, transform: DaughterTransform) -> (f32, f32) {
+    let depth = smoothstep(0.42, 1.0, y);
+    let plane = transform.plane_depth;
+    let distort = transform.distortion;
+    let shear = (y - 0.58) * plane * 0.016;
+    let warp_x = distort
+        * (0.010 * (y * 17.0 + t * 0.80).sin() + 0.006 * (x * 37.0 - t * 0.45).sin())
+        * (0.30 + 0.70 * depth);
+    let warp_y = distort
+        * (0.007 * (x * 15.0 - t * 0.36).sin() + 0.004 * (y * 29.0 + t * 0.28).cos())
+        * (0.24 + 0.76 * depth);
+    (x + shear + warp_x, y + warp_y - plane * 0.006 * depth)
+}
+
+fn daughter_soft_transform_haze(
+    x: f32,
+    y: f32,
+    horizon: f32,
+    transform: DaughterTransform,
+    stage: DaughterStage,
+) -> f32 {
+    let horizon_band = 1.0 - smoothstep(0.02, 0.30, (y - horizon).abs());
+    let side_field = (1.0 - smoothstep(0.02, 0.30, x)).max(smoothstep(0.70, 0.98, x));
+    ((horizon_band * 0.08 + side_field * 0.05) * transform.haze * (0.65 + 0.35 * stage.grief)).clamp(0.0, 0.14)
+}
+
+fn daughter_night_base(
+    x: f32,
+    y: f32,
+    radius: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> Color {
+    let sky = smoothstep(0.0, 0.62, y);
+    let n = value_noise(x * 4.0 + t * 0.006, y * 3.4 - t * 0.004);
+    let mut color = lerp_color(
+        Color::new(16.0 + 12.0 * n, 8.0, 6.0 + 6.0 * stage.grief),
+        Color::new(34.0 + 10.0 * stage.hope, 20.0 + 10.0 * stage.answer, 12.0 + 8.0 * stage.hope),
+        sky,
+    );
+    let star_field = daughter_background_stars(x, y, t);
+    if star_field > 0.0 {
+        blend_add(&mut color, Color::new(160.0, 160.0, 190.0), star_field * (0.25 + 0.35 * stage.answer));
+    }
+    let center_hush = (1.0 - smoothstep(0.02, 0.72, radius)) * (0.02 + 0.08 * audio.rms + 0.12 * stage.hope);
+    blend_add(&mut color, Color::new(20.0, 24.0 + 22.0 * stage.hope, 54.0 + 58.0 * stage.answer), center_hush);
+    color
+}
+
+fn daughter_background_stars(x: f32, y: f32, t: f32) -> f32 {
+    if y > 0.53 {
+        return 0.0;
+    }
+    let gx = (x * 96.0).floor();
+    let gy = (y * 120.0).floor();
+    let gate = hash2(gx, gy);
+    if gate < 0.987 {
+        return 0.0;
+    }
+    let lx = (x * 96.0).fract() - 0.5;
+    let ly = (y * 120.0).fract() - 0.5;
+    let dot = 1.0 - smoothstep(0.025, 0.22, (lx * lx + ly * ly).sqrt());
+    dot * (0.25 + 0.35 * (0.5 + 0.5 * (t * 0.15 + gate * 9.0).sin()))
+}
+
+fn daughter_water_field(x: f32, y: f32, horizon: f32, t: f32, audio: AudioFeature, stage: DaughterStage) -> f32 {
+    if y < horizon {
+        return 0.0;
+    }
+    let depth = smoothstep(horizon, 1.0, y);
+    let perspective = 0.70 + 1.80 * depth;
+    let wave = (x * (22.0 + 74.0 * depth) + t * (0.08 + audio.bass * 0.18)).sin()
+        + 0.38 * (x * (64.0 + 120.0 * depth) - t * 0.14).sin();
+    let glint = 1.0 - smoothstep(0.010, 0.105 + 0.04 * audio.high, (wave / perspective).abs());
+    (0.20 + 0.42 * depth + glint * (0.08 + 0.18 * stage.answer + 0.20 * audio.high)).clamp(0.0, 0.82)
+}
+
+fn daughter_memory_fog(x: f32, y: f32, horizon: f32, t: f32, audio: AudioFeature, stage: DaughterStage) -> f32 {
+    let band = 1.0 - smoothstep(0.025, 0.30, (y - horizon).abs());
+    let curl_x = x + 0.045 * (y * 12.0 + t * 0.040).sin();
+    let curl_y = y + 0.035 * (x * 9.0 - t * 0.032).cos();
+    let n1 = value_noise(curl_x * 4.8 + t * 0.020, curl_y * 3.5 - t * 0.014);
+    let n2 = value_noise(x * 11.0 - t * 0.030, y * 7.0 + t * 0.012);
+    let billow = 0.5 + 0.5 * (x * 8.0 + y * 5.0 + n1 * 4.0 - t * 0.060).sin();
+    let hush = stage.grief * (1.0 - 0.42 * stage.hope);
+    ((n1 * 0.11 + n2 * 0.08 + billow * 0.07 + band * 0.18) * (0.20 + 0.22 * hush + 0.12 * audio.rms)).clamp(0.0, 0.32)
+}
+
+fn daughter_symbol_protection(x: f32, y: f32, star_x: f32, star_y: f32, heart_x: f32, heart_y: f32) -> f32 {
+    let star = 1.0 - smoothstep(0.070, 0.240, ((x - star_x).powi(2) + ((y - star_y) * 1.12).powi(2)).sqrt());
+    let heart = 1.0 - smoothstep(0.080, 0.220, ((x - heart_x).powi(2) + ((y - heart_y) * 1.08).powi(2)).sqrt());
+    (star.max(heart)).clamp(0.0, 1.0)
+}
+
+fn daughter_depth_shadow(
+    x: f32,
+    y: f32,
+    horizon: f32,
+    star_x: f32,
+    star_y: f32,
+    heart_x: f32,
+    heart_y: f32,
+    stage: DaughterStage,
+) -> f32 {
+    if y < horizon {
+        return 0.0;
+    }
+    let star_shadow_y = horizon + (horizon - star_y).abs() * 0.34;
+    let heart_shadow_y = horizon + (horizon - heart_y).abs() * 0.42;
+    let star_shadow = 1.0 - smoothstep(
+        0.05,
+        0.28,
+        (((x - star_x) / 0.19).powi(2) + ((y - star_shadow_y) / 0.045).powi(2)).sqrt(),
+    );
+    let heart_shadow = 1.0 - smoothstep(
+        0.05,
+        0.32,
+        (((x - heart_x) / 0.17).powi(2) + ((y - heart_shadow_y) / 0.055).powi(2)).sqrt(),
+    );
+    ((star_shadow * 0.10 + heart_shadow * 0.18) * (0.55 + 0.45 * stage.distance)).clamp(0.0, 0.22)
+}
+
+#[derive(Clone, Copy)]
+struct DaughterLightSample {
+    glow: f32,
+    color: Color,
+}
+
+fn daughter_star_shape(
+    x: f32,
+    y: f32,
+    sx: f32,
+    sy: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> DaughterLightSample {
+    let dx = x - sx;
+    let dy = (y - sy) * 1.08;
+    let r = (dx * dx + dy * dy).sqrt();
+    let a = dy.atan2(dx);
+    let point = 0.62 + 0.52 * (0.5 + 0.5 * (a * 5.0 - std::f32::consts::FRAC_PI_2).cos()).powf(2.6);
+    let edge = 0.088 * point;
+    let body = 1.0 - smoothstep(edge * 0.60, edge, r);
+    let core = 1.0 - smoothstep(0.016, 0.050, r);
+    let rib = (1.0 - smoothstep(0.006, 0.036, ((a * 5.0 - std::f32::consts::FRAC_PI_2).sin()).abs() * r))
+        * (1.0 - smoothstep(0.012, edge * 0.95, r));
+    let facet = 0.55 + 0.45 * (0.5 + 0.5 * (a * 10.0 + t * 0.035).cos());
+    let aura = (1.0 - smoothstep(edge, edge * (4.6 + 1.0 * audio.rms), r))
+        * (0.18 + 0.42 * stage.answer + 0.22 * audio.rms);
+    let shimmer = 0.65 + 0.35 * (t * 0.38 + audio.high * 3.0).sin().abs();
+    let glow = (body * (0.64 + 0.22 * facet + 0.20 * stage.answer) + core * 0.40 + rib * 0.25 + aura) * shimmer;
+    DaughterLightSample {
+        glow: glow.clamp(0.0, 1.35),
+        color: lerp_color(
+            Color::new(212.0, 184.0 + 24.0 * facet, 228.0),
+            Color::new(128.0 + 40.0 * facet, 224.0, 255.0),
+            stage.hope.clamp(0.0, 1.0),
+        ),
+    }
+}
+
+#[derive(Clone, Copy)]
+struct HeartSample {
+    body: f32,
+    crack: f32,
+    color: Color,
+}
+
+fn daughter_heart_locket(
+    x: f32,
+    y: f32,
+    hx: f32,
+    hy: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> HeartSample {
+    let lx = (x - hx) / 0.104;
+    let ly = -(y - hy) / 0.100;
+    let f = (lx * lx + ly * ly - 1.0).powi(3) - lx * lx * ly.powi(3);
+    let body = (1.0 - smoothstep(-0.42, 0.08, f)) * (0.34 + 0.48 * stage.fracture + 0.18 * audio.rms);
+    let rim = 1.0 - smoothstep(0.03, 0.24, f.abs());
+    let highlight = (1.0 - smoothstep(0.06, 0.58, ((lx + 0.34).powi(2) + (ly - 0.34).powi(2)).sqrt())) * body;
+    let vertical_light = smoothstep(-0.82, 0.78, ly);
+    let side_shadow = smoothstep(0.12, 0.95, lx);
+    let shade = (0.68 + 0.24 * vertical_light + 0.22 * highlight - 0.13 * side_shadow).clamp(0.46, 1.20);
+    let crack_line = daughter_heart_crack(x, y, hx, hy, t, audio, stage) * (body + rim * 0.6).clamp(0.0, 1.0);
+    HeartSample {
+        body: (body * shade + rim * 0.26 + highlight * 0.32 + crack_line * 0.58).clamp(0.0, 1.20),
+        crack: crack_line.clamp(0.0, 1.0),
+        color: lerp_color(
+            Color::new(76.0 + 26.0 * shade, 78.0 + 30.0 * shade, 104.0 + 32.0 * shade),
+            Color::new(86.0 + 34.0 * stage.hope + 24.0 * highlight, 188.0 + 42.0 * stage.hope, 255.0),
+            (stage.hope * 0.55 + crack_line * 0.20).clamp(0.0, 1.0),
+        ),
+    }
+}
+
+fn daughter_heart_crack(x: f32, y: f32, hx: f32, hy: f32, t: f32, audio: AudioFeature, stage: DaughterStage) -> f32 {
+    let local_y = y - hy;
+    let bend = hx + 0.010 * (local_y * 42.0 + t * 0.08).sin() + 0.010 * (local_y * 93.0).sin();
+    let vertical = smoothstep(-0.060, -0.010, local_y) * (1.0 - smoothstep(0.055, 0.105, local_y));
+    let line = 1.0 - smoothstep(0.002, 0.014 + 0.012 * audio.beat, (x - bend).abs());
+    (line * vertical * (0.26 + 0.68 * stage.fracture + 0.32 * audio.beat)).clamp(0.0, 1.0)
+}
+
+fn daughter_chain_arc(
+    x: f32,
+    y: f32,
+    sx: f32,
+    sy: f32,
+    hx: f32,
+    hy: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> f32 {
+    let vx = hx - sx;
+    let u = ((x - sx) / vx.max(0.0001)).clamp(0.0, 1.0);
+    let curve_y = sy + (hy - sy) * u - 0.052 * (std::f32::consts::PI * u).sin();
+    let on_arc = 1.0 - smoothstep(0.003, 0.015, (y - curve_y).abs());
+    let range = smoothstep(sx + 0.012, sx + 0.070, x) * (1.0 - smoothstep(hx - 0.055, hx + 0.016, x));
+    let link = 0.45 + 0.55 * ((x * 110.0 + t * 0.13).sin().abs());
+    (on_arc * range * link * (0.16 + 0.24 * stage.reach + 0.26 * audio.high)).clamp(0.0, 0.78)
+}
+
+fn daughter_reflection_field(
+    x: f32,
+    y: f32,
+    horizon: f32,
+    star_x: f32,
+    star_y: f32,
+    heart_x: f32,
+    heart_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> DaughterLightSample {
+    if y < horizon {
+        return DaughterLightSample { glow: 0.0, color: Color::new(0.0, 0.0, 0.0) };
+    }
+    let wave = 0.010 * (x * 42.0 + t * 0.18).sin() + 0.006 * (x * 93.0 - t * 0.12).sin();
+    let ry = horizon - (y - horizon) * 0.64 + wave;
+    let star = daughter_star_shape(x, ry, star_x, star_y, t, audio, stage).glow;
+    let heart = daughter_heart_locket(x, ry, heart_x, heart_y, t, audio, stage).body;
+    let depth = smoothstep(horizon, 0.94, y);
+    let star_column = (1.0 - smoothstep(0.010, 0.080 + 0.035 * stage.answer, (x - star_x).abs()))
+        * (1.0 - smoothstep(0.12, 0.82, depth))
+        * (0.06 + 0.22 * stage.answer + 0.16 * audio.high);
+    let heart_column = (1.0 - smoothstep(0.020, 0.100, (x - heart_x).abs()))
+        * (1.0 - smoothstep(0.10, 0.72, depth))
+        * (0.035 + 0.15 * stage.fracture + 0.12 * audio.rms);
+    let fade = (1.0 - smoothstep(horizon + 0.02, 0.94, y)) * (0.22 + 0.22 * audio.rms + 0.18 * stage.hope);
+    DaughterLightSample {
+        glow: ((star * 0.50 + heart * 0.42) * fade + star_column + heart_column).clamp(0.0, 0.90),
+        color: Color::new(110.0 + 38.0 * stage.hope, 96.0 + 46.0 * stage.answer, 132.0 + 74.0 * stage.hope),
+    }
+}
+
+fn daughter_tear_ripples(
+    x: f32,
+    y: f32,
+    horizon: f32,
+    star_x: f32,
+    heart_x: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> f32 {
+    if y < horizon {
+        return 0.0;
+    }
+    let centers = [(star_x, horizon + 0.070), (heart_x, horizon + 0.105), (0.50, horizon + 0.160)];
+    let mut sum = 0.0_f32;
+    for (index, (cx, cy)) in centers.iter().enumerate() {
+        let dx = (x - *cx) / (0.18 + index as f32 * 0.04);
+        let dy = (y - *cy) / (0.045 + index as f32 * 0.014);
+        let r = (dx * dx + dy * dy).sqrt();
+        let ring = 1.0 - smoothstep(0.018, 0.070, (r - (0.45 + 0.08 * (t * 0.08 + index as f32).sin())).abs());
+        sum += ring * (0.055 + 0.14 * audio.beat + 0.10 * stage.fracture);
+    }
+    sum.clamp(0.0, 0.55)
+}
+
+fn daughter_hope_bridge(
+    x: f32,
+    y: f32,
+    sx: f32,
+    sy: f32,
+    hx: f32,
+    hy: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DaughterStage,
+) -> f32 {
+    let vx = hx - sx;
+    let vy = hy - sy;
+    let len2 = vx * vx + vy * vy;
+    let u = (((x - sx) * vx + (y - sy) * vy) / len2).clamp(0.0, 1.0);
+    let px = sx + vx * u;
+    let py = sy + vy * u + 0.012 * (u * 8.0 + t * 0.10).sin();
+    let d = ((x - px).powi(2) + ((y - py) * 1.8).powi(2)).sqrt();
+    let line = 1.0 - smoothstep(0.002, 0.018 + 0.010 * stage.hope, d);
+    let reveal = smoothstep(0.60, 0.96, stage.reach + stage.answer + stage.hope);
+    (line * reveal * (0.10 + 0.50 * stage.hope + 0.16 * audio.beat)).clamp(0.0, 0.82)
+}
+
+fn render_edge_nightmare_world_frame(
+    args: &Args,
+    time_seconds: f64,
+    frame_index: usize,
+    audio: AudioFeature,
+    frame: &mut [u8],
+    stats: &mut FrameStats,
+) -> String {
+    let width = args.width;
+    let height = args.height;
+    let t = time_seconds as f32;
+    let phase = (time_seconds / args.duration.max(0.000_001)).clamp(0.0, 1.0) as f32;
+    let threads = args.render_threads.min(height.max(1));
+    let rows_per_chunk = height.div_ceil(threads);
+    let row_stride = width * 3;
+    let mut glow_pixels = 0_u64;
+    let mut fog_accum = 0.0_f64;
+    let mut abyss_accum = 0.0_f64;
+    let mut silhouette_accum = 0.0_f64;
+    let mut lightning_accum = 0.0_f64;
+    let mut transform_accum = 0.0_f64;
+    let mut hope_accum = 0.0_f64;
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (chunk_index, chunk) in frame.chunks_mut(row_stride * rows_per_chunk).enumerate() {
+            let y_start = chunk_index * rows_per_chunk;
+            let rows = chunk.len() / row_stride;
+            handles.push(scope.spawn(move || {
+                let mut local_glow = 0_u64;
+                let mut local_fog = 0.0_f64;
+                let mut local_abyss = 0.0_f64;
+                let mut local_silhouette = 0.0_f64;
+                let mut local_lightning = 0.0_f64;
+                let mut local_transform = 0.0_f64;
+                let mut local_hope = 0.0_f64;
+                for local_y in 0..rows {
+                    let y = y_start + local_y;
+                    let yf = y as f32 / height as f32;
+                    for x in 0..width {
+                        let xf = x as f32 / width as f32;
+                        let sample = edge_nightmare_world_pixel(xf, yf, width, height, t, phase, audio);
+                        if sample.glow {
+                            local_glow += 1;
+                        }
+                        local_fog += sample.fog as f64;
+                        local_abyss += sample.abyss as f64;
+                        local_silhouette += sample.silhouette as f64;
+                        local_lightning += sample.lightning as f64;
+                        local_transform += sample.transform_pressure as f64;
+                        local_hope += sample.hope as f64;
+                        write_pixel_local(chunk, width, x, local_y, sample.color);
+                    }
+                }
+                (
+                    local_glow,
+                    local_fog,
+                    local_abyss,
+                    local_silhouette,
+                    local_lightning,
+                    local_transform,
+                    local_hope,
+                )
+            }));
+        }
+        for handle in handles {
+            let (
+                local_glow,
+                local_fog,
+                local_abyss,
+                local_silhouette,
+                local_lightning,
+                local_transform,
+                local_hope,
+            ) = handle.join().unwrap_or((0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
+            glow_pixels += local_glow;
+            fog_accum += local_fog;
+            abyss_accum += local_abyss;
+            silhouette_accum += local_silhouette;
+            lightning_accum += local_lightning;
+            transform_accum += local_transform;
+            hope_accum += local_hope;
+        }
+    });
+
+    let pixel_count = (width * height).max(1) as f64;
+    let fog_mean = fog_accum / pixel_count;
+    let abyss_mean = abyss_accum / pixel_count;
+    let silhouette_mean = silhouette_accum / pixel_count;
+    let lightning_mean = lightning_accum / pixel_count;
+    let transform_mean = transform_accum / pixel_count;
+    let hope_mean = hope_accum / pixel_count;
+    stats.fog_coverage_sum += fog_mean;
+    stats.fog_samples += 1;
+    stats.occluded_pixels_sum += (silhouette_mean * pixel_count) as u64;
+    stats.glow_pixels_sum += glow_pixels;
+    let stage = edge_nightmare_stage(phase);
+    let transform = edge_nightmare_transform_state(t, phase, audio, stage);
+
+    format!(
+        "{{\"frame_index\":{},\"time_seconds\":{:.6},\"scene\":\"edge_nightmare_world\",\"stage\":\"{}\",\"camera_state\":\"{}\",\"palette\":\"{}\",\"audio\":{{\"rms\":{:.6},\"bass\":{:.6},\"high\":{:.6},\"beat\":{:.6},\"vocal_presence\":{:.6}}},\"render_law\":\"nightmare_edge_state_arc_transforms_full_pov_motion_human_silhouette_no_external_assets\",\"phase\":{:.6},\"fog_mean\":{:.6},\"abyss_river_mean\":{:.6},\"silhouette_mean\":{:.6},\"lightning_bloom_mean\":{:.6},\"transform_pressure_mean\":{:.6},\"hope_release_mean\":{:.6},\"glow_pixels\":{},\"state_layers\":[\"nightmare_cliff_rim\",\"wide_angle_push_in\",\"side_parallax_crossing\",\"top_down_abyss_view\",\"falling_camera_spiral\",\"under_edge_river_of_color\",\"human_silhouette_motion\",\"roiling_edge_fog\",\"branching_lightning_bloom\",\"ash_ember_drift\",\"gold_white_hope_release\",\"arc_learning_transform_mix\"]}}",
+        frame_index,
+        time_seconds,
+        json_escape(stage.name),
+        json_escape(transform.name),
+        json_escape(&args.palette),
+        audio.rms,
+        audio.bass,
+        audio.high,
+        audio.beat,
+        vocal_presence(audio),
+        phase,
+        fog_mean,
+        abyss_mean,
+        silhouette_mean,
+        lightning_mean,
+        transform_mean,
+        hope_mean,
+        glow_pixels
+    )
+}
+
+fn render_edge_nightmare_wide_edge_intro_frame(
+    args: &Args,
+    time_seconds: f64,
+    frame_index: usize,
+    audio: AudioFeature,
+    frame: &mut [u8],
+    stats: &mut FrameStats,
+) -> String {
+    let width = args.width;
+    let height = args.height;
+    let t = time_seconds as f32;
+    let phase = (time_seconds / args.duration.max(0.000_001)).clamp(0.0, 1.0) as f32;
+    let chaos_budget = if args.chaos_budget >= 0.0 {
+        args.chaos_budget.clamp(0.0, 0.15)
+    } else {
+        0.15
+    };
+    let threads = args.render_threads.min(height.max(1));
+    let rows_per_chunk = height.div_ceil(threads);
+    let row_stride = width * 3;
+    let mut glow_pixels = 0_u64;
+    let mut fog_accum = 0.0_f64;
+    let mut subject_accum = 0.0_f64;
+    let mut ground_accum = 0.0_f64;
+    let mut edge_accum = 0.0_f64;
+    let mut separation_accum = 0.0_f64;
+    let mut parallax_accum = 0.0_f64;
+    let mut occlusion_accum = 0.0_f64;
+    let mut negative_accum = 0.0_f64;
+
+    thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for (chunk_index, chunk) in frame.chunks_mut(row_stride * rows_per_chunk).enumerate() {
+            let y_start = chunk_index * rows_per_chunk;
+            let rows = chunk.len() / row_stride;
+            handles.push(scope.spawn(move || {
+                let mut local_glow = 0_u64;
+                let mut local_fog = 0.0_f64;
+                let mut local_subject = 0.0_f64;
+                let mut local_ground = 0.0_f64;
+                let mut local_edge = 0.0_f64;
+                let mut local_separation = 0.0_f64;
+                let mut local_parallax = 0.0_f64;
+                let mut local_occlusion = 0.0_f64;
+                let mut local_negative = 0.0_f64;
+                for local_y in 0..rows {
+                    let y = y_start + local_y;
+                    let yf = y as f32 / height as f32;
+                    for x in 0..width {
+                        let xf = x as f32 / width as f32;
+                        let sample = edge_nightmare_wide_edge_intro_pixel(
+                            xf,
+                            yf,
+                            width,
+                            height,
+                            t,
+                            phase,
+                            audio,
+                            chaos_budget,
+                        );
+                        if sample.glow {
+                            local_glow += 1;
+                        }
+                        local_fog += sample.fog as f64;
+                        local_subject += sample.subject as f64;
+                        local_ground += sample.ground as f64;
+                        local_edge += sample.edge as f64;
+                        local_separation += sample.separation as f64;
+                        local_parallax += sample.parallax as f64;
+                        local_occlusion += sample.occlusion as f64;
+                        local_negative += sample.negative_space as f64;
+                        write_pixel_local(chunk, width, x, local_y, sample.color);
+                    }
+                }
+                (
+                    local_glow,
+                    local_fog,
+                    local_subject,
+                    local_ground,
+                    local_edge,
+                    local_separation,
+                    local_parallax,
+                    local_occlusion,
+                    local_negative,
+                )
+            }));
+        }
+        for handle in handles {
+            let (
+                local_glow,
+                local_fog,
+                local_subject,
+                local_ground,
+                local_edge,
+                local_separation,
+                local_parallax,
+                local_occlusion,
+                local_negative,
+            ) = handle.join().unwrap_or((0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0));
+            glow_pixels += local_glow;
+            fog_accum += local_fog;
+            subject_accum += local_subject;
+            ground_accum += local_ground;
+            edge_accum += local_edge;
+            separation_accum += local_separation;
+            parallax_accum += local_parallax;
+            occlusion_accum += local_occlusion;
+            negative_accum += local_negative;
+        }
+    });
+
+    let pixel_count = (width * height).max(1) as f64;
+    let fog_mean = fog_accum / pixel_count;
+    let subject_readability = (subject_accum / pixel_count * 64.0).clamp(0.0, 1.0);
+    let ground_plane_visibility = (ground_accum / pixel_count * 2.4).clamp(0.0, 1.0);
+    let edge_visibility = (edge_accum / pixel_count * 28.0).clamp(0.0, 1.0);
+    let separation_score = (separation_accum / pixel_count * 7.5).clamp(0.0, 1.0);
+    let parallax_score = (parallax_accum / pixel_count).clamp(0.0, 1.0);
+    let effect_occlusion_ratio = (occlusion_accum / pixel_count * 48.0).clamp(0.0, 1.0);
+    let negative_space = (negative_accum / pixel_count).clamp(0.0, 1.0);
+    stats.fog_coverage_sum += fog_mean;
+    stats.fog_samples += 1;
+    stats.occluded_pixels_sum += (effect_occlusion_ratio * pixel_count) as u64;
+    stats.glow_pixels_sum += glow_pixels;
+
+    format!(
+        "{{\"frame_index\":{},\"time_seconds\":{:.6},\"scene\":\"edge_nightmare_world\",\"stage\":\"wide_edge_intro_depth_proof\",\"shot_type\":\"wide_edge_intro\",\"camera_motion\":\"locked_slow_push\",\"primary_transform\":\"depth_parallax_only\",\"secondary_transform\":\"foreground_fog_drift\",\"palette\":\"{}\",\"audio\":{{\"rms\":{:.6},\"bass\":{:.6},\"high\":{:.6},\"beat\":{:.6},\"vocal_presence\":{:.6}}},\"render_law\":\"no_nightmare_until_the_edge_exists_depth_proof_only\",\"phase\":{:.6},\"chaos_budget\":{:.6},\"subject_readability\":{:.6},\"silhouette_readability\":{:.6},\"ground_plane_visibility\":{:.6},\"edge_visibility\":{:.6},\"foreground_midground_background_separation\":{:.6},\"parallax_score\":{:.6},\"effect_occlusion_ratio\":{:.6},\"negative_space\":{:.6},\"light_punctuation\":0.000000,\"fog_mean\":{:.6},\"glow_pixels\":{},\"section_arc_stage\":\"isolation_before_nightmare\",\"state_layers\":[\"background_void_sky\",\"horizon_world_edge_glow\",\"midground_abyss_or_sea\",\"subject_silhouette_plane\",\"foreground_cliff_rim\",\"foreground_atmosphere_debris\"]}}",
+        frame_index,
+        time_seconds,
+        json_escape(&args.palette),
+        audio.rms,
+        audio.bass,
+        audio.high,
+        audio.beat,
+        vocal_presence(audio),
+        phase,
+        chaos_budget,
+        subject_readability,
+        subject_readability,
+        ground_plane_visibility,
+        edge_visibility,
+        separation_score,
+        parallax_score,
+        effect_occlusion_ratio,
+        negative_space,
+        fog_mean,
+        glow_pixels
+    )
+}
+
+#[derive(Clone, Copy)]
+struct EdgeWideIntroPixel {
+    color: Color,
+    glow: bool,
+    fog: f32,
+    subject: f32,
+    ground: f32,
+    edge: f32,
+    separation: f32,
+    parallax: f32,
+    occlusion: f32,
+    negative_space: f32,
+}
+
+fn edge_nightmare_wide_edge_intro_pixel(
+    x: f32,
+    y: f32,
+    width: usize,
+    height: usize,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+    chaos_budget: f32,
+) -> EdgeWideIntroPixel {
+    let aspect = width as f32 / height as f32;
+    let push = 0.035 * phase.clamp(0.0, 1.0);
+    let bg_x = (x - 0.5) * (1.0 - push * 0.12) + 0.5;
+    let mid_x = (x - 0.5) * (1.0 + push * 0.28) + 0.5;
+    let fg_x = (x - 0.5) * (1.0 + push * 0.68) + 0.5;
+    let fg_y = (y - 0.5) * (1.0 + push * 0.44) + 0.5;
+    let cx = (bg_x - 0.5) * aspect;
+    let cy = y - 0.5;
+    let radius = (cx * cx + cy * cy).sqrt();
+    let horizon_y = 0.414 + 0.004 * (bg_x * 4.0 + t * 0.012).sin();
+    let rim_y = 0.640
+        + 0.010 * (fg_x * 9.0 - t * 0.006).sin()
+        + 0.005 * (fg_x * 23.0 + t * 0.004).sin();
+    let mut color = lerp_color(
+        Color::new(8.0, 5.0, 3.0),
+        Color::new(19.0 + 6.0 * audio.rms, 10.0, 6.0),
+        smoothstep(0.0, 1.0, y),
+    );
+    let mut glow = false;
+
+    let sky_star = edge_nightmare_starfield(bg_x, y * 0.95, t) * (1.0 - smoothstep(0.32, 0.55, y)) * 0.42;
+    if sky_star > 0.0 {
+        blend_add(&mut color, Color::new(118.0, 124.0, 164.0), sky_star);
+        glow = true;
+    }
+    let dead_halo = (1.0 - smoothstep(0.06, 0.78, radius)) * 0.026 * (1.0 - chaos_budget * 1.8);
+    blend_add(&mut color, Color::new(34.0, 27.0, 45.0), dead_halo);
+
+    let horizon_line = 1.0 - smoothstep(0.0015, 0.010, (y - horizon_y).abs());
+    let horizon_glow = (1.0 - smoothstep(0.006, 0.065, (y - horizon_y).abs()))
+        * (0.30 + 0.22 * (1.0 - phase))
+        * (1.0 - smoothstep(0.44, 0.88, (x - 0.52).abs()));
+    if horizon_glow > 0.0 {
+        blend_add(
+            &mut color,
+            Color::new(30.0 + 22.0 * audio.high, 74.0 + 46.0 * phase, 118.0 + 78.0 * phase),
+            horizon_glow,
+        );
+        glow = true;
+    }
+
+    let sea_gate = smoothstep(horizon_y - 0.005, horizon_y + 0.030, y)
+        * (1.0 - smoothstep(rim_y - 0.035, rim_y + 0.020, y));
+    let depth = smoothstep(horizon_y, rim_y + 0.030, y).clamp(0.0, 1.0);
+    let slow_wave = 0.5 + 0.5 * (mid_x * (8.0 + 14.0 * depth) + depth * 5.0 - t * 0.020).sin();
+    let abyss_well = sea_gate
+        * smoothstep(0.06, 0.82, depth)
+        * (1.0 - smoothstep(0.03, 0.46, (mid_x - 0.52).abs() + depth * 0.10));
+    if sea_gate > 0.0 {
+        blend(
+            &mut color,
+            Color::new(18.0 + 20.0 * slow_wave, 9.0 + 7.0 * phase, 5.0 + 5.0 * phase),
+            sea_gate * (0.54 + 0.20 * depth),
+        );
+        blend_add(
+            &mut color,
+            Color::new(54.0 + 20.0 * slow_wave, 34.0 + 12.0 * audio.rms, 18.0 + 8.0 * phase),
+            abyss_well * 0.18,
+        );
+    }
+
+    let cliff_edge = 1.0 - smoothstep(0.0018, 0.016, (fg_y - rim_y).abs());
+    let cliff_plane = smoothstep(rim_y - 0.004, rim_y + 0.045, fg_y);
+    if cliff_plane > 0.0 {
+        blend(&mut color, Color::new(0.0, 0.0, 1.0), cliff_plane * 0.94);
+        let terrain = value_noise(fg_x * 9.0 + t * 0.004, fg_y * 5.0 - t * 0.003);
+        blend_add(
+            &mut color,
+            Color::new(10.0 + 10.0 * terrain, 8.0 + 6.0 * terrain, 7.0 + 5.0 * terrain),
+            cliff_plane * (0.035 + 0.035 * terrain),
+        );
+    }
+    if cliff_edge > 0.0 {
+        blend_add(&mut color, Color::new(34.0, 54.0 + 22.0 * phase, 84.0 + 28.0 * phase), cliff_edge * 0.55);
+        glow = true;
+    }
+
+    let subject = edge_one_silhouette(x, y, 0.515, 0.655, 1.52, t * 0.045, 1.0);
+    let cloak = 1.0 - smoothstep(
+        0.18,
+        0.98,
+        (((x - 0.515) / 0.048).powi(2) + ((y - 0.590) / 0.098).powi(2)).sqrt(),
+    );
+    let hard_subject = smoothstep(0.10, 0.50, subject.body.max(cloak * 0.78)).clamp(0.0, 1.0);
+    let subject_rim = (subject.rim + (1.0 - smoothstep(0.020, 0.078, (x - 0.515).abs() + (y - 0.582).abs() * 0.35)) * 0.05)
+        * (1.0 - hard_subject * 0.55);
+    let subject_mask = hard_subject.max(subject_rim * 0.45).clamp(0.0, 1.0);
+    if hard_subject > 0.0 {
+        blend(&mut color, Color::new(0.0, 0.0, 0.0), hard_subject);
+    }
+    if subject_rim > 0.0 {
+        blend_add(&mut color, Color::new(50.0, 74.0, 116.0), subject_rim * 1.18);
+        glow = true;
+    }
+    let foot_shadow = (1.0 - smoothstep(0.018, 0.095, (((x - 0.515) / 0.080).powi(2) + ((y - rim_y - 0.016) / 0.026).powi(2)).sqrt()))
+        * smoothstep(rim_y - 0.020, rim_y + 0.040, y);
+    if foot_shadow > 0.0 {
+        blend(&mut color, Color::new(0.0, 0.0, 0.0), foot_shadow * 0.65);
+    }
+
+    let edge_fog_band = (1.0 - smoothstep(0.030, 0.220, (y - rim_y).abs())).clamp(0.0, 1.0);
+    let side_fog = (1.0 - smoothstep(0.04, 0.22, x)).max(smoothstep(0.78, 0.99, x));
+    let fog_noise = value_noise(fg_x * 4.2 + t * 0.012, fg_y * 3.0 - t * 0.010);
+    let fog = ((edge_fog_band * 0.065 + side_fog * 0.055) * (0.50 + 0.50 * fog_noise) * (1.0 + audio.rms * 0.18))
+        .clamp(0.0, 0.105)
+        * (1.0 - subject_mask * 0.90);
+    if fog > 0.0 {
+        blend(&mut color, Color::new(34.0, 31.0, 34.0), fog);
+    }
+
+    let debris_gate = hash2((fg_x * 36.0).floor(), (fg_y * 90.0 + t * 0.16).floor());
+    let foreground_debris = if debris_gate > 0.985 && (x < 0.12 || x > 0.88 || y > 0.78) {
+        let dx = (fg_x * 36.0).fract() - 0.5;
+        let dy = (fg_y * 90.0 + t * 0.16).fract() - 0.5;
+        (1.0 - smoothstep(0.04, 0.28, (dx * dx + dy * dy).sqrt())) * 0.16
+    } else {
+        0.0
+    };
+    if foreground_debris > 0.0 {
+        blend(&mut color, Color::new(1.0, 1.0, 2.0), foreground_debris);
+    }
+
+    let vignette = smoothstep(0.48, 1.02, radius) * 0.44;
+    blend(&mut color, Color::new(0.0, 0.0, 1.0), vignette);
+
+    let separation = (horizon_line * 0.24
+        + sea_gate * 0.18
+        + cliff_edge * 0.30
+        + cliff_plane * 0.12
+        + subject_mask * 0.36
+        + foreground_debris * 0.20)
+        .clamp(0.0, 1.0);
+    let parallax = (0.24 + 0.36 * phase + foreground_debris * 0.20 + edge_fog_band * 0.08).clamp(0.0, 1.0);
+    let occlusion = fog * subject_mask;
+    let activity = fog + subject_mask + cliff_edge + horizon_glow + foreground_debris;
+    let negative_space = if y < horizon_y - 0.030 {
+        (1.0 - smoothstep(0.0, 0.80, activity)).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+
+    EdgeWideIntroPixel {
+        color,
+        glow,
+        fog,
+        subject: subject_mask,
+        ground: cliff_plane,
+        edge: cliff_edge,
+        separation,
+        parallax,
+        occlusion,
+        negative_space,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct EdgeNightmarePixel {
+    color: Color,
+    glow: bool,
+    fog: f32,
+    abyss: f32,
+    silhouette: f32,
+    lightning: f32,
+    transform_pressure: f32,
+    hope: f32,
+}
+
+#[derive(Clone, Copy)]
+struct EdgeNightmareStage {
+    name: &'static str,
+    darkness: f32,
+    abyss: f32,
+    storm: f32,
+    human: f32,
+    descent: f32,
+    hope: f32,
+    top_down: f32,
+}
+
+#[derive(Clone, Copy)]
+struct EdgeNightmareTransform {
+    name: &'static str,
+    zoom: f32,
+    pan_x: f32,
+    pan_y: f32,
+    roll: f32,
+    top_down: f32,
+    spiral: f32,
+    shear: f32,
+    shimmer: f32,
+}
+
+#[derive(Clone, Copy)]
+struct EdgeEnergySample {
+    amount: f32,
+    color: Color,
+}
+
+#[derive(Clone, Copy)]
+struct EdgeSilhouetteSample {
+    body: f32,
+    rim: f32,
+}
+
+fn edge_nightmare_stage(phase: f32) -> EdgeNightmareStage {
+    if phase < 0.110 {
+        EdgeNightmareStage { name: "black_edge_wake", darkness: 1.0, abyss: 0.18, storm: 0.18, human: 0.08, descent: 0.0, hope: 0.0, top_down: 0.0 }
+    } else if phase < 0.245 {
+        EdgeNightmareStage { name: "walk_to_rim", darkness: 0.92, abyss: 0.35, storm: 0.34, human: 0.74, descent: 0.0, hope: 0.02, top_down: 0.0 }
+    } else if phase < 0.370 {
+        EdgeNightmareStage { name: "side_parallax_pressure", darkness: 0.90, abyss: 0.48, storm: 0.48, human: 0.92, descent: 0.10, hope: 0.03, top_down: 0.08 }
+    } else if phase < 0.505 {
+        EdgeNightmareStage { name: "just_looking_down", darkness: 0.96, abyss: 0.94, storm: 0.62, human: 0.55, descent: 0.42, hope: 0.04, top_down: 0.92 }
+    } else if phase < 0.650 {
+        EdgeNightmareStage { name: "falling_camera_spiral", darkness: 1.0, abyss: 1.0, storm: 0.82, human: 0.34, descent: 1.0, hope: 0.02, top_down: 0.70 }
+    } else if phase < 0.800 {
+        EdgeNightmareStage { name: "river_below_answers", darkness: 0.86, abyss: 0.88, storm: 0.70, human: 0.64, descent: 0.56, hope: 0.18, top_down: 0.36 }
+    } else if phase < 0.925 {
+        EdgeNightmareStage { name: "storm_power_walk", darkness: 0.82, abyss: 0.68, storm: 1.0, human: 1.0, descent: 0.16, hope: 0.36, top_down: 0.0 }
+    } else {
+        EdgeNightmareStage { name: "gold_edge_release", darkness: 0.72, abyss: 0.42, storm: 0.42, human: 0.74, descent: 0.0, hope: 1.0, top_down: 0.0 }
+    }
+}
+
+fn edge_nightmare_transform_state(
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+) -> EdgeNightmareTransform {
+    let driver = t * (0.50 + 0.14 * stage.storm) + phase * 4.0 + audio.beat * 2.4;
+    let lane = (driver.floor() as i32).rem_euclid(6);
+    let local = driver.fract();
+    let gate = (smoothstep(0.04, 0.26, local)
+        * (1.0 - smoothstep(0.74, 0.97, local))
+        * (0.32 + 0.40 * audio.rms + 0.52 * audio.beat + 0.25 * stage.storm))
+        .clamp(0.0, 1.0);
+    let top = stage.top_down.clamp(0.0, 1.0);
+    let base_zoom = 1.02 + 0.10 * stage.abyss + 0.08 * stage.human + 0.10 * audio.rms;
+    match lane {
+        0 => EdgeNightmareTransform {
+            name: "wide_angle_push_in",
+            zoom: base_zoom + 0.18 * gate,
+            pan_x: -0.018 * stage.human + 0.012 * (t * 0.030).sin(),
+            pan_y: -0.035 * gate + 0.025 * top,
+            roll: 0.006 * (t * 0.075).sin(),
+            top_down: top * 0.40,
+            spiral: 0.06 * gate,
+            shear: 0.05 * gate,
+            shimmer: 0.25 * gate,
+        },
+        1 => EdgeNightmareTransform {
+            name: "side_parallax_crossing",
+            zoom: base_zoom + 0.08 * gate,
+            pan_x: 0.060 * (0.5 - phase) * gate + 0.018 * (t * 0.050).sin(),
+            pan_y: 0.006 * (t * 0.044).cos(),
+            roll: -0.012 * gate,
+            top_down: top * 0.25,
+            spiral: 0.04 * gate,
+            shear: 0.18 * gate,
+            shimmer: 0.22 * gate,
+        },
+        2 => EdgeNightmareTransform {
+            name: "top_down_abyss_view",
+            zoom: base_zoom + 0.34 * top + 0.12 * gate,
+            pan_x: 0.010 * (t * 0.020).sin(),
+            pan_y: -0.080 * top - 0.018 * gate,
+            roll: 0.018 * (t * 0.070).sin() * top,
+            top_down: (top + 0.28 * gate).clamp(0.0, 1.0),
+            spiral: 0.22 * gate + 0.20 * top,
+            shear: 0.10 * gate,
+            shimmer: 0.20 + 0.35 * gate,
+        },
+        3 => EdgeNightmareTransform {
+            name: "falling_camera_spiral",
+            zoom: base_zoom + 0.42 * stage.descent + 0.22 * gate,
+            pan_x: 0.040 * (t * 0.090).sin() * stage.descent,
+            pan_y: 0.055 * stage.descent - 0.022 * gate,
+            roll: 0.090 * (t * 0.120).sin() * stage.descent + 0.030 * gate,
+            top_down: (top + 0.45 * stage.descent).clamp(0.0, 1.0),
+            spiral: 0.66 * stage.descent + 0.24 * gate,
+            shear: 0.14 * gate,
+            shimmer: 0.42 * gate + 0.12 * stage.descent,
+        },
+        4 => EdgeNightmareTransform {
+            name: "under_edge_river_roll",
+            zoom: base_zoom + 0.18 * gate,
+            pan_x: 0.030 * (t * 0.045).cos(),
+            pan_y: 0.042 * stage.descent + 0.030 * stage.abyss,
+            roll: -0.045 * gate + 0.020 * (t * 0.060).sin(),
+            top_down: top * 0.55,
+            spiral: 0.18 * gate,
+            shear: -0.16 * gate,
+            shimmer: 0.34 * gate,
+        },
+        _ => EdgeNightmareTransform {
+            name: "hope_release_pullback",
+            zoom: base_zoom - 0.08 * stage.hope + 0.05 * gate,
+            pan_x: 0.006 * (t * 0.020).sin(),
+            pan_y: 0.035 * stage.hope - 0.010 * stage.abyss,
+            roll: 0.004 * (t * 0.030).cos(),
+            top_down: top * (1.0 - 0.55 * stage.hope),
+            spiral: 0.05 * gate,
+            shear: 0.04 * gate,
+            shimmer: 0.36 * stage.hope + 0.14 * gate,
+        },
+    }
+}
+
+fn edge_nightmare_world_pixel(
+    x: f32,
+    y: f32,
+    width: usize,
+    height: usize,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> EdgeNightmarePixel {
+    let aspect = width as f32 / height as f32;
+    let stage = edge_nightmare_stage(phase);
+    let transform = edge_nightmare_transform_state(t, phase, audio, stage);
+    let (sx, sy) = edge_nightmare_apply_transform(x, y, t, transform);
+    let cx = (sx - 0.5) * aspect;
+    let cy = sy - 0.5;
+    let radius = (cx * cx + cy * cy).sqrt();
+    let rim_y = edge_nightmare_rim_y(sx, t, stage, transform);
+    let mut color = edge_nightmare_base(sx, sy, radius, t, audio, stage, transform);
+    let mut glow = false;
+
+    let abyss = edge_nightmare_abyss_river(sx, sy, rim_y, t, audio, stage, transform);
+    if abyss.amount > 0.0 {
+        blend_add(&mut color, abyss.color, abyss.amount);
+        glow = true;
+    }
+
+    let cliff = edge_nightmare_cliff_rim(sx, sy, rim_y, t, audio, stage);
+    if cliff.amount > 0.0 {
+        blend(&mut color, Color::new(2.0, 2.0, 4.0), cliff.amount * 0.85);
+        blend_add(&mut color, cliff.color, cliff.amount * 0.20);
+        glow = true;
+    }
+
+    let fog = edge_nightmare_roiling_fog(sx, sy, rim_y, t, audio, stage, transform);
+    if fog > 0.0 {
+        blend(
+            &mut color,
+            Color::new(30.0 + 18.0 * audio.high, 28.0 + 12.0 * stage.hope, 34.0 + 20.0 * stage.storm),
+            fog,
+        );
+    }
+
+    let lightning = edge_nightmare_lightning_bloom(sx, sy, rim_y, t, audio, stage, transform);
+    if lightning.amount > 0.0 {
+        blend_add(&mut color, lightning.color, lightning.amount);
+        glow = true;
+    }
+
+    let ash = edge_nightmare_ash_ember(sx, sy, t, audio, stage);
+    if ash.amount > 0.0 {
+        blend_add(&mut color, ash.color, ash.amount);
+        glow = true;
+    }
+
+    let silhouette = edge_nightmare_human_silhouettes(sx, sy, rim_y, t, audio, stage, transform);
+    if silhouette.body > 0.0 {
+        blend(&mut color, Color::new(0.0, 0.0, 1.0), silhouette.body);
+    }
+    if silhouette.rim > 0.0 {
+        blend_add(
+            &mut color,
+            Color::new(38.0 + 72.0 * stage.hope, 52.0 + 92.0 * stage.hope, 84.0 + 116.0 * stage.hope),
+            silhouette.rim,
+        );
+        glow = true;
+    }
+
+    let hope = edge_nightmare_hope_release(sx, sy, rim_y, t, audio, stage);
+    if hope > 0.0 {
+        blend_add(&mut color, Color::new(86.0, 205.0 + 18.0 * audio.high, 255.0), hope);
+        glow = true;
+    }
+
+    let vignette = smoothstep(0.44, 0.98, radius) * (0.52 + 0.22 * stage.darkness);
+    blend(&mut color, Color::new(0.0, 0.0, 2.0), vignette);
+
+    EdgeNightmarePixel {
+        color,
+        glow,
+        fog,
+        abyss: abyss.amount,
+        silhouette: silhouette.body + silhouette.rim,
+        lightning: lightning.amount,
+        transform_pressure: ((transform.spiral + transform.shear.abs() + transform.shimmer) * 0.33).clamp(0.0, 1.0),
+        hope,
+    }
+}
+
+fn edge_nightmare_apply_transform(
+    x: f32,
+    y: f32,
+    t: f32,
+    transform: EdgeNightmareTransform,
+) -> (f32, f32) {
+    let mut px = x - 0.5;
+    let mut py = y - 0.5;
+    let roll = transform.roll + transform.spiral * 0.025 * (t * 0.25 + (px * px + py * py) * 10.0).sin();
+    let cr = roll.cos();
+    let sr = roll.sin();
+    let rx = px * cr - py * sr;
+    let ry = px * sr + py * cr;
+    px = rx / transform.zoom.max(0.10);
+    py = ry / transform.zoom.max(0.10);
+    let depth = smoothstep(-0.10, 0.52, py + 0.5);
+    let top_squash = 1.0 - 0.24 * transform.top_down;
+    let spiral = transform.spiral
+        * 0.018
+        * ((px * 19.0 + t * 0.30).sin() + (py * 23.0 - t * 0.22).cos())
+        * (0.20 + 0.80 * depth);
+    let shear = transform.shear * (py * 0.070);
+    (
+        px + 0.5 + transform.pan_x + shear + spiral,
+        py * top_squash + 0.5 + transform.pan_y - transform.top_down * 0.030 * depth,
+    )
+}
+
+fn edge_nightmare_base(
+    x: f32,
+    y: f32,
+    radius: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+    transform: EdgeNightmareTransform,
+) -> Color {
+    let sky = smoothstep(0.0, 0.72, y);
+    let n = value_noise(x * 3.0 + t * 0.008, y * 2.8 - t * 0.006);
+    let storm = stage.storm * (0.50 + 0.50 * audio.rms);
+    let mut color = lerp_color(
+        Color::new(4.0 + 4.0 * n, 3.0, 2.0 + 5.0 * stage.darkness),
+        Color::new(22.0 + 18.0 * stage.abyss, 8.0 + 8.0 * stage.hope, 7.0 + 28.0 * storm),
+        sky,
+    );
+    let moonless_halo = (1.0 - smoothstep(0.05, 0.72, ((x - 0.52).powi(2) + ((y - 0.18) * 1.6).powi(2)).sqrt()))
+        * (0.018 + 0.040 * stage.storm + 0.040 * audio.high);
+    blend_add(&mut color, Color::new(36.0, 42.0 + 22.0 * stage.hope, 70.0 + 55.0 * stage.storm), moonless_halo);
+    let star = edge_nightmare_starfield(x, y, t) * (1.0 - stage.storm * 0.55) * (1.0 - transform.top_down * 0.45);
+    if star > 0.0 {
+        blend_add(&mut color, Color::new(170.0, 170.0, 210.0), star);
+    }
+    let center_pressure = (1.0 - smoothstep(0.02, 0.82, radius)) * (0.018 + 0.045 * audio.rms + 0.055 * stage.abyss);
+    blend_add(&mut color, Color::new(12.0 + 48.0 * stage.abyss, 18.0 + 24.0 * stage.hope, 40.0 + 30.0 * stage.storm), center_pressure);
+    color
+}
+
+fn edge_nightmare_starfield(x: f32, y: f32, t: f32) -> f32 {
+    if y > 0.55 {
+        return 0.0;
+    }
+    let gx = (x * 118.0).floor();
+    let gy = (y * 140.0).floor();
+    let gate = hash2(gx, gy);
+    if gate < 0.991 {
+        return 0.0;
+    }
+    let lx = (x * 118.0).fract() - 0.5;
+    let ly = (y * 140.0).fract() - 0.5;
+    let dot = 1.0 - smoothstep(0.020, 0.18, (lx * lx + ly * ly).sqrt());
+    dot * (0.16 + 0.32 * (0.5 + 0.5 * (t * 0.11 + gate * 17.0).sin()))
+}
+
+fn edge_nightmare_rim_y(
+    x: f32,
+    t: f32,
+    stage: EdgeNightmareStage,
+    transform: EdgeNightmareTransform,
+) -> f32 {
+    let wide_rim = 0.565 + 0.020 * (x * 8.0 + t * 0.018).sin() + 0.012 * (x * 19.0 - t * 0.012).sin();
+    let top_rim = 0.350 + 0.018 * (x * 6.0 - t * 0.020).sin();
+    let below_rim = 0.440 + 0.025 * (x * 11.0 + t * 0.030).sin();
+    let mixed = wide_rim * (1.0 - stage.top_down) + top_rim * stage.top_down;
+    mixed * (1.0 - 0.28 * stage.descent) + below_rim * 0.28 * stage.descent + transform.top_down * -0.020
+}
+
+fn edge_nightmare_cliff_rim(
+    x: f32,
+    y: f32,
+    rim_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+) -> EdgeEnergySample {
+    let rim_band = 1.0 - smoothstep(0.002, 0.020 + 0.012 * audio.beat, (y - rim_y).abs());
+    let land_mass = (1.0 - smoothstep(rim_y - 0.045, rim_y + 0.020, y)) * smoothstep(0.04, 0.18, y);
+    let crack = (1.0 - smoothstep(0.002, 0.014, ((x * 12.0 + t * 0.022).sin() * 0.012 + y - rim_y).abs()))
+        * (0.10 + 0.18 * stage.storm + 0.16 * audio.high);
+    let amount = (land_mass * (0.34 + 0.22 * stage.darkness) + rim_band * (0.34 + 0.30 * audio.beat) + crack).clamp(0.0, 1.0);
+    EdgeEnergySample {
+        amount,
+        color: Color::new(22.0 + 20.0 * audio.high, 30.0 + 18.0 * stage.hope, 64.0 + 70.0 * stage.storm),
+    }
+}
+
+fn edge_nightmare_abyss_river(
+    x: f32,
+    y: f32,
+    rim_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+    transform: EdgeNightmareTransform,
+) -> EdgeEnergySample {
+    if y < rim_y - 0.010 {
+        return EdgeEnergySample { amount: 0.0, color: Color::new(0.0, 0.0, 0.0) };
+    }
+    let depth = smoothstep(rim_y, 1.0, y);
+    let center_pull = 1.0 - smoothstep(0.05, 0.62, (x - 0.5).abs() + depth * 0.12);
+    let flow_speed = 0.10 + 0.22 * audio.bass + 0.12 * stage.abyss;
+    let ribbon_a = (x * (8.0 + depth * 32.0) + t * flow_speed + depth * 6.0).sin();
+    let ribbon_b = (x * (18.0 + depth * 58.0) - t * (flow_speed * 0.72) + depth * 9.0).sin();
+    let ribbon_c = ((x - 0.5) * (26.0 + depth * 40.0) + t * 0.060 + transform.spiral * 4.0).cos();
+    let line = (1.0 - smoothstep(0.035, 0.170, (ribbon_a * 0.55 + ribbon_b * 0.28 + ribbon_c * 0.22).abs()))
+        * center_pull;
+    let well = smoothstep(0.06, 0.74, depth) * (1.0 - smoothstep(0.72, 1.0, depth));
+    let pulse = (0.20 + 0.55 * audio.rms + 0.55 * audio.beat + 0.35 * stage.abyss).clamp(0.0, 1.35);
+    let amount = (line * well * pulse * (0.42 + 0.35 * stage.abyss)).clamp(0.0, 1.10);
+    let color_shift = (0.5 + 0.5 * (t * 0.052 + depth * 7.0).sin()).clamp(0.0, 1.0);
+    EdgeEnergySample {
+        amount,
+        color: lerp_color(
+            Color::new(142.0 + 54.0 * audio.high, 34.0 + 120.0 * stage.abyss, 16.0 + 46.0 * stage.storm),
+            Color::new(58.0 + 70.0 * stage.hope, 170.0 + 42.0 * audio.high, 250.0),
+            color_shift * (0.55 + 0.45 * stage.hope),
+        ),
+    }
+}
+
+fn edge_nightmare_roiling_fog(
+    x: f32,
+    y: f32,
+    rim_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+    transform: EdgeNightmareTransform,
+) -> f32 {
+    let edge_band = 1.0 - smoothstep(0.025, 0.260, (y - rim_y).abs());
+    let side_fog = (1.0 - smoothstep(0.05, 0.26, x)).max(smoothstep(0.74, 0.98, x));
+    let curl_x = x + 0.050 * (y * 10.0 + t * 0.048).sin() + transform.shear * 0.030;
+    let curl_y = y + 0.035 * (x * 11.0 - t * 0.038).cos() + transform.spiral * 0.014;
+    let n1 = value_noise(curl_x * 5.5 + t * 0.025, curl_y * 4.2 - t * 0.018);
+    let n2 = value_noise(x * 13.0 - t * 0.040, y * 8.0 + t * 0.022);
+    let billow = 0.5 + 0.5 * (x * 7.0 + y * 9.0 + n1 * 5.0 - t * (0.055 + 0.055 * audio.rms)).sin();
+    ((n1 * 0.10 + n2 * 0.07 + billow * 0.08) * (edge_band * 0.82 + side_fog * 0.40)
+        * (0.38 + 0.26 * stage.storm + 0.18 * audio.rms)
+        * (1.0 - 0.42 * stage.hope))
+        .clamp(0.0, 0.34)
+}
+
+fn edge_nightmare_lightning_bloom(
+    x: f32,
+    y: f32,
+    rim_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+    transform: EdgeNightmareTransform,
+) -> EdgeEnergySample {
+    let flash = (audio.beat * 0.82 + audio.high * 0.36 + stage.storm * 0.20).clamp(0.0, 1.0);
+    let sky_gate = (1.0 - smoothstep(rim_y - 0.050, rim_y + 0.025, y)).clamp(0.0, 1.0);
+    let mut branch = 0.0_f32;
+    for i in 0..5 {
+        let seed = i as f32;
+        let start = 0.14 + 0.18 * seed + 0.035 * (t * 0.070 + seed).sin();
+        let path = start
+            + 0.035 * (y * (16.0 + seed * 3.0) + t * (0.090 + seed * 0.013)).sin()
+            + 0.018 * (y * (47.0 + seed * 5.0) - t * 0.110).sin()
+            + transform.shear * 0.040;
+        let line = 1.0 - smoothstep(0.002, 0.020 + 0.020 * flash, (x - path).abs());
+        let span = smoothstep(0.020, 0.120, y) * (1.0 - smoothstep(rim_y - 0.030, rim_y + 0.035, y));
+        let fork = 0.52 + 0.48 * ((x * 43.0 + y * 31.0 + seed * 1.7).sin().abs());
+        branch = branch.max(line * span * fork);
+    }
+    let rim_flash = (1.0 - smoothstep(0.004, 0.032 + 0.020 * flash, (y - rim_y).abs()))
+        * (0.10 + 0.36 * flash + 0.18 * stage.abyss);
+    let amount = ((branch * sky_gate * (0.20 + 0.95 * flash) + rim_flash) * (0.55 + 0.55 * stage.storm)).clamp(0.0, 1.35);
+    EdgeEnergySample {
+        amount,
+        color: lerp_color(
+            Color::new(180.0, 194.0, 255.0),
+            Color::new(52.0 + 40.0 * stage.abyss, 98.0 + 50.0 * audio.high, 255.0),
+            stage.hope * 0.45,
+        ),
+    }
+}
+
+fn edge_nightmare_ash_ember(
+    x: f32,
+    y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+) -> EdgeEnergySample {
+    let cell_x = (x * 88.0).floor();
+    let cell_y = (y * 168.0 - t * (1.3 + 1.5 * audio.rms + 0.9 * stage.storm)).floor();
+    let gate = hash2(cell_x, cell_y);
+    if gate < 0.965 {
+        return EdgeEnergySample { amount: 0.0, color: Color::new(0.0, 0.0, 0.0) };
+    }
+    let lx = (x * 88.0).fract() - 0.5;
+    let ly = (y * 168.0 - t * (1.3 + 1.5 * audio.rms)).fract() - 0.5;
+    let speck = 1.0 - smoothstep(0.035, 0.260, (lx * lx + ly * ly).sqrt());
+    let rise = smoothstep(0.24, 1.0, y);
+    let amount = (speck * rise * (0.10 + 0.34 * stage.storm + 0.26 * audio.high)).clamp(0.0, 0.68);
+    EdgeEnergySample {
+        amount,
+        color: Color::new(20.0 + 36.0 * stage.hope, 78.0 + 64.0 * audio.high, 190.0 + 55.0 * stage.storm),
+    }
+}
+
+fn edge_nightmare_human_silhouettes(
+    x: f32,
+    y: f32,
+    rim_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+    transform: EdgeNightmareTransform,
+) -> EdgeSilhouetteSample {
+    let visibility = stage.human * (1.0 - 0.62 * transform.top_down);
+    let walk = t * (0.72 + 0.40 * audio.rms);
+    let central_x = 0.50 + 0.035 * (stage.descent * (t * 0.045).sin()) - 0.020 * stage.top_down;
+    let central_y = rim_y + 0.020 + 0.030 * (1.0 - stage.descent) - 0.025 * stage.hope;
+    let central = edge_one_silhouette(x, y, central_x, central_y, 1.00 + 0.18 * audio.rms, walk, visibility);
+    let left = edge_one_silhouette(
+        x,
+        y,
+        0.32 - 0.045 * (t * 0.035).sin(),
+        rim_y + 0.048,
+        0.62,
+        walk + 1.7,
+        visibility * 0.34 * (1.0 - stage.hope * 0.30),
+    );
+    let right = edge_one_silhouette(
+        x,
+        y,
+        0.69 + 0.035 * (t * 0.030).cos(),
+        rim_y + 0.040,
+        0.54,
+        walk + 3.1,
+        visibility * 0.26 * (1.0 - stage.hope * 0.40),
+    );
+    EdgeSilhouetteSample {
+        body: central.body.max(left.body).max(right.body).clamp(0.0, 1.0),
+        rim: (central.rim + left.rim * 0.65 + right.rim * 0.55).clamp(0.0, 1.0),
+    }
+}
+
+fn edge_one_silhouette(
+    x: f32,
+    y: f32,
+    cx: f32,
+    foot_y: f32,
+    scale: f32,
+    walk: f32,
+    visibility: f32,
+) -> EdgeSilhouetteSample {
+    if visibility <= 0.001 {
+        return EdgeSilhouetteSample { body: 0.0, rim: 0.0 };
+    }
+    let h = 0.152 * scale;
+    let w = 0.034 * scale;
+    let head_y = foot_y - h * 0.92;
+    let chest_y = foot_y - h * 0.56;
+    let hip_y = foot_y - h * 0.26;
+    let stride = 0.018 * scale * walk.sin();
+    let arm = 0.019 * scale * (walk + 1.4).sin();
+    let head = 1.0 - smoothstep(0.010 * scale, 0.031 * scale, ((x - cx).powi(2) + ((y - head_y) * 1.05).powi(2)).sqrt());
+    let torso = 1.0 - smoothstep(
+        0.018,
+        0.075,
+        (((x - cx) / w).powi(2) + ((y - chest_y) / (h * 0.30)).powi(2)).sqrt(),
+    );
+    let left_leg = 1.0 - smoothstep(
+        0.004 * scale,
+        0.020 * scale,
+        segment_distance(x, y, cx - 0.006 * scale, hip_y, cx - stride, foot_y),
+    );
+    let right_leg = 1.0 - smoothstep(
+        0.004 * scale,
+        0.020 * scale,
+        segment_distance(x, y, cx + 0.006 * scale, hip_y, cx + stride, foot_y),
+    );
+    let left_arm = 1.0 - smoothstep(
+        0.004 * scale,
+        0.018 * scale,
+        segment_distance(x, y, cx - 0.012 * scale, chest_y, cx - arm, hip_y + 0.010 * scale),
+    );
+    let right_arm = 1.0 - smoothstep(
+        0.004 * scale,
+        0.018 * scale,
+        segment_distance(x, y, cx + 0.012 * scale, chest_y, cx + arm, hip_y + 0.010 * scale),
+    );
+    let body = (head.max(torso).max(left_leg).max(right_leg).max(left_arm).max(right_arm) * visibility).clamp(0.0, 1.0);
+    let aura = 1.0 - smoothstep(
+        0.018 * scale,
+        0.070 * scale,
+        (((x - cx) / (w * 1.5)).powi(2) + ((y - chest_y) / (h * 0.70)).powi(2)).sqrt(),
+    );
+    EdgeSilhouetteSample {
+        body,
+        rim: (aura * visibility * 0.20 * (1.0 - body * 0.55)).clamp(0.0, 0.32),
+    }
+}
+
+fn edge_nightmare_hope_release(
+    x: f32,
+    y: f32,
+    rim_y: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: EdgeNightmareStage,
+) -> f32 {
+    if stage.hope <= 0.001 {
+        return 0.0;
+    }
+    let horizon_line = 1.0 - smoothstep(0.002, 0.022 + 0.014 * audio.beat, (y - rim_y).abs());
+    let upward = (1.0 - smoothstep(rim_y - 0.32, rim_y + 0.020, y)).clamp(0.0, 1.0);
+    let center = 1.0 - smoothstep(0.03, 0.42, (x - 0.5).abs());
+    let breath = 0.68 + 0.32 * (t * 0.070 + audio.rms * 2.0).sin().abs();
+    (stage.hope * breath * (horizon_line * 0.42 + upward * center * 0.18 + audio.beat * 0.12)).clamp(0.0, 0.90)
+}
+
+fn segment_distance(px: f32, py: f32, ax: f32, ay: f32, bx: f32, by: f32) -> f32 {
+    let vx = bx - ax;
+    let vy = by - ay;
+    let wx = px - ax;
+    let wy = py - ay;
+    let len2 = vx * vx + vy * vy;
+    let u = if len2 <= 0.000_001 {
+        0.0
+    } else {
+        ((wx * vx + wy * vy) / len2).clamp(0.0, 1.0)
+    };
+    let cx = ax + vx * u;
+    let cy = ay + vy * u;
+    ((px - cx).powi(2) + (py - cy).powi(2)).sqrt()
+}
+
+#[derive(Clone, Copy)]
+struct VicePixel {
+    color: Color,
+    glow: bool,
+    fog: f32,
+    vice: f32,
+    core: f32,
+}
+
+fn dead_memory_vice_pixel(
+    x: f32,
+    y: f32,
+    width: usize,
+    height: usize,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+) -> VicePixel {
+    let aspect = width as f32 / height as f32;
+    let cx = (x - 0.5) * aspect;
+    let cy = y - 0.50;
+    let radius = (cx * cx + cy * cy).sqrt();
+    let angle = cy.atan2(cx);
+    let stage = dead_memory_stage(phase);
+    let vocal = vocal_presence(audio);
+    let rage = (stage.rage + audio.rms * 0.46 + audio.beat * 0.32).clamp(0.0, 1.45);
+    let pressure = (stage.pressure + audio.bass * 0.45 + audio.beat * 0.34).clamp(0.0, 1.65);
+    let grief = stage.grief;
+    let hope = stage.hope;
+    let mut color = dead_memory_base(x, y, radius, t, grief, rage, hope, audio);
+    let mut glow = false;
+
+    let chamber = dead_memory_cathedral_lines(cx, cy, x, y, t, audio, pressure);
+    if chamber > 0.0 {
+        blend_add(
+            &mut color,
+            Color::new(18.0 + 20.0 * audio.high, 12.0 + 16.0 * grief, 24.0 + 52.0 * rage),
+            chamber,
+        );
+        glow = true;
+    }
+
+    let fog = dead_memory_fog(x, y, t, audio, grief, stage.release);
+    blend(
+        &mut color,
+        Color::new(26.0 + 22.0 * audio.high, 24.0 + 18.0 * vocal, 34.0 + 20.0 * grief),
+        fog,
+    );
+
+    let glass = dead_memory_rain_glass(x, y, t, audio, stage.distortion);
+    if glass > 0.0 {
+        blend_add(
+            &mut color,
+            Color::new(78.0 + 48.0 * audio.high, 42.0 + 24.0 * vocal, 62.0 + 40.0 * pressure),
+            glass,
+        );
+        glow = true;
+    }
+
+    let photos = dead_memory_photo_fragments(x, y, t, phase, audio);
+    if photos > 0.0 {
+        blend(
+            &mut color,
+            Color::new(8.0 + 18.0 * grief, 10.0 + 12.0 * rage, 20.0 + 56.0 * rage),
+            photos * 0.72,
+        );
+        blend_add(&mut color, Color::new(4.0, 42.0 + 45.0 * rage, 92.0 + 86.0 * rage), photos * 0.18);
+    }
+
+    let chalk = dead_memory_chalk_ghosts(x, y, t, phase);
+    if chalk > 0.0 {
+        blend_add(&mut color, Color::new(126.0, 128.0, 135.0), chalk * (0.30 + 0.30 * grief));
+        glow = true;
+    }
+
+    let core = dead_memory_core(cx, cy, t, phase, audio, stage);
+    if core.core > 0.0 {
+        blend_add(&mut color, core.color, core.core);
+        glow = true;
+    }
+
+    let vice = dead_memory_vice_jaws(x, y, t, phase, audio, pressure);
+    if vice.body > 0.0 {
+        blend(&mut color, Color::new(2.0, 2.4, 4.0), vice.body);
+        if vice.rim > 0.0 {
+            blend_add(
+                &mut color,
+                Color::new(6.0 + 32.0 * audio.high, 30.0 + 44.0 * pressure, 86.0 + 96.0 * rage),
+                vice.rim,
+            );
+            glow = true;
+        }
+    }
+
+    let lightning = dead_memory_lightning_cuts(cx, cy, radius, angle, t, audio, stage);
+    if lightning > 0.0 {
+        blend_add(
+            &mut color,
+            Color::new(192.0 + 54.0 * audio.high, 188.0 + 42.0 * audio.beat, 224.0 + 20.0 * rage),
+            lightning,
+        );
+        glow = true;
+    }
+
+    let ash = dead_memory_ash_field(x, y, t, audio, rage, grief);
+    if ash > 0.0 {
+        blend_add(
+            &mut color,
+            Color::new(18.0 + 46.0 * hope, 74.0 + 88.0 * rage + 60.0 * hope, 150.0 + 60.0 * rage + 70.0 * hope),
+            ash,
+        );
+        glow = true;
+    }
+
+    let fracture = dead_memory_survival_fracture(cx, cy, t, audio, hope);
+    if fracture > 0.0 {
+        blend_add(&mut color, Color::new(62.0, 192.0 + 46.0 * audio.beat, 255.0), fracture);
+        glow = true;
+    }
+
+    let vignette = smoothstep(0.32, 0.90, radius) * (0.54 + 0.18 * pressure);
+    blend(&mut color, Color::new(0.0, 0.0, 1.0), vignette);
+
+    VicePixel {
+        color,
+        glow,
+        fog,
+        vice: vice.body.max(vice.rim),
+        core: core.core,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct DeadMemoryStage {
+    name: &'static str,
+    grief: f32,
+    rage: f32,
+    pressure: f32,
+    distortion: f32,
+    hope: f32,
+    release: f32,
+}
+
+fn dead_memory_stage(phase: f32) -> DeadMemoryStage {
+    if phase < 0.105 {
+        DeadMemoryStage {
+            name: "whisper_dead_memory",
+            grief: 1.0,
+            rage: 0.05,
+            pressure: 0.08,
+            distortion: 0.18,
+            hope: 0.0,
+            release: 0.0,
+        }
+    } else if phase < 0.295 {
+        DeadMemoryStage {
+            name: "room_wakes_bitterness",
+            grief: 0.84,
+            rage: 0.34,
+            pressure: 0.28,
+            distortion: 0.26,
+            hope: 0.0,
+            release: 0.0,
+        }
+    } else if phase < 0.395 {
+        DeadMemoryStage {
+            name: "vice_reveal",
+            grief: 0.70,
+            rage: 0.58,
+            pressure: 0.56,
+            distortion: 0.46,
+            hope: 0.0,
+            release: 0.0,
+        }
+    } else if phase < 0.585 {
+        DeadMemoryStage {
+            name: "pressure_drop_truth_cuts",
+            grief: 0.48,
+            rage: 0.86,
+            pressure: 0.88,
+            distortion: 0.62,
+            hope: 0.0,
+            release: 0.0,
+        }
+    } else if phase < 0.720 {
+        DeadMemoryStage {
+            name: "fall_from_grace",
+            grief: 0.76,
+            rage: 0.62,
+            pressure: 0.70,
+            distortion: 0.72,
+            hope: 0.02,
+            release: 0.0,
+        }
+    } else if phase < 0.895 {
+        DeadMemoryStage {
+            name: "collision_core",
+            grief: 0.44,
+            rage: 1.0,
+            pressure: 1.0,
+            distortion: 0.92,
+            hope: 0.04,
+            release: 0.0,
+        }
+    } else if phase < 0.962 {
+        DeadMemoryStage {
+            name: "final_chorus_peak",
+            grief: 0.38,
+            rage: 1.0,
+            pressure: 1.0,
+            distortion: 0.86,
+            hope: 0.22,
+            release: 0.15,
+        }
+    } else {
+        DeadMemoryStage {
+            name: "outro_release",
+            grief: 0.72,
+            rage: 0.18,
+            pressure: 0.26,
+            distortion: 0.24,
+            hope: 1.0,
+            release: 1.0,
+        }
+    }
+}
+
+fn dead_memory_base(
+    x: f32,
+    y: f32,
+    radius: f32,
+    t: f32,
+    grief: f32,
+    rage: f32,
+    hope: f32,
+    audio: AudioFeature,
+) -> Color {
+    let vertical = smoothstep(0.0, 1.0, y);
+    let noise = value_noise(x * 3.0 + t * 0.010, y * 3.7 - t * 0.006);
+    let bruised = Color::new(
+        8.0 + 10.0 * grief + 6.0 * noise,
+        6.0 + 4.0 * audio.rms,
+        10.0 + 8.0 * grief,
+    );
+    let rust = Color::new(
+        3.0 + 8.0 * audio.bass,
+        5.0 + 9.0 * rage,
+        10.0 + 28.0 * rage,
+    );
+    let mut color = lerp_color(bruised, rust, vertical * (0.38 + 0.30 * rage));
+    let center = (-((radius / (0.42 + 0.10 * audio.bass)).powf(2.0))).exp();
+    blend_add(
+        &mut color,
+        Color::new(6.0 + 28.0 * hope, 10.0 + 18.0 * hope, 22.0 + 22.0 * rage + 64.0 * hope),
+        center * (0.04 + 0.18 * audio.rms + 0.16 * hope),
+    );
+    color
+}
+
+fn dead_memory_cathedral_lines(
+    cx: f32,
+    cy: f32,
+    x: f32,
+    y: f32,
+    t: f32,
+    audio: AudioFeature,
+    pressure: f32,
+) -> f32 {
+    let arch = 1.0 - smoothstep(0.012, 0.035, ((cx.abs() / 0.38).powf(2.0) + ((cy + 0.02) / 0.54).powf(2.0) - 1.0).abs());
+    let pillars = {
+        let lane = ((x * 8.0).fract() - 0.5).abs();
+        let gate = if x < 0.16 || x > 0.84 { 1.0 } else { 0.38 };
+        (1.0 - smoothstep(0.060, 0.115, lane)) * smoothstep(0.05, 0.94, y) * gate
+    };
+    let ribs = 1.0 - smoothstep(0.012, 0.040, ((y * 13.0 + t * 0.030).fract() - 0.5).abs());
+    (arch * (0.08 + 0.10 * audio.high + 0.08 * pressure)
+        + pillars * (0.035 + 0.08 * pressure)
+        + ribs * smoothstep(0.0, 0.38, y) * (0.018 + 0.06 * audio.beat))
+        .clamp(0.0, 0.52)
+}
+
+fn dead_memory_fog(x: f32, y: f32, t: f32, audio: AudioFeature, grief: f32, release: f32) -> f32 {
+    let n1 = value_noise(x * 4.0 + t * 0.020, y * 3.2 - t * 0.012);
+    let n2 = value_noise(x * 9.0 - t * 0.035, y * 6.0 + t * 0.018);
+    let floor = smoothstep(0.24, 1.0, y);
+    let center = 1.0 - smoothstep(0.05, 0.58, (x - 0.5).abs());
+    ((n1 * 0.18 + n2 * 0.10 + center * 0.10)
+        * floor
+        * (0.42 + 0.34 * grief + 0.28 * audio.rms)
+        * (1.0 - 0.55 * release))
+        .clamp(0.0, 0.46)
+}
+
+#[derive(Clone, Copy)]
+struct ViceSample {
+    body: f32,
+    rim: f32,
+}
+
+fn dead_memory_vice_jaws(x: f32, y: f32, t: f32, phase: f32, audio: AudioFeature, pressure: f32) -> ViceSample {
+    let closure = (smoothstep(0.30, 0.92, phase) * 0.74 + pressure * 0.20 + audio.bass * 0.12).clamp(0.0, 1.0);
+    let dx = (x - 0.5).abs();
+    let dy = (y - 0.48).abs();
+    let inner = 0.235 - 0.090 * closure + 0.006 * (t * 0.15).sin();
+    let outer = 0.470;
+    let vertical_gate = 1.0 - smoothstep(0.25 + 0.05 * pressure, 0.46, dy);
+    let body = smoothstep(inner, inner + 0.020, dx) * (1.0 - smoothstep(outer, outer + 0.030, dx)) * vertical_gate;
+    let rim_inner = 1.0 - smoothstep(0.004, 0.020 + 0.012 * audio.beat, (dx - inner).abs());
+    let serration = 0.52 + 0.48 * ((y * 72.0 + t * 0.18).sin().abs());
+    let top_bottom = (1.0 - smoothstep(0.010, 0.035, (dy - (0.25 + 0.04 * pressure)).abs()))
+        * (1.0 - smoothstep(0.05, 0.45, dx));
+    ViceSample {
+        body: (body * (0.86 + 0.14 * serration)).clamp(0.0, 1.0),
+        rim: ((rim_inner * vertical_gate * serration + top_bottom * 0.55)
+            * (0.22 + 0.42 * pressure + 0.20 * audio.beat))
+            .clamp(0.0, 1.0),
+    }
+}
+
+#[derive(Clone, Copy)]
+struct CoreSample {
+    core: f32,
+    color: Color,
+}
+
+fn dead_memory_core(
+    cx: f32,
+    cy: f32,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+    stage: DeadMemoryStage,
+) -> CoreSample {
+    let distortion = 1.0 + stage.distortion * 0.18 * (t * 0.22 + audio.beat).sin();
+    let dx = cx / (0.070 + 0.018 * audio.bass);
+    let dy = (cy + 0.015 * (t * 0.06).sin()) / (0.104 * distortion);
+    let ell = (dx * dx + dy * dy).sqrt();
+    let body = (1.0 - smoothstep(0.72, 1.18, ell)) * (0.30 + 0.60 * audio.rms + 0.35 * stage.pressure);
+    let ring = 1.0 - smoothstep(0.010, 0.050 + 0.015 * audio.beat, (ell - 1.0).abs());
+    let crack = dead_memory_core_cracks(cx, cy, t, phase, audio, stage);
+    let core = (body + ring * (0.22 + 0.30 * audio.beat) + crack).clamp(0.0, 1.35);
+    let red = Color::new(10.0 + 28.0 * audio.high, 46.0 + 74.0 * stage.pressure, 148.0 + 96.0 * stage.rage);
+    let hope = Color::new(56.0 + 42.0 * audio.high, 176.0 + 62.0 * stage.hope, 248.0);
+    CoreSample {
+        core,
+        color: lerp_color(red, hope, stage.hope.clamp(0.0, 1.0)),
+    }
+}
+
+fn dead_memory_core_cracks(
+    cx: f32,
+    cy: f32,
+    t: f32,
+    phase: f32,
+    audio: AudioFeature,
+    stage: DeadMemoryStage,
+) -> f32 {
+    let radius = (cx * cx + cy * cy).sqrt();
+    let angle = cy.atan2(cx);
+    let active = smoothstep(0.38, 0.94, phase) * (0.22 + 0.60 * stage.pressure + 0.32 * audio.beat);
+    let lane = 1.0 - smoothstep(0.006, 0.036, (angle * 9.0 + radius * 13.0 - t * 0.18).sin().abs());
+    let radial = smoothstep(0.015, 0.055, radius) * (1.0 - smoothstep(0.19, 0.34, radius));
+    (lane * radial * active).clamp(0.0, 0.86)
+}
+
+fn dead_memory_lightning_cuts(
+    cx: f32,
+    cy: f32,
+    radius: f32,
+    angle: f32,
+    t: f32,
+    audio: AudioFeature,
+    stage: DeadMemoryStage,
+) -> f32 {
+    let gate = (audio.beat * 0.95 + audio.high * 0.42 + phase_gate(stage.rage, 0.65, 1.1) * 0.20)
+        * smoothstep(0.38, 0.92, stage.pressure);
+    if gate <= 0.02 {
+        return 0.0;
+    }
+    let lane_count = 13.0;
+    let lane = ((angle + std::f32::consts::PI) / (std::f32::consts::PI * 2.0) * lane_count).floor();
+    let lane_angle = lane / lane_count * std::f32::consts::PI * 2.0 - std::f32::consts::PI;
+    let zig = 0.040 * (radius * 33.0 + lane * 1.7 + t * 0.95).sin();
+    let diff = angle_delta(angle + zig, lane_angle).abs();
+    let line = 1.0 - smoothstep(0.006, 0.024 + 0.018 * audio.beat, diff);
+    let reach = smoothstep(0.05, 0.18, radius) * (1.0 - smoothstep(0.78, 1.20, radius));
+    let source_bias = smoothstep(0.10, 0.60, (cx.abs() + cy.abs()).clamp(0.0, 1.0));
+    (line * reach * source_bias * gate).clamp(0.0, 1.0)
+}
+
+fn dead_memory_survival_fracture(cx: f32, cy: f32, t: f32, audio: AudioFeature, hope: f32) -> f32 {
+    if hope <= 0.01 {
+        return 0.0;
+    }
+    let bend = 0.012 * (cy * 20.0 + t * 0.12).sin();
+    let line = 1.0 - smoothstep(0.002, 0.012 + 0.010 * hope, (cx - bend).abs());
+    let vertical = smoothstep(-0.27, -0.03, cy) * (1.0 - smoothstep(0.26, 0.43, cy));
+    let pulse = 0.55 + 0.35 * audio.rms + 0.30 * audio.beat;
+    (line * vertical * hope * pulse).clamp(0.0, 1.0)
+}
+
+fn dead_memory_rain_glass(x: f32, y: f32, t: f32, audio: AudioFeature, distortion: f32) -> f32 {
+    let col = (x * 120.0).floor();
+    let gate = hash2(col, 91.0);
+    if gate < 0.82 {
+        return 0.0;
+    }
+    let local = (x * 120.0).fract();
+    let streak_x = 1.0 - smoothstep(0.020, 0.085, (local - 0.5).abs());
+    let fall = ((y * (1.8 + gate * 3.4) + t * (0.18 + 0.32 * audio.high + gate * 0.08)).fract() - 0.5).abs();
+    let bead = 1.0 - smoothstep(0.035, 0.26, fall);
+    let height = smoothstep(0.08, 0.95, y);
+    (streak_x * bead * height * distortion * (0.10 + 0.34 * audio.high)).clamp(0.0, 0.55)
+}
+
+fn dead_memory_photo_fragments(x: f32, y: f32, t: f32, phase: f32, audio: AudioFeature) -> f32 {
+    let reveal = smoothstep(0.45, 0.78, phase);
+    if reveal <= 0.0 {
+        return 0.0;
+    }
+    let gx = (x * 10.0).floor();
+    let gy = (y * 16.0).floor();
+    let gate = hash2(gx, gy + 13.0);
+    if gate < 0.86 || y < 0.30 {
+        return 0.0;
+    }
+    let lx = (x * 10.0).fract() - 0.5;
+    let ly = (y * 16.0).fract() - 0.5;
+    let drift = 0.05 * (t * 0.04 + gate * 7.0).sin();
+    let rect = (1.0 - smoothstep(0.16, 0.30, (lx + drift).abs()))
+        * (1.0 - smoothstep(0.13, 0.26, ly.abs()));
+    let charred = 0.45 + 0.55 * value_noise(x * 28.0 + t * 0.04, y * 28.0 - t * 0.03);
+    (rect * charred * reveal * (0.18 + 0.16 * audio.bass)).clamp(0.0, 0.42)
+}
+
+fn dead_memory_chalk_ghosts(x: f32, y: f32, t: f32, phase: f32) -> f32 {
+    let floor = smoothstep(0.56, 1.0, y);
+    if floor <= 0.0 {
+        return 0.0;
+    }
+    let centers = [(0.30, 0.72), (0.68, 0.76), (0.50, 0.86)];
+    let mut sum = 0.0_f32;
+    for (index, (cx, cy)) in centers.iter().enumerate() {
+        let wobble = 0.010 * (t * 0.035 + index as f32).sin();
+        let dx = (x - *cx - wobble) / (0.080 + index as f32 * 0.010);
+        let dy = (y - *cy) / (0.034 + index as f32 * 0.005);
+        let ell = (dx * dx + dy * dy).sqrt();
+        let line = 1.0 - smoothstep(0.030, 0.155, (ell - 1.0).abs());
+        sum += line * (0.22 + 0.18 * smoothstep(0.0, 0.55, phase));
+    }
+    (sum * floor).clamp(0.0, 0.42)
+}
+
+fn dead_memory_ash_field(x: f32, y: f32, t: f32, audio: AudioFeature, rage: f32, grief: f32) -> f32 {
+    let cell_x = (x * 95.0).floor();
+    let cell_y = (y * 160.0).floor();
+    let gate = hash2(cell_x, cell_y);
+    if gate < 0.965 {
+        return 0.0;
+    }
+    let speed = 0.025 + 0.080 * audio.high + 0.050 * rage;
+    let drift = (t * speed + gate * 13.0).fract();
+    let lx = (x * 95.0).fract() - 0.5 + 0.16 * (t * 0.07 + gate).sin();
+    let ly = ((y * 160.0 + drift * 6.0).fract()) - 0.5;
+    let dot = 1.0 - smoothstep(0.035, 0.36, (lx * lx + ly * ly).sqrt());
+    let height = smoothstep(0.18, 0.92, y) * (1.0 - smoothstep(0.98, 1.0, y));
+    (dot * height * (0.08 + 0.44 * rage + 0.18 * grief + 0.24 * audio.beat)).clamp(0.0, 0.70)
+}
+
 #[derive(Clone, Copy)]
 struct MemoryPixel {
     color: Color,
@@ -3906,10 +6264,37 @@ fn process_memory_snapshot() -> (u64, u64) {
     }
 }
 
+fn manifest_claim_for_args(args: &Args) -> &'static str {
+    if (args.scene_mode == "edge_nightmare_world" || args.scene_mode == "edge_nightmare")
+        && args.shot_type == "wide_edge_intro"
+    {
+        return "12-second Edge Of The World depth proof: readable subject, visible cliff plane, separated background/midground/foreground layers, slow push only, no lightning, no distortion, no fast transform switching";
+    }
+    manifest_claim(&args.scene_mode)
+}
+
+fn scene_motifs_for_args(args: &Args) -> &'static str {
+    if (args.scene_mode == "edge_nightmare_world" || args.scene_mode == "edge_nightmare")
+        && args.shot_type == "wide_edge_intro"
+    {
+        return "[\"background void sky\", \"thin horizon world-edge glow\", \"midground abyss or sea\", \"hard subject silhouette plane\", \"foreground cliff rim\", \"low foreground atmosphere\", \"locked slow push\", \"depth parallax only\"]";
+    }
+    scene_motifs_json(&args.scene_mode)
+}
+
 fn manifest_claim(scene_mode: &str) -> &'static str {
     match scene_mode {
         "memory_cathedral" | "fade_away_memory_cathedral" => {
             "deterministic synthetic state-media render for ambient memory, dream collapse, absence, voice light, and inward fade"
+        }
+        "daughter_star_locket_sea" | "star_locket_sea" => {
+            "deterministic synthetic state-media render for a father-daughter grief bond using star light, cracked heart locket, black water, reflection, chain, fog, tear ripples, and gold-white hope"
+        }
+        "edge_nightmare_world" | "edge_nightmare" => {
+            "deterministic synthetic state-media render for Edge Of The World nightmare using cliff-rim state, shifting POV, human silhouettes, abyss river, lightning bloom, roiling edge fog, and final hope release"
+        }
+        "dead_memory_vice_chamber" | "vice_chamber" => {
+            "deterministic synthetic state-media render for heartbreak, deception, mechanical vice pressure, memory-core fracture, fog, ash, lightning bloom, and survival release"
         }
         "state_presentation" | "truevision_state_presentation" => {
             "deterministic state presentation by TrueVision Labs explaining state media, validated packets, manifests, receipts, and credits"
@@ -3934,6 +6319,15 @@ fn scene_motifs_json(scene_mode: &str) -> &'static str {
     match scene_mode {
         "memory_cathedral" | "fade_away_memory_cathedral" => {
             "[\"near-black blue memory field\", \"soft doorway depth windows\", \"central human absence\", \"paired voice light fields\", \"inward memory particles\", \"dream snap collapse\", \"outro heart sink\"]"
+        }
+        "daughter_star_locket_sea" | "star_locket_sea" => {
+            "[\"midnight water reflection\", \"daughter star glow\", \"cracked father heart locket\", \"perspective depth plane\", \"dimensional heart locket shading\", \"unbroken chain arc\", \"controlled roiling fog field\", \"tear ripple field\", \"distant horizon blue\", \"gold-white hope fill\"]"
+        }
+        "edge_nightmare_world" | "edge_nightmare" => {
+            "[\"nightmare cliff rim\", \"shifting camera POV\", \"human silhouettes\", \"top-down abyss look\", \"falling camera spiral\", \"river of color below\", \"roiling edge fog\", \"branching lightning bloom\", \"ash and ember drift\", \"gold-white hope release\"]"
+        }
+        "dead_memory_vice_chamber" | "vice_chamber" => {
+            "[\"black industrial cathedral machine\", \"black iron vice jaws\", \"cracked memory core\", \"cold density fog\", \"chalk outline ghosts\", \"burned photo fragments\", \"rain glass distortion\", \"white lightning truth cuts\", \"ember ash memory bleed\", \"thin gold-white survival fracture\"]"
         }
         "state_presentation" | "truevision_state_presentation" => {
             "[\"state fields\", \"validated state packets\", \"system harness nodes\", \"temporal bridge\", \"manifest receipts\", \"third-party credits\", \"calm narration\"]"
@@ -4013,7 +6407,9 @@ fn write_manifest(
             "    \"crf\": {},\n",
             "    \"bitrate\": \"{}\",\n",
             "    \"render_threads\": {},\n",
-            "    \"state_log_every\": {}\n",
+            "    \"state_log_every\": {},\n",
+            "    \"shot_type\": \"{}\",\n",
+            "    \"chaos_budget\": {:.6}\n",
             "  }},\n",
             "  \"audio\": {{\n",
             "    \"path\": {},\n",
@@ -4040,7 +6436,7 @@ fn write_manifest(
         ),
         json_escape(&args.run_id),
         unix_now(),
-        json_escape(manifest_claim(&args.scene_mode)),
+        json_escape(manifest_claim_for_args(args)),
         json_escape(&video_path.display().to_string()),
         json_escape(&visual_path.display().to_string()),
         json_escape(&state_path.display().to_string()),
@@ -4054,6 +6450,8 @@ fn write_manifest(
         json_escape(&args.bitrate),
         args.render_threads,
         args.state_log_every,
+        json_escape(&args.shot_type),
+        args.chaos_budget,
         match &args.audio {
             Some(path) => format!("\"{}\"", json_escape(&path.display().to_string())),
             None => "null".to_string(),
@@ -4063,7 +6461,7 @@ fn write_manifest(
         args.audio.is_some() && args.mux_audio,
         json_escape(&args.scene_mode),
         json_escape(&args.palette),
-        scene_motifs_json(&args.scene_mode),
+        scene_motifs_for_args(args),
         avg_fog,
         avg_occluded,
         avg_glow,
