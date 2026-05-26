@@ -27,6 +27,7 @@ from truevision_runtime.learning_intake.youtube_cdp import (
     evaluate_on_first_page,
     navigate_first_page,
 )
+from truevision_runtime.learning_intake.lightfield_focus import write_state_focus_lens_from_capture
 from truevision_runtime.learning_intake.youtube_metadata import fetch_youtube_metadata
 
 
@@ -284,6 +285,7 @@ def execute_batch(
     load_wait_seconds: float,
     close_browser: bool,
     devtools_port: int,
+    state_focus_lens: bool,
 ) -> dict[str, Any]:
     storage_root = run_root / "storage"
     capture_root = run_root / "captures"
@@ -350,6 +352,17 @@ def execute_batch(
                     raise RuntimeError(f"source video state could not be read after capture: {after_state}")
                 source_time_delta = float(after_state.get("currentTime") or 0.0) - float(before_state.get("currentTime") or 0.0)
                 manifest_path = _find_capture_manifest(capture_root, sample_run_id)
+                focus_result: dict[str, Any] | None = None
+                if state_focus_lens:
+                    focus_result = write_state_focus_lens_from_capture(
+                        {
+                            "manifest": str(manifest_path),
+                            "element_id": source["element_id"],
+                            "run_id": sample_run_id,
+                            "max_frames": 180,
+                        },
+                        storage_root=storage_root,
+                    )
                 profile = _profile_capture(
                     manifest_path=manifest_path,
                     element_id=source["element_id"],
@@ -389,6 +402,7 @@ def execute_batch(
                     "visual_motion_score": round(visual_motion_score, 6),
                     "source_video_before": before_state,
                     "source_video_after": after_state,
+                    "state_focus_lens": focus_result,
                     "six_one_six_windows": profile["six_one_six_windows"],
                     "purge": profile["purge"],
                     "remaining_tvcells": len(remaining_chunks),
@@ -450,6 +464,7 @@ def main() -> int:
     parser.add_argument("--metadata-timeout", type=float, default=15.0)
     parser.add_argument("--load-wait-seconds", type=float, default=8.0)
     parser.add_argument("--devtools-port", type=int, default=9223)
+    parser.add_argument("--state-focus-lens", action="store_true", help="Build State Focus Lens profile before teacher chunks are purged.")
     parser.add_argument("--no-close-browser", action="store_true")
     args = parser.parse_args()
 
@@ -509,6 +524,7 @@ def main() -> int:
         load_wait_seconds=args.load_wait_seconds,
         close_browser=not args.no_close_browser,
         devtools_port=args.devtools_port,
+        state_focus_lens=bool(args.state_focus_lens),
     )
     _console(
         "\ncomplete: "

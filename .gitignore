@@ -47,7 +47,7 @@ storage/tmp/**
 !storage/tmp/.gitkeep
 storage/screenshots/**
 !storage/screenshots/.gitkeep
-storage/config/coordinate_maps/youtube_intake_map.json
+storage/config/coordinate_maps/*.json
 
 *.log
 video ref.png

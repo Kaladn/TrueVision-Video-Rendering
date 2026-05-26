@@ -310,6 +310,7 @@ throwaway scripts.
 | Spectrum/Audio-Reactive City Tool | Maps audio pressure to skyline, windows, glow, fog, and beat-synced frame pressure. |
 | Atmosphere Capture Profiler | Reads native `.tvcells` captures and derives fog/mist/cloud/rain-glass profiles with 6-1-6 windows. |
 | Weather / Atmosphere Toolset | Creates reusable state tools for fog, mist, cloud volume, and rain drops on glass. |
+| TruDepth Contract Layer | Defines Volumetric State Field, Effect State Profile, Effect State Transform, and the TruDepth Logging Array contracts. |
 | Source-Surface Capture Planner | Builds deterministic approved-source capture plans where recording starts before play and stops from source video time. |
 | Source-Surface Multi-Sample Planner | Splits large approved videos into four section samples so the system learns across the source without retaining bulky teacher state. |
 | Source-Surface Video-State Receipt | Verifies canonical address-bar navigation, resolved URL/title/duration, nonblank state, profile creation, and teacher-state purge before capture can count. |
@@ -361,6 +362,26 @@ This lane turns reference captures and successful experiments into reusable
 state tools. It is not object detection and it is not a fluid simulator yet.
 It produces deterministic state profiles that renderers can consume.
 
+TruDepth law:
+
+```text
+Copy behavior, not pixels.
+Transform state, not identity.
+Validate before render.
+```
+
+The machine-readable TruDepth contract lives at:
+
+```text
+truevision_runtime/learning_intake/trudepth_contracts.py
+```
+
+The human contract is documented at:
+
+```text
+docs/TRUDEPTH_LAW_AND_CONTRACTS.md
+```
+
 Current elements:
 
 ```text
@@ -384,6 +405,30 @@ droplet_density
 droplet_streak
 refraction
 surface_wetness
+```
+
+TruDepth logging-array channels:
+
+```text
+density_slice_near
+density_slice_mid
+density_slice_far
+density_delta
+depth_layer
+depth_confidence
+occlusion_pressure
+light_scatter
+bloom_bleed
+reveal_rate
+edge_recovery
+contrast_recovery
+texture_birth
+motion_parallax
+parallax_direction_16
+angular_energy_16
+softness
+persistence_frames
+validation_flags
 ```
 
 Capture-learning flow:
@@ -524,6 +569,7 @@ python scripts\truevision_atmosphere_tools.py create `
 | --- | --- | --- | --- |
 | Signature profile extractor | `scripts/truevision_signature_profile_extract.py` | exists | Extracts motion/look profiles from captured state. |
 | Lightning/flash extractor | `scripts/truevision_extract_lightning_signature.py` | exists | Extracts 6-1-6 peak hot-cell lighting signatures. |
+| Meter Grid | `scripts/truevision_meter_grid.py` | exists | Extracts cell meter summaries, candidate event profiles, PNG tuning graphs, and section-ranking support. |
 | Edge projection | `scripts/truevision_project_edge_from_capture.py` | exists | Projects capture dynamics across Edge Of The World audio. |
 | TrueFrameGen fill | `scripts/trueframegen_fill.py` | exists | Fills missing frames from surrounding state. |
 | TrueFrameGen upsample | `scripts/trueframegen_upsample.py` | exists | Generates in-between state frames inside the source timeline for higher FPS playback. |

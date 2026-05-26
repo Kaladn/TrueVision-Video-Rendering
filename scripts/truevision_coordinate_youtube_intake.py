@@ -16,6 +16,7 @@ from truevision_runtime.learning_intake.coordinate_surface import (
     validate_coordinate_map,
 )
 from truevision_runtime.learning_intake.youtube_metadata import fetch_youtube_metadata
+from truevision_runtime.learning_intake.meter_grid import write_meter_grid_from_capture
 from truevision_runtime.learning_intake.source_surface import build_source_surface_multi_sample_plan
 from truevision_youtube_learning_intake_batch import (
     NATIVE_CAPTURE_EXE,
@@ -309,6 +310,17 @@ def _execute_sample(
     manifest_path = _find_capture_manifest(run_root / "captures", sample_run_id)
     profile: dict[str, Any] | None = None
     try:
+        meter_result = write_meter_grid_from_capture(
+            {
+                "manifest": str(manifest_path),
+                "run_id": sample_run_id,
+                "section_id": sample_run_id,
+                "event_type_candidate": "candidate_lightning",
+                "max_frames": 180,
+                "sample_stride": 1,
+            },
+            storage_root=storage_root,
+        )
         profile = _profile_capture(
             manifest_path=manifest_path,
             element_id=str(source["element_id"]),
@@ -352,6 +364,7 @@ def _execute_sample(
         "sampled_frames": profile["sampled_frames"],
         "visual_motion_score": round(visual_motion_score, 6),
         "six_one_six_windows": profile["six_one_six_windows"],
+        "meter_grid": meter_result,
         "purge": profile["purge"],
         "remaining_tvcells": len(remaining_chunks),
     }

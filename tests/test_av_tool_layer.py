@@ -30,6 +30,7 @@ class AVToolLayerTests(unittest.TestCase):
         self.assertIn("template_from_audio_signals", names)
         self.assertIn("video_render_preview", names)
         self.assertIn("template_patch", names)
+        self.assertIn("meter_grid_from_capture", names)
         self.assertNotIn("filesystem_delete", names)
         self.assertNotIn("browser_open", names)
         self.assertNotIn("security_enforce", names)

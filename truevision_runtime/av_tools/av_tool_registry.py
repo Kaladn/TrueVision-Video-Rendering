@@ -55,6 +55,7 @@ AV_TOOLS: tuple[AVToolSpec, ...] = (
     AVToolSpec("source_surface_multi_sample_plan", "Prepare four-section sampling plans for long approved videos so intake learns multiple sections without hoarding source state.", 1, "high", "multi-sample plan + receipt"),
     AVToolSpec("source_surface_video_state_receipt", "Verify an approved source really loaded video state before a capture can count as complete.", 1, "high", "verified video-state receipt"),
     AVToolSpec("element_creation_profile_from_capture", "Convert temporary teacher capture state into a compact creation signature, then optionally purge bulky observed state.", 1, "high", "creation profile + purge receipt"),
+    AVToolSpec("meter_grid_from_capture", "Extract measured cell meters, event profiles, and tuning graphs from native TrueVision capture state.", 1, "high", "meter profile + event graphs + receipt"),
     AVToolSpec("frame_diff_replay_accuracy", "Compare source and regen manifests or state artifacts for replay drift.", 1, "medium", "accuracy report"),
     AVToolSpec("manifest_browser", "Browse AV render/capture manifests.", 1, "medium", "manifest listing"),
     AVToolSpec("render_preset_library", "List, load, save, and promote reusable render presets.", 1, "high", "preset library result"),

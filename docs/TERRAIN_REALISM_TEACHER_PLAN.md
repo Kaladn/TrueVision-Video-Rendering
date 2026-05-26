@@ -160,6 +160,46 @@ At thumbnail size, viewer understands:
 person standing on cliff edge over abyss/ocean.
 ```
 
+## Metered Section Choice
+
+Long-video movement must be goal-directed:
+
+```text
+probe section
+-> build meter grid
+-> score target signature
+-> rank next sections
+-> controller moves only with a meter reason
+```
+
+Metered section choice is not browser control by itself. It produces a ranked
+plan for a human-owned controller/agent:
+
+```text
+section_id
+target_signature
+score
+recommended_action
+meter_reasons
+rejection_reasons
+frame_peak
+cell_bounds
+```
+
+Current first target:
+
+```text
+candidate_lightning
+```
+
+Hard laws:
+
+```text
+No meter, no section choice.
+No graph, no tuning.
+No receipt, no success claim.
+```
+
 ## Future Logger Lanes
 
 Parked for later:

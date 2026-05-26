@@ -4,10 +4,102 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from truevision_coordinate_youtube_intake import main
+from truevision_coordinate_youtube_intake import _execute_sample, main
 
 
 class CoordinateYoutubeIntakeScriptTests(unittest.TestCase):
+    def test_execute_sample_writes_meter_grid_before_profile_purge(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            run_root = root / "run"
+            sample_run_id = "metered_sample"
+            capture_dir = run_root / "captures" / sample_run_id
+            capture_dir.mkdir(parents=True)
+            manifest = capture_dir / f"{sample_run_id}_manifest.json"
+            manifest.write_text("{}", encoding="utf-8")
+            calls = []
+
+            class FakeProcess:
+                returncode = 0
+
+                def communicate(self, timeout):
+                    calls.append(("capture", timeout))
+                    return "", ""
+
+            def fake_meter(args, *, storage_root):
+                calls.append(("meter", Path(args["manifest"]).name))
+                return {
+                    "profile_json": str(root / "meter.json"),
+                    "receipt_json": str(root / "meter_receipt.json"),
+                    "graphs": {"luma_curve.png": str(root / "luma_curve.png")},
+                    "event_status": "visually_supported",
+                }
+
+            def fake_profile(*, manifest_path, element_id, run_id, storage_root):
+                calls.append(("profile", Path(manifest_path).name))
+                profile_path = root / "profile.json"
+                profile_path.write_text("{}", encoding="utf-8")
+                return {
+                    "profile_json": str(profile_path),
+                    "profile_sha256": "sha256:abc",
+                    "receipt_json": str(root / "profile_receipt.json"),
+                    "sampled_frames": 8,
+                    "creation_signature": {
+                        "transition_behavior": {"motion_mean": 0.1, "motion_abs_mean": 0.1},
+                        "shape_behavior": {"center_drift_xy": [0.0, 0.0]},
+                        "growth_decay": {"volatility": 0.0},
+                    },
+                    "six_one_six_windows": 0,
+                    "purge": {"status": "purged", "deleted_bytes": 1},
+                }
+
+            sample_entry = {
+                "source": {
+                    "source_order": 1,
+                    "category": "Lightning",
+                    "element_id": "lightning_arc_bloom",
+                    "video_id": "abc123",
+                    "source_url": "https://www.youtube.com/watch?v=abc123",
+                },
+                "sample": {
+                    "sample_index": 1,
+                    "sample_navigation_url": "https://www.youtube.com/watch?v=abc123&t=0s",
+                    "duration_seconds": 1.0,
+                },
+                "sample_run_id": sample_run_id,
+                "coordinate_plan": {"native_capture_command": ["python", "-c", "pass"]},
+            }
+            coordinate_map = {
+                "map_id": "temp",
+                "map_sha256": "sha256:abc123",
+                "capture_region": [0, 0, 100, 100],
+                "points": {"address_bar": [1, 1], "video_play": [2, 2]},
+            }
+            patches = [
+                patch("truevision_coordinate_youtube_intake._paste_url_in_existing_browser"),
+                patch("truevision_coordinate_youtube_intake._mouse_click"),
+                patch("truevision_coordinate_youtube_intake.subprocess.Popen", return_value=FakeProcess()),
+                patch("truevision_coordinate_youtube_intake._find_capture_manifest", return_value=manifest),
+                patch("truevision_coordinate_youtube_intake.write_meter_grid_from_capture", fake_meter),
+                patch("truevision_coordinate_youtube_intake._profile_capture", fake_profile),
+            ]
+            for p in patches:
+                p.start()
+                self.addCleanup(p.stop)
+
+            result = _execute_sample(
+                sample_entry,
+                coordinate_map=coordinate_map,
+                run_root=run_root,
+                storage_root=root / "storage",
+                load_wait_seconds=0.0,
+                pre_play_seconds=0.0,
+            )
+
+        self.assertEqual([item[0] for item in calls], ["capture", "meter", "profile"])
+        self.assertEqual(result["meter_grid"]["event_status"], "visually_supported")
+        self.assertIn("luma_curve.png", result["meter_grid"]["graphs"])
+
     def test_execute_max_samples_limits_work_after_queue_build(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

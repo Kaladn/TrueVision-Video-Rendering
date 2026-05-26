@@ -4,6 +4,37 @@ TrueVision Video Rendering is an experimental local system for recording visual 
 
 The project is source-first. Generated media, capture chunks, manifests, reports, and run artifacts are intentionally excluded from the repository.
 
+## Start Here
+
+TrueVision is a local state-machine tool stack.
+
+```text
+TrueVision records state.
+AnchorWorks interprets meaning.
+SecureCore proves safety.
+```
+
+Run the local prerequisite and repo-health check:
+
+```powershell
+python scripts\truevision_preflight.py
+```
+
+For machine-readable output:
+
+```powershell
+python scripts\truevision_preflight.py --json
+```
+
+Read the current product map:
+
+```text
+docs/TRUEVISION_LOCAL_PRODUCT_MAP.md
+docs/ACTIVE_TOOL_SURFACE.md
+docs/PARKED_EXPERIMENTS.md
+docs/TRUEVISION_RECEIPT_AND_MANIFEST_RULES.md
+```
+
 ## Core Boundary
 
 ```text
@@ -57,6 +88,8 @@ The machine can still output pixels, but pixels are the final delivery format,
 not the main reasoning system.
 ```
 
+Generation is a proof/output lane. It is not the center of the product.
+
 ## Scientific Summary
 
 TrueVision represents video as time-ordered visual state rather than as a prompt-only media product. A capture maps observed frames into addressed cell tensors containing channels such as color, luminance, edge density, texture energy, motion energy, and temporal deltas. TrueFrameGen then reconstructs higher-rate video by estimating transition fields between known states.
@@ -103,6 +136,15 @@ truevision_runtime/           AV tools, document state, storage, renderer, and L
 ui/                           Local studio HTML
 storage/                      Ignored runtime lanes with tracked placeholders
 outputs/                      Ignored generated output lane
+```
+
+Current stabilization docs:
+
+```text
+docs/TRUEVISION_LOCAL_PRODUCT_MAP.md
+docs/TRUEVISION_TO_ANCHORWORKS_PACKET_CONTRACT.md
+docs/TRUEVISION_SECURECORE_SAFETY_BOUNDARY.md
+docs/TRUEVISION_RECEIPT_AND_MANIFEST_RULES.md
 ```
 
 ## Studio Presets

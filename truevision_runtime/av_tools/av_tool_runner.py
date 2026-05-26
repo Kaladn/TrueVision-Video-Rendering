@@ -30,6 +30,7 @@ from truevision_runtime.learning_intake.source_surface import (
     write_source_surface_video_state_receipt,
 )
 from truevision_runtime.learning_intake.element_creation_profile import write_element_creation_profile_from_capture
+from truevision_runtime.learning_intake.meter_grid import write_meter_grid_from_capture
 from truevision_runtime.studio.studio_tooling import (
     build_studio_tool_plan,
     get_render_preset,
@@ -831,6 +832,8 @@ def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> di
         return write_source_surface_video_state_receipt(args, storage_root=storage_root)
     if tool == "element_creation_profile_from_capture":
         return write_element_creation_profile_from_capture(args, storage_root=storage_root)
+    if tool == "meter_grid_from_capture":
+        return write_meter_grid_from_capture(args, storage_root=storage_root)
     if tool == "frame_diff_replay_accuracy":
         return _frame_diff_replay_accuracy(args)
     if tool == "manifest_browser":

@@ -95,6 +95,9 @@ trueframegen_stream_rs
 truevision_weird_occlusion_rs
 ```
 
+Compiled binaries are build/runtime artifacts only. They are not repository
+truth and must not be committed.
+
 Why it exists:
 
 Python was too slow for sustained capture and full-length render loops. Rust

@@ -14,6 +14,30 @@ Render pixels last.
 Prove every run.
 ```
 
+## Stack Boundary
+
+```text
+TrueVision is a local usable stack, not a platform backend.
+Generation is an output lane, not the whole purpose.
+New ideas enter as bounded workers with contracts, tests, manifests, and receipts.
+No worker becomes a platform until local repeatability proves it needs one.
+```
+
+The stack exists to make media state usable by later tooling:
+
+```text
+capture/log
+-> meter
+-> profile
+-> transform
+-> validate
+-> render or export
+-> receipt
+```
+
+Platform-style plans, account systems, remote orchestration, and browser-control
+detours stay out unless a proven local worker cannot operate without them.
+
 ## Current Live Abilities
 
 ```text
@@ -31,6 +55,15 @@ local studio/server exists
 generated media remains out of git
 ```
 
+Timing lock:
+
+```text
+Frame index and FPS are the clock.
+Wall time is performance, not timeline truth.
+Full-frame downstream tooling requires state_log_every = 1.
+Sampled logs may be exact, but they are not full-frame truth.
+```
+
 ## Parked Or Separate
 
 ```text
@@ -39,6 +72,7 @@ AnchorWorks may consume symbols/state later, not raw audio.
 SecureCore may gate retention later, not own audio replay.
 UI product work is parked.
 Generated videos/audio/state artifacts are local outputs, not repo truth.
+Platform backend work is parked.
 ```
 
 ## Current Staged Work

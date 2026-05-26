@@ -179,6 +179,26 @@ class DevToolsClient:
         return payload.decode("utf-8", errors="replace")
 
 
+def select_devtools_page(pages: list[dict[str, Any]]) -> dict[str, Any] | None:
+    candidates = [
+        page
+        for page in pages
+        if page.get("type") == "page" and page.get("webSocketDebuggerUrl")
+    ]
+    if not candidates:
+        return None
+    for page in candidates:
+        url = str(page.get("url") or "")
+        if "youtube.com/watch" in url or "youtube.com/shorts" in url:
+            return page
+    for page in candidates:
+        url = str(page.get("url") or "")
+        if url.startswith("http://") or url.startswith("https://"):
+            if "chrome-extension" not in url and "dc-chrome-extension" not in url:
+                return page
+    return candidates[0]
+
+
 def wait_for_devtools_page(port: int, *, timeout_seconds: float = 15.0) -> dict[str, Any]:
     deadline = time.monotonic() + timeout_seconds
     last_error: Exception | None = None
@@ -186,9 +206,9 @@ def wait_for_devtools_page(port: int, *, timeout_seconds: float = 15.0) -> dict[
         try:
             with urllib.request.urlopen(f"http://127.0.0.1:{port}/json", timeout=1.5) as response:
                 pages = json.loads(response.read().decode("utf-8", errors="replace"))
-            for page in pages:
-                if page.get("type") == "page" and page.get("webSocketDebuggerUrl"):
-                    return page
+            page = select_devtools_page(pages)
+            if page is not None:
+                return page
         except Exception as exc:  # noqa: BLE001 - retry until browser exposes the endpoint.
             last_error = exc
         time.sleep(0.25)

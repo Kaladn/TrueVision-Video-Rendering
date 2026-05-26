@@ -5,6 +5,11 @@
 - [x] Keep generated media and run artifacts out of git.
 - [x] Keep runtime storage directories as placeholders only.
 - [x] Keep the project scoped to audio/video state media.
+- [x] Park platform-style backend plans; TrueVision is a local usable stack first.
+- [x] Treat new ideas as bounded workers until contracts, tests, manifests, and receipts prove them.
+- [x] Lock generation POC as an output lane, not the product center.
+- [x] Add local product map, active tool surface, parked experiment map, and AW/SC boundary contracts.
+- [x] Add `scripts/truevision_preflight.py` for non-mutating local prerequisite checks.
 - [ ] Add a `CONTRIBUTING.md`.
 - [ ] Add a license after ownership and release intent are decided.
 - [ ] Add CI for Python tests and Rust build.
@@ -179,6 +184,7 @@
 - [x] Unit tests cover core Python modules.
 - [x] Rust build has been proven locally.
 - [x] Full-song QSV/32-thread render produced per-frame deterministic state records.
+- [x] Add saved timeline audit for frame/FPS timing integrity across state logs.
 - [ ] Add small fixture capture for reproducible tests.
 - [ ] Add benchmark command for capture FPS, frame time, CPU, and RAM.
 - [ ] Add generated-video quality metrics that do not require external services.

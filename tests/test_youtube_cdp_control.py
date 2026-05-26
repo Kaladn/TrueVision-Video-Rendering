@@ -3,6 +3,7 @@ import unittest
 from truevision_runtime.learning_intake.youtube_cdp import (
     build_video_play_expression,
     build_video_state_expression,
+    select_devtools_page,
 )
 
 
@@ -25,6 +26,24 @@ class YouTubeCdpControlTests(unittest.TestCase):
         self.assertIn("location.href", expression)
         self.assertIn("paused", expression)
         self.assertIn("readyState", expression)
+
+    def test_select_devtools_page_prefers_youtube_over_extension_pages(self):
+        pages = [
+            {
+                "type": "page",
+                "url": "https://acrobat.adobe.com/dc-chrome-extension/mv/en_US/Acrobat-for-Edge.pdf",
+                "webSocketDebuggerUrl": "ws://127.0.0.1/ext",
+            },
+            {
+                "type": "page",
+                "url": "https://www.youtube.com/watch?v=kYnRKOgZulU",
+                "webSocketDebuggerUrl": "ws://127.0.0.1/youtube",
+            },
+        ]
+
+        selected = select_devtools_page(pages)
+
+        self.assertEqual(selected["webSocketDebuggerUrl"], "ws://127.0.0.1/youtube")
 
 
 if __name__ == "__main__":

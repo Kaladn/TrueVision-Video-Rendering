@@ -23,6 +23,7 @@ packages = [
   "truevision_runtime.av_tools",
   "truevision_runtime.document_state",
   "truevision_runtime.llm_adapter",
+  "truevision_runtime.learning_intake",
   "truevision_runtime.rendering",
   "truevision_runtime.state_patterns",
   "truevision_runtime.studio",
