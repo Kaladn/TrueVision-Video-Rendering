@@ -173,6 +173,27 @@ class TrueVisionStateMediaStudioHtmlTests(unittest.TestCase):
         self.assertIn("render_preset_library", html)
         self.assertIn("local_qwen_controller", html)
 
+    def test_html_has_draft_only_tv_ta_forge_surface(self):
+        html = HTML.read_text(encoding="utf-8")
+
+        self.assertIn('data-value="forge"', html)
+        self.assertIn("TV/TA Forge is draft-only", html)
+        self.assertIn("canonical_chat_row_v1", html)
+        self.assertIn("tv_ta_local_draft_candidate_v1", html)
+        self.assertIn('target_system: "SecureCore"', html)
+        self.assertIn('speaker_kind: "truevision_tool_ui"', html)
+        self.assertIn("tool_shape_request", html)
+        self.assertIn("worker_shape_request", html)
+        self.assertIn("execution_allowed: false", html)
+        self.assertIn("file_write_allowed: false", html)
+        self.assertIn("activation_allowed: false", html)
+        self.assertIn("memory_promotion_allowed: false", html)
+        self.assertIn("securecore_gate_required_for_operation: true", html)
+        self.assertIn("local_surface_only: true", html)
+        self.assertIn("No file write, no execution, no worker activation", html)
+        self.assertIn('if (isForgeMode()) {\n          shapeForgePacket();\n          return;', html)
+        self.assertIn('"downloadConfig"', html)
+
 
 if __name__ == "__main__":
     unittest.main()

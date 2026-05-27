@@ -1,0 +1,46 @@
+{
+  "agent_id": "truevision_consensus_reasoning_agent",
+  "id": "truevision_consensus_reasoning_agent",
+  "catalog_id": "truevision_consensus_reasoning_agent",
+  "name": "TrueVision Consensus Reasoning Agent",
+  "version": "0.1.0",
+  "description": "Read candidate packets from TrueVision workers and produce a candidate-only consensus decision for operator review.",
+  "runtime_language": "python",
+  "entrypoint": "AGENTS/truevision-agents/truevision_consensus_reasoning_agent.py",
+  "entrypoint_hash": "sha256:68cbee824383482a7b7cefbf7d51b1cd09fb31703fc8e10849c66f8dc9ca89ce",
+  "allowed_reads": [
+    "AGENTS/truevision-agents",
+    "runtime",
+    "reports",
+    "storage"
+  ],
+  "allowed_writes": [
+    "AGENTS/truevision-agents/runtime"
+  ],
+  "requires_approval": false,
+  "approval_phrase": "",
+  "mutation_class": "report_only",
+  "dry_run_supported": true,
+  "log_stream": "agent_decision",
+  "test_command": [
+    "python",
+    "-m",
+    "unittest",
+    "securecore.live_agents.AGENTS.tests.test_securecore_agent_runner"
+  ],
+  "risk_tier": 1,
+  "prompt_only_allowed": false,
+  "required_params": [
+    "candidate_packets"
+  ],
+  "default_out_dir": "AGENTS/truevision-agents/runtime",
+  "command": [
+    "python",
+    "AGENTS/truevision-agents/truevision_consensus_reasoning_agent.py",
+    "--candidate-packets",
+    "{candidate_packets}",
+    "--out-dir",
+    "{out_dir}"
+  ]
+}
+

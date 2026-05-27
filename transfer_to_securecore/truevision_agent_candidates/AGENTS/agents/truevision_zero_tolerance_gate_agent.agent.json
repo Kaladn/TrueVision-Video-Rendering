@@ -1,0 +1,45 @@
+{
+  "agent_id": "truevision_zero_tolerance_gate_agent",
+  "id": "truevision_zero_tolerance_gate_agent",
+  "catalog_id": "truevision_zero_tolerance_gate_agent",
+  "name": "TrueVision Zero Tolerance Gate Agent",
+  "version": "0.1.0",
+  "description": "Validate TrueVision-to-SecureCore handoff packages for exact manifest fields, entrypoint hashes, catalog shape, and worker-to-agent boundary compliance.",
+  "runtime_language": "python",
+  "entrypoint": "AGENTS/truevision-agents/truevision_zero_tolerance_gate_agent.py",
+  "entrypoint_hash": "sha256:733ba3a5c934babd2e08a9b482b3a5ac1f185e1614e8fffde03b2fab36e89889",
+  "allowed_reads": [
+    "AGENTS",
+    "AGENTS/truevision-agents",
+    "AGENTS/agents",
+    "AGENTS/catalog"
+  ],
+  "allowed_writes": [
+    "AGENTS/truevision-agents/runtime"
+  ],
+  "requires_approval": false,
+  "approval_phrase": "",
+  "mutation_class": "report_only",
+  "dry_run_supported": true,
+  "log_stream": "agent_decision",
+  "test_command": [
+    "python",
+    "-m",
+    "unittest",
+    "securecore.live_agents.AGENTS.tests.test_securecore_agent_runner"
+  ],
+  "risk_tier": 1,
+  "prompt_only_allowed": false,
+  "required_params": [
+    "handoff_root"
+  ],
+  "default_out_dir": "AGENTS/truevision-agents/runtime",
+  "command": [
+    "python",
+    "AGENTS/truevision-agents/truevision_zero_tolerance_gate_agent.py",
+    "--handoff-root",
+    "{handoff_root}",
+    "--out-dir",
+    "{out_dir}"
+  ]
+}

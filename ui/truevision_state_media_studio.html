@@ -443,17 +443,49 @@
 
     .chat {
       display: grid;
-      grid-template-rows: 42px minmax(170px, 1fr) minmax(220px, 0.78fr);
+      grid-template-rows: 42px auto minmax(170px, 1fr) minmax(220px, 0.78fr);
       min-height: 0;
       background: var(--panel);
     }
 
     .chat-routes {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
       gap: 6px;
       padding: 8px;
       border-bottom: 1px solid var(--line);
+    }
+
+    .forge-panel {
+      display: none;
+      gap: 10px;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      background: #11161a;
+    }
+
+    .forge-panel.active {
+      display: grid;
+    }
+
+    .forge-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .forge-panel textarea {
+      min-height: 76px;
+    }
+
+    .forge-status {
+      border: 1px solid rgba(240, 193, 92, 0.42);
+      border-radius: var(--radius);
+      padding: 8px;
+      color: var(--gold);
+      background: rgba(240, 193, 92, 0.08);
+      font-size: 12px;
+      line-height: 1.35;
     }
 
     .chat-window {
@@ -932,6 +964,72 @@
             <button class="pill active" data-value="director">Director</button>
             <button class="pill" data-value="forensics">Forensics</button>
             <button class="pill" data-value="math">Math</button>
+            <button class="pill" data-value="forge">Forge</button>
+          </div>
+          <div class="forge-panel" id="forgePanel">
+            <div class="forge-status">
+              TV/TA Forge is draft-only. It emits canonical-chat-row-shaped candidate packets in the UI only. No file write, no execution, no worker activation.
+            </div>
+            <div class="forge-grid">
+              <label>
+                Source System
+                <select id="forgeSourceSystem">
+                  <option value="TrueVision" selected>TrueVision</option>
+                  <option value="TrueAudio">TrueAudio</option>
+                </select>
+              </label>
+              <label>
+                Draft Kind
+                <select id="forgeDraftKind">
+                  <option value="tool" selected>tool</option>
+                  <option value="worker">worker</option>
+                  <option value="control_surface">control surface</option>
+                </select>
+              </label>
+              <label>
+                Component Name
+                <input id="forgeComponentName" type="text" value="state_signature_worker" spellcheck="false">
+              </label>
+              <label>
+                Engagement
+                <select id="forgeEngagementType">
+                  <option value="tool_shape_request" selected>tool shape request</option>
+                  <option value="worker_shape_request">worker shape request</option>
+                  <option value="planning_note">planning note</option>
+                  <option value="correction">correction</option>
+                </select>
+              </label>
+            </div>
+            <label>
+              One Job
+              <textarea id="forgePurpose" spellcheck="true">Inspect one replay log or state packet and emit one compact receipt-backed observation candidate.</textarea>
+            </label>
+            <div class="forge-grid">
+              <label>
+                Reads
+                <textarea id="forgeReads" spellcheck="false">storage/artifacts/replay_logs/*.jsonl
+storage/manifests/replay_logs/*.json</textarea>
+              </label>
+              <label>
+                Writes
+                <textarea id="forgeWrites" spellcheck="false">draft packet only
+canonical writer later</textarea>
+              </label>
+            </div>
+            <label>
+              Forbidden Actions
+              <textarea id="forgeForbidden" spellcheck="false">write files
+run tools
+install workers
+activate agents
+promote memory
+claim canonical truth</textarea>
+            </label>
+            <div class="button-row">
+              <button class="secondary" id="shapeForgePacket">Shape Packet</button>
+              <button class="secondary" id="copyForgePacket">Copy Packet</button>
+              <button class="secondary" id="clearForgePacket">Clear Forge Draft</button>
+            </div>
           </div>
           <div class="chat-window" id="chatWindow">
             <div class="message">
@@ -941,7 +1039,7 @@
           </div>
           <div class="render-window">
             <div class="render-window-head">
-              <span>Render Template</span>
+              <span id="templatePaneTitle">Render Template</span>
               <button class="secondary" id="saveTemplateFromPane">Save</button>
             </div>
             <textarea class="json-view" id="templateJson" readonly></textarea>
@@ -1067,6 +1165,7 @@
       templates: [],
       presets: [],
       selectedPreset: null,
+      lastForgePacket: null,
       chatLogReady: false
     };
 
@@ -1108,6 +1207,24 @@
         return [0, 0, 960, 540];
       }
       return parts.map((value) => Math.max(0, Math.round(value)));
+    }
+
+    function splitLines(value) {
+      return String(value || "")
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter(Boolean);
+    }
+
+    function makeId(prefix) {
+      const suffix = typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `${Date.now()}_${Math.random().toString(16).slice(2)}`;
+      return `${prefix}_${suffix}`;
+    }
+
+    function isForgeMode() {
+      return state.chatProfile === "forge";
     }
 
     function formatBytes(bytes) {
@@ -1199,6 +1316,61 @@
         button.classList.toggle("active", button.dataset.value === value);
       });
       update();
+    }
+
+    function actionPolicyForEngagement(engagementType) {
+      if (engagementType === "planning_note") {
+        return "context_only";
+      }
+      if (engagementType === "correction") {
+        return "no_operation";
+      }
+      return "draft_only";
+    }
+
+    function buildForgePacket() {
+      const sourceSystem = $("forgeSourceSystem").value;
+      const draftKind = $("forgeDraftKind").value;
+      const engagementType = $("forgeEngagementType").value;
+      const componentName = $("forgeComponentName").value.trim() || `${sourceSystem.toLowerCase()}_${draftKind}_draft`;
+      const body = $("prompt").value.trim() || $("forgePurpose").value.trim();
+      return {
+        schema: "canonical_chat_row_v1",
+        created_at_utc: new Date().toISOString(),
+        conversation_id: "truevision_studio_local_draft",
+        branch_id: "main",
+        message_id: makeId("msg"),
+        source_system: sourceSystem,
+        source_component: "truevision_state_media_studio.tv_ta_forge_chatbox",
+        target_system: "SecureCore",
+        speaker_identity: {
+          speaker_kind: "truevision_tool_ui",
+          system_id: sourceSystem === "TrueAudio" ? "trueaudio_tool_worker_chatbox" : "truevision_tool_worker_chatbox",
+          model_id: null
+        },
+        engagement_type: engagementType,
+        action_policy: actionPolicyForEngagement(engagementType),
+        body,
+        structured_candidate: {
+          schema: "tv_ta_local_draft_candidate_v1",
+          draft_kind: draftKind,
+          target_stack: sourceSystem,
+          component_name: componentName,
+          one_job: $("forgePurpose").value.trim(),
+          allowed_reads: splitLines($("forgeReads").value),
+          proposed_writes: splitLines($("forgeWrites").value),
+          forbidden_actions: splitLines($("forgeForbidden").value),
+          execution_allowed: false,
+          file_write_allowed: false,
+          install_allowed: false,
+          activation_allowed: false,
+          memory_promotion_allowed: false,
+          canonical_writer_required: true,
+          securecore_gate_required_for_operation: true,
+          local_surface_only: true
+        },
+        receipt_refs: []
+      };
     }
 
     function buildRequest() {
@@ -1983,8 +2155,42 @@
       const request = buildRequest();
       const template = buildRenderTemplate(request);
       $("stateJson").value = JSON.stringify(request, null, 2);
-      $("templateJson").value = JSON.stringify(template, null, 2);
-      $("templateFoot").textContent = `${template.time_distance.source}: ${template.timeline.duration_seconds}s / ${template.timeline.frame_count} frames @ ${template.timeline.fps}fps.`;
+      if (isForgeMode()) {
+        const packet = state.lastForgePacket || buildForgePacket();
+        $("templateJson").value = JSON.stringify(packet, null, 2);
+        $("templateFoot").textContent = "Forge draft only: canonical row shape, no file write, no execution, SecureCore gate required for operations.";
+      } else {
+        $("templateJson").value = JSON.stringify(template, null, 2);
+        $("templateFoot").textContent = `${template.time_distance.source}: ${template.timeline.duration_seconds}s / ${template.timeline.frame_count} frames @ ${template.timeline.fps}fps.`;
+      }
+    }
+
+    function shapeForgePacket() {
+      const packet = buildForgePacket();
+      state.lastForgePacket = packet;
+      $("templateJson").value = JSON.stringify(packet, null, 2);
+      $("templateFoot").textContent = "Forge draft shaped locally only. Copy it into the canonical writer flow when SecureCore is ready.";
+      addMessage(
+        "TV/TA Forge",
+        `Draft packet shaped for ${packet.source_system}: ${packet.structured_candidate.component_name}. No file write, no execution, no activation.`,
+        false,
+        false
+      );
+      update();
+      return packet;
+    }
+
+    async function copyForgePacket() {
+      const packet = state.lastForgePacket || buildForgePacket();
+      await navigator.clipboard.writeText(JSON.stringify(packet, null, 2));
+      addMessage("TV/TA Forge", "Canonical chat-row draft packet copied locally. Nothing was written or executed.", false, false);
+    }
+
+    function clearForgePacket() {
+      state.lastForgePacket = null;
+      $("templateJson").value = "";
+      addMessage("TV/TA Forge", "Forge draft cleared locally. Canonical writer was not called.", false, false);
+      update();
     }
 
     function updateLabels() {
@@ -2003,7 +2209,9 @@
       ].filter(Boolean).length / 4).toFixed(2);
       $("hudGeom").textContent = geomScore;
       $("hudCv").textContent = cvScore;
-      $("routeLine").textContent = `${state.remote} / ${state.llm.replaceAll("_", " ")} / ${state.mode.replaceAll("_", " ")}`;
+      $("routeLine").textContent = isForgeMode()
+        ? "local draft surface / canonical chat row shape / no operation"
+        : `${state.remote} / ${state.llm.replaceAll("_", " ")} / ${state.mode.replaceAll("_", " ")}`;
       $("geomState").textContent = `FOV ${$("fov").value}, H ${$("horizon").value}`;
       $("trigState").textContent = `amp ${$("waveAmp").value}, f ${$("waveFreq").value}`;
       $("linearState").textContent = `Rz ${$("rotZ").value}, S ${$("scale").value}`;
@@ -2014,6 +2222,17 @@
       const minutes = number("durationMinutes");
       const delay = number("startDelayMinutes");
       $("recordStatus").textContent = `Manual record limit: ${minutes} minute${minutes === 1 ? "" : "s"}, start ${delay === 0 ? "immediately" : `after ${delay} minute${delay === 1 ? "" : "s"}`}; countdown ${checked("countdownEnabled") ? `${$("countdownSeconds").value}s ${state.countdownContrastMode || "state-aware"}` : "off"}.`;
+      $("forgePanel").classList.toggle("active", isForgeMode());
+      const forgeDisabled = isForgeMode();
+      $("templatePaneTitle").textContent = forgeDisabled ? "Canonical Row Draft" : "Render Template";
+      ["saveRequest", "prepareRecord", "generateDraft", "downloadConfig", "saveTemplateFromPane", "saveTemplate", "probeAudio"].forEach((id) => {
+        const node = $(id);
+        if (node) {
+          node.disabled = forgeDisabled || state.busy;
+          node.title = forgeDisabled ? "Disabled in TV/TA Forge draft-only mode" : "";
+        }
+      });
+      $("sendPrompt").textContent = forgeDisabled ? "Shape Packet" : "Talk with Qwen";
     }
 
     function update() {
@@ -2221,6 +2440,10 @@
 
     $("sendPrompt").addEventListener("click", async () => {
       try {
+        if (isForgeMode()) {
+          shapeForgePacket();
+          return;
+        }
         await runBusy("Catbot is working through the prompt...", () => sendAssistantMessage());
       } catch (error) {
         addMessage("Catbot", `Action failed: ${error.message}`);
@@ -2228,6 +2451,10 @@
     });
     $("generateDraft").addEventListener("click", async () => {
       try {
+        if (isForgeMode()) {
+          shapeForgePacket();
+          return;
+        }
         await runBusy("Catbot is working on the state draft...", synthesizeDraft);
       } catch (error) {
         addMessage("Catbot", `Draft failed: ${error.message}`);
@@ -2308,7 +2535,11 @@
     });
     $("clearChat").addEventListener("click", () => {
       $("chatWindow").innerHTML = "";
-      addMessage("system", "Chat window cleared locally. The daily chat file remains saved on disk.");
+      if (isForgeMode()) {
+        addMessage("system", "Forge chat window cleared locally. No canonical writer call was made.", false, false);
+      } else {
+        addMessage("system", "Chat window cleared locally. The daily chat file remains saved on disk.");
+      }
     });
     $("resetDefaults").addEventListener("click", () => {
       $("prompt").value = "A person walks through a windswept green field under a wide sky. Preserve geometry, gait phase, field texture, depth, contact shadow, and deterministic state replay.";
@@ -2338,10 +2569,17 @@
       update();
     });
     $("copyConfig").addEventListener("click", async () => {
+      if (isForgeMode()) {
+        await copyForgePacket();
+        return;
+      }
       await navigator.clipboard.writeText(JSON.stringify(buildRequest(), null, 2));
       addMessage("system", "State request JSON copied to clipboard.");
     });
     $("downloadConfig").addEventListener("click", downloadJson);
+    $("shapeForgePacket").addEventListener("click", shapeForgePacket);
+    $("copyForgePacket").addEventListener("click", copyForgePacket);
+    $("clearForgePacket").addEventListener("click", clearForgePacket);
 
     loadQwenConfig();
     update();

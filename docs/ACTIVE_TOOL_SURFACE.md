@@ -60,13 +60,37 @@ These lanes derive intermediate frame/state transitions. They do not replace sou
 ## Learning / Measurement Workers
 
 ```powershell
+python scripts\truevision_worker_forge.py inventory ...
+python scripts\truevision_worker_forge.py forge ...
+python scripts\truevision_worker_forge.py choose ...
 python scripts\truevision_meter_grid.py ...
 python scripts\truevision_angular_seismic_video.py ...
 python scripts\truevision_driving_school.py ...
 python scripts\truevision_state_focus_lens.py ...
 ```
 
-These workers produce compact measurement profiles, candidates, and receipts. Candidate-first output is intentional.
+The worker forge is the local mini-SecureCore-style selector for TrueVision tools
+and workers. It writes manifests, append-only logs, and receipts; it does not
+execute selected workers.
+
+The measurement workers produce compact profiles, candidates, and receipts.
+Candidate-first output is intentional.
+
+Worker law:
+
+```text
+One worker.
+One job.
+One artifact.
+One receipt.
+No hidden work.
+```
+
+Full worker rack contract:
+
+```text
+docs/TRUEVISION_WORKER_RACK_CONTRACT.md
+```
 
 ## Render / Proof Lanes
 

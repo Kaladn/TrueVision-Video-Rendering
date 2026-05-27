@@ -1,0 +1,46 @@
+{
+  "agent_id": "truevision_worker_receipt_router",
+  "id": "truevision_worker_receipt_router",
+  "catalog_id": "truevision_worker_receipt_router",
+  "name": "TrueVision Worker Receipt Router",
+  "version": "0.1.0",
+  "description": "Read one TrueVision worker receipt and route it into a SecureCore-style decision packet without moving the worker into SecureCore.",
+  "runtime_language": "python",
+  "entrypoint": "AGENTS/truevision-agents/truevision_worker_receipt_router.py",
+  "entrypoint_hash": "sha256:81705ecae93494066cdfe2f9320835012ee9eadf11a681b2523e92253f9cefbd",
+  "allowed_reads": [
+    "AGENTS/truevision-agents",
+    "runtime",
+    "reports",
+    "storage"
+  ],
+  "allowed_writes": [
+    "AGENTS/truevision-agents/runtime"
+  ],
+  "requires_approval": false,
+  "approval_phrase": "",
+  "mutation_class": "report_only",
+  "dry_run_supported": true,
+  "log_stream": "agent_decision",
+  "test_command": [
+    "python",
+    "-m",
+    "unittest",
+    "securecore.live_agents.AGENTS.tests.test_securecore_agent_runner"
+  ],
+  "risk_tier": 1,
+  "prompt_only_allowed": false,
+  "required_params": [
+    "worker_receipt"
+  ],
+  "default_out_dir": "AGENTS/truevision-agents/runtime",
+  "command": [
+    "python",
+    "AGENTS/truevision-agents/truevision_worker_receipt_router.py",
+    "--worker-receipt",
+    "{worker_receipt}",
+    "--out-dir",
+    "{out_dir}"
+  ]
+}
+

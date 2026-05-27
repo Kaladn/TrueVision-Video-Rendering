@@ -34,6 +34,12 @@ TrueVision
   manifests and receipts
 ```
 
+Worker contracts are locked in:
+
+```text
+docs/TRUEVISION_WORKER_RACK_CONTRACT.md
+```
+
 ## Current Job
 
 TrueVision answers this question:

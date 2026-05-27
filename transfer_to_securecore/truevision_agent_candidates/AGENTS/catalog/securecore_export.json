@@ -1,0 +1,84 @@
+{
+  "agents": [
+    {
+      "id": "truevision_worker_receipt_router",
+      "name": "truevision_worker_receipt_router.py",
+      "category": "truevision_bridge_agents",
+      "tier": "standalone",
+      "entry_point": "truevision_worker_receipt_router.py",
+      "definition": "[agent] route one TrueVision worker receipt into a SecureCore decision packet",
+      "source_file": "AGENTS/truevision-agents/truevision_worker_receipt_router.py",
+      "risk": {
+        "score": 1,
+        "type": "audit_read",
+        "reason": "reads worker receipt and writes separate decision packet",
+        "confirmation": false,
+        "sandbox": false
+      },
+      "contract": {
+        "input": "worker_receipt:path",
+        "output": "decision_packet:json",
+        "assumptions_in": "Worker receipt exists and is JSON object",
+        "assumptions_out": "Decision packet records routing only and does not promote truth",
+        "side_effects": "disk|logging",
+        "dependencies": "python|json|hashlib",
+        "statefulness": "STATELESS",
+        "sync_mode": "SYNC"
+      }
+    },
+    {
+      "id": "truevision_consensus_reasoning_agent",
+      "name": "truevision_consensus_reasoning_agent.py",
+      "category": "truevision_bridge_agents",
+      "tier": "standalone",
+      "entry_point": "truevision_consensus_reasoning_agent.py",
+      "definition": "[agent] candidate-only consensus over worker evidence packets",
+      "source_file": "AGENTS/truevision-agents/truevision_consensus_reasoning_agent.py",
+      "risk": {
+        "score": 1,
+        "type": "audit_read",
+        "reason": "reads candidate packets and writes separate consensus decision",
+        "confirmation": false,
+        "sandbox": false
+      },
+      "contract": {
+        "input": "candidate_packets:path",
+        "output": "consensus_decision:json",
+        "assumptions_in": "Input packets are JSON or JSONL candidate evidence packets",
+        "assumptions_out": "Consensus remains candidate-only and requires operator review",
+        "side_effects": "disk|logging",
+        "dependencies": "python|json|hashlib",
+        "statefulness": "STATELESS",
+        "sync_mode": "SYNC"
+      }
+    },
+    {
+      "id": "truevision_zero_tolerance_gate_agent",
+      "name": "truevision_zero_tolerance_gate_agent.py",
+      "category": "truevision_bridge_agents",
+      "tier": "standalone",
+      "entry_point": "truevision_zero_tolerance_gate_agent.py",
+      "definition": "[agent] validate TrueVision handoff package against SecureCore live-agent manifest and catalog shape",
+      "source_file": "AGENTS/truevision-agents/truevision_zero_tolerance_gate_agent.py",
+      "risk": {
+        "score": 1,
+        "type": "audit_read",
+        "reason": "reads handoff package and writes separate gate report",
+        "confirmation": false,
+        "sandbox": false
+      },
+      "contract": {
+        "input": "handoff_root:path",
+        "output": "gate_report:json",
+        "assumptions_in": "Handoff root mirrors SecureCore live_agents AGENTS structure",
+        "assumptions_out": "Reports pass or reject without activating agents",
+        "side_effects": "disk|logging",
+        "dependencies": "python|json|hashlib|csv",
+        "statefulness": "STATELESS",
+        "sync_mode": "SYNC"
+      }
+    }
+  ],
+  "count": 3
+}
+
