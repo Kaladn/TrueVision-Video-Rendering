@@ -21,6 +21,23 @@ python scripts\truevision_preflight.py
 
 Checks local prerequisites and repo health.
 
+## State Source Law
+
+```text
+docs/TRUEVISION_STATE_SOURCE_LAW.md
+truevision_runtime/state_source_law.py
+```
+
+Law:
+
+```text
+If it is raw pixels, it is not the TrueVision source.
+If it is state, it can be replayed.
+If it is replayed, it is derived.
+If it is generated/cartoon, it is visualization.
+If it is not state-backed, it does not count.
+```
+
 ## Timing Audit
 
 ```powershell
@@ -67,6 +84,7 @@ python scripts\truevision_meter_grid.py ...
 python scripts\truevision_angular_seismic_video.py ...
 python scripts\truevision_driving_school.py ...
 python scripts\truevision_state_focus_lens.py ...
+python scripts\truevision_geometry_engine.py ...
 ```
 
 The worker forge is the local mini-SecureCore-style selector for TrueVision tools
@@ -75,6 +93,10 @@ execute selected workers.
 
 The measurement workers produce compact profiles, candidates, and receipts.
 Candidate-first output is intentional.
+
+The geometry engine consumes existing logger artifacts and creates data-carrying
+shape units. Shapes keep raw/source refs, true local metrics, and filtered
+metrics separate.
 
 Worker law:
 
