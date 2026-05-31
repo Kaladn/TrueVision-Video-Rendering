@@ -65,6 +65,24 @@ class FinalizedToolsTests(unittest.TestCase):
 
         self.assertIn('"status": "copied"', result.stdout)
 
+    def test_cli_status_only_does_not_require_destination(self):
+        result = subprocess.run(
+            [
+                sys.executable,
+                "scripts/truevision_copy_finalized_tool.py",
+                "--tool-id",
+                "cleveland_graffiti_state_proof",
+                "--status-only",
+            ],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertIn('"tool_id": "cleveland_graffiti_state_proof"', result.stdout)
+        self.assertIn('"edit_policy": "copy_only"', result.stdout)
+
 
 if __name__ == "__main__":
     unittest.main()

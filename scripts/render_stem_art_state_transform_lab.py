@@ -44,6 +44,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--waterline", type=float, default=0.68)
     parser.add_argument("--camera-drift", type=float, default=0.18, help="Slow non-music side drift cycles per second.")
+    parser.add_argument("--run-instruction", default="", help="Run-only visual instruction; not a preset promotion.")
     return parser.parse_args()
 
 
@@ -100,6 +101,19 @@ def _fit_contain_bottom_with_margin(gray: np.ndarray, w: int, h: int, margin_x: 
     y0 = h - nh
     canvas[y0 : y0 + nh, x0 : x0 + nw] = resized
     return canvas
+
+
+def _fit_contain_bottom_info(gray: np.ndarray, w: int, h: int, margin_x: int) -> tuple[np.ndarray, tuple[int, int, int, int]]:
+    canvas = np.zeros((h, w), dtype=np.uint8)
+    usable_w = max(1, w - margin_x * 2)
+    ih, iw = gray.shape[:2]
+    scale = min(usable_w / max(iw, 1), h / max(ih, 1))
+    nw, nh = int(iw * scale), int(ih * scale)
+    resized = cv2.resize(gray, (nw, nh), interpolation=cv2.INTER_AREA)
+    x0 = margin_x + (usable_w - nw) // 2
+    y0 = h - nh
+    canvas[y0 : y0 + nh, x0 : x0 + nw] = resized
+    return canvas, (x0, y0, nw, nh)
 
 
 def _decode_stems(stems_zip: Path, work_dir: Path, seconds: float) -> dict[str, Path]:
@@ -271,9 +285,11 @@ def _ink_mix_phone_water(
     synth = env["Synth"]
     other = env["Other"]
 
-    top = _fit_contain_bottom_with_margin(skyline, W, water_y, max_drift + 6).astype(np.float32)
+    top_base, city_rect = _fit_contain_bottom_info(skyline, W, water_y, max_drift + 6)
     proof_a_top = _fit_contain_bottom_with_margin(proof_a, W, water_y, max_drift + 6)
     proof_b_top = _fit_contain_bottom_with_margin(proof_b, W, water_y, max_drift + 6)
+    city_mask = (top_base > 10).astype(np.float32)
+    top = top_base.astype(np.float32)
     top = _shift_horizontal(top.astype(np.uint8), drift).astype(np.float32)
     proof_a_top = _shift_horizontal(proof_a_top, drift)
     proof_b_top = _shift_horizontal(proof_b_top, drift)
@@ -281,10 +297,11 @@ def _ink_mix_phone_water(
     a_edges = cv2.Canny(proof_a_top, 58, 148).astype(np.float32)
     b_edges = cv2.Canny(proof_b_top, 50, 138).astype(np.float32)
     sky_edges = cv2.Canny(top.astype(np.uint8), 44, 125).astype(np.float32)
+    object_plane = np.maximum(a_edges * (0.18 + guitar * 0.50), b_edges * (0.13 + backing * 0.42 + synth * 0.18))
+    object_plane *= 0.18 + 0.82 * np.clip(city_mask + (top > 80).astype(np.float32) * 0.25, 0.0, 1.0)
     graffiti_fade = 0.16 + guitar * 0.28 + backing * 0.20
     top = np.maximum(top * (0.80 + keyboard * 0.17), sky_edges * (0.70 + drums * 0.35))
-    top = np.maximum(top, a_edges * graffiti_fade)
-    top = np.maximum(top, b_edges * (0.12 + backing * 0.25 + synth * 0.16))
+    top = np.maximum(top, object_plane * (0.85 + graffiti_fade))
     proof_dark = ((proof_a_top < 120).astype(np.float32) * (0.06 + other * 0.11)) + ((proof_b_top < 125).astype(np.float32) * (0.05 + synth * 0.08))
     top *= 1.0 - np.clip(proof_dark, 0.0, 0.26)
 
@@ -295,19 +312,26 @@ def _ink_mix_phone_water(
     top += ((np.sin(center_x * 0.035 + t * 3.0) + np.cos(center_y * 0.029 + t * 2.2)) * (1.5 + other * 5.0))
     top = np.clip(top, 0, 255).astype(np.uint8)
 
-    reflected = cv2.flip(top, 0)
-    reflected = cv2.resize(reflected, (W, water_h), interpolation=cv2.INTER_AREA)
+    reflection_source = np.maximum(top * city_mask, object_plane * (0.90 + lead * 0.22))
+    x0, y0, cw, ch = city_rect
+    reflected_slice = cv2.flip(reflection_source[y0 : y0 + ch, :], 0) if ch > 0 else cv2.flip(reflection_source, 0)
+    reflected = np.zeros((water_h, W), dtype=np.uint8)
+    landing_h = min(water_h, max(1, int(ch * 0.55)))
+    reflected_near = cv2.resize(reflected_slice.astype(np.uint8), (W, landing_h), interpolation=cv2.INTER_AREA)
+    reflected[:landing_h, :] = reflected_near
     rows = np.arange(water_h, dtype=np.float32)
-    ripple_strength = 3.0 + bass * 12.0 + synth * 8.0
+    ripple_strength = 2.0 + bass * 10.0 + synth * 6.0
+    perspective = np.linspace(1.0, 0.12, water_h, dtype=np.float32)
     rippled = np.zeros_like(reflected)
     for y, row in enumerate(rows):
-        shift = int(math.sin(row * 0.055 + t * 2.4) * ripple_strength + math.sin(row * 0.135 + t * 4.1) * (1.5 + drums * 3.0))
+        shift = int((math.sin(row * 0.055 + t * 2.4) * ripple_strength + math.sin(row * 0.135 + t * 4.1) * (1.5 + drums * 3.0)) * perspective[y])
         rippled[y] = np.roll(reflected[y], shift)
-    fade = np.linspace(0.46 + lead * 0.10, 0.08, water_h, dtype=np.float32)[:, None]
+    fade = np.linspace(0.50 + lead * 0.10, 0.045, water_h, dtype=np.float32)[:, None]
     water = (rippled.astype(np.float32) * fade).astype(np.uint8)
-    water = cv2.GaussianBlur(water, (0, 0), 1.1 + synth * 1.2)
+    water = cv2.GaussianBlur(water, (0, 0), 0.75 + synth * 1.0)
     water_noise = ((np.sin(np.arange(W)[None, :] * 0.043 + t * 4.0) + np.cos(rows[:, None] * 0.081 + t * 1.9)) * (3.0 + bass * 8.0)).astype(np.float32)
-    water = np.clip(water.astype(np.float32) + water_noise, 0, 255).astype(np.uint8)
+    flat_plane = np.clip((1.0 - rows[:, None] / max(water_h, 1)) * 9.0 + water_noise, 0, 28)
+    water = np.clip(water.astype(np.float32) + flat_plane, 0, 255).astype(np.uint8)
 
     full = np.zeros((H, W), dtype=np.uint8)
     full[:water_y, :] = top
@@ -441,6 +465,17 @@ def _render(args: argparse.Namespace) -> dict[str, Any]:
         "width": W,
         "height": H,
         "layout": args.layout,
+        "run_instruction": args.run_instruction or ("city_vertical_water_plane_reflection_run_only" if args.layout == "phone_water_reflection" else "default_lab_run"),
+        "promotion_status": "run_only_not_preset" if args.layout == "phone_water_reflection" else "lab_output_not_preset",
+        "preset_promoted": False,
+        "water_plane_contract": {
+            "city_plane": "vertical",
+            "water_plane": "horizontal",
+            "foreground_light_objects_reflect": True,
+            "reflection_lands_on_water_plane": True,
+        }
+        if args.layout == "phone_water_reflection"
+        else None,
         "waterline": args.waterline if args.layout == "phone_water_reflection" else None,
         "camera_drift": args.camera_drift,
         "encoder": used_encoder,
@@ -450,6 +485,7 @@ def _render(args: argparse.Namespace) -> dict[str, Any]:
             "new_graffiti_language_added": False,
             "lyrics_rendered": False,
             "generated_media_is_visualization": True,
+            "run_specific_instruction": args.layout == "phone_water_reflection",
         },
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")

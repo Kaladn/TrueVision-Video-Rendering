@@ -24,6 +24,7 @@ class StemArtTransformLabCliTests(unittest.TestCase):
         self.assertIn("--height", result.stdout)
         self.assertIn("--waterline", result.stdout)
         self.assertIn("--camera-drift", result.stdout)
+        self.assertIn("--run-instruction", result.stdout)
         self.assertIn("phone_water_reflection", result.stdout)
 
 

@@ -15,7 +15,7 @@ from truevision_runtime.finalized_tools import copy_finalized_tool, finalized_to
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Copy a finalized TrueVision tool into a new lab file.")
     parser.add_argument("--tool-id", required=True)
-    parser.add_argument("--destination", required=True)
+    parser.add_argument("--destination")
     parser.add_argument("--overwrite", action="store_true")
     parser.add_argument("--status-only", action="store_true")
     return parser.parse_args()
@@ -26,6 +26,8 @@ def main() -> int:
     if args.status_only:
         print(json.dumps(finalized_tool_status(ROOT, args.tool_id), indent=2))
         return 0
+    if not args.destination:
+        raise SystemExit("--destination is required unless --status-only is used")
     result = copy_finalized_tool(ROOT, args.tool_id, args.destination, overwrite=args.overwrite)
     print(json.dumps(result, indent=2))
     return 0
