@@ -39,6 +39,11 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--output-root", default="outputs/cleveland_graffiti_state/lower_room_mind_scrape_bw_graffiti_30s")
     parser.add_argument("--run-id", default="lower_room_mind_scrape_bw_graffiti_30s")
     parser.add_argument("--seconds", type=float, default=30.0)
+    parser.add_argument("--layout", choices=["landscape_graffiti", "phone_water_reflection"], default="landscape_graffiti")
+    parser.add_argument("--width", type=int, default=1280)
+    parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--waterline", type=float, default=0.68)
+    parser.add_argument("--camera-drift", type=float, default=0.18, help="Slow non-music side drift cycles per second.")
     return parser.parse_args()
 
 
@@ -72,6 +77,27 @@ def _fit_contain(gray: np.ndarray, w: int, h: int) -> np.ndarray:
     resized = cv2.resize(gray, (nw, nh), interpolation=cv2.INTER_AREA)
     x0 = (w - nw) // 2
     y0 = (h - nh) // 2
+    canvas[y0 : y0 + nh, x0 : x0 + nw] = resized
+    return canvas
+
+
+def _fit_contain_with_margin(gray: np.ndarray, w: int, h: int, margin_x: int) -> np.ndarray:
+    usable_w = max(1, w - margin_x * 2)
+    contained = _fit_contain(gray, usable_w, h)
+    canvas = np.zeros((h, w), dtype=np.uint8)
+    canvas[:, margin_x : margin_x + usable_w] = contained
+    return canvas
+
+
+def _fit_contain_bottom_with_margin(gray: np.ndarray, w: int, h: int, margin_x: int) -> np.ndarray:
+    canvas = np.zeros((h, w), dtype=np.uint8)
+    usable_w = max(1, w - margin_x * 2)
+    ih, iw = gray.shape[:2]
+    scale = min(usable_w / max(iw, 1), h / max(ih, 1))
+    nw, nh = int(iw * scale), int(ih * scale)
+    resized = cv2.resize(gray, (nw, nh), interpolation=cv2.INTER_AREA)
+    x0 = margin_x + (usable_w - nw) // 2
+    y0 = h - nh
     canvas[y0 : y0 + nh, x0 : x0 + nw] = resized
     return canvas
 
@@ -218,11 +244,86 @@ def _ink_mix(base: np.ndarray, proof_a: np.ndarray, proof_b: np.ndarray, env: di
     return image
 
 
+def _shift_horizontal(gray: np.ndarray, dx: int) -> np.ndarray:
+    matrix = np.float32([[1, 0, dx], [0, 1, 0]])
+    return cv2.warpAffine(gray, matrix, (gray.shape[1], gray.shape[0]), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
+
+def _ink_mix_phone_water(
+    skyline: np.ndarray,
+    proof_a: np.ndarray,
+    proof_b: np.ndarray,
+    env: dict[str, float],
+    t: float,
+    waterline: float,
+    camera_drift: float,
+) -> np.ndarray:
+    water_y = int(np.clip(waterline, 0.52, 0.82) * H)
+    water_h = max(1, H - water_y)
+    max_drift = max(8, int(W * 0.035))
+    drift = int(math.sin(t * math.tau * max(camera_drift, 0.01)) * max_drift)
+    lead = env["Lead Vocals"]
+    backing = env["Backing Vocals"]
+    drums = env["Drums"]
+    bass = env["Bass"]
+    guitar = env["Guitar"]
+    keyboard = env["Keyboard"]
+    synth = env["Synth"]
+    other = env["Other"]
+
+    top = _fit_contain_bottom_with_margin(skyline, W, water_y, max_drift + 6).astype(np.float32)
+    proof_a_top = _fit_contain_bottom_with_margin(proof_a, W, water_y, max_drift + 6)
+    proof_b_top = _fit_contain_bottom_with_margin(proof_b, W, water_y, max_drift + 6)
+    top = _shift_horizontal(top.astype(np.uint8), drift).astype(np.float32)
+    proof_a_top = _shift_horizontal(proof_a_top, drift)
+    proof_b_top = _shift_horizontal(proof_b_top, drift)
+
+    a_edges = cv2.Canny(proof_a_top, 58, 148).astype(np.float32)
+    b_edges = cv2.Canny(proof_b_top, 50, 138).astype(np.float32)
+    sky_edges = cv2.Canny(top.astype(np.uint8), 44, 125).astype(np.float32)
+    graffiti_fade = 0.16 + guitar * 0.28 + backing * 0.20
+    top = np.maximum(top * (0.80 + keyboard * 0.17), sky_edges * (0.70 + drums * 0.35))
+    top = np.maximum(top, a_edges * graffiti_fade)
+    top = np.maximum(top, b_edges * (0.12 + backing * 0.25 + synth * 0.16))
+    proof_dark = ((proof_a_top < 120).astype(np.float32) * (0.06 + other * 0.11)) + ((proof_b_top < 125).astype(np.float32) * (0.05 + synth * 0.08))
+    top *= 1.0 - np.clip(proof_dark, 0.0, 0.26)
+
+    center_x = np.arange(W, dtype=np.float32)[None, :]
+    center_y = np.arange(water_y, dtype=np.float32)[:, None]
+    breath = np.exp(-(((center_x - W / 2) / (W * 0.28)) ** 2 + ((center_y - water_y * 0.45) / (water_y * 0.32)) ** 2))
+    top += breath * (lead * 24.0 + backing * 12.0)
+    top += ((np.sin(center_x * 0.035 + t * 3.0) + np.cos(center_y * 0.029 + t * 2.2)) * (1.5 + other * 5.0))
+    top = np.clip(top, 0, 255).astype(np.uint8)
+
+    reflected = cv2.flip(top, 0)
+    reflected = cv2.resize(reflected, (W, water_h), interpolation=cv2.INTER_AREA)
+    rows = np.arange(water_h, dtype=np.float32)
+    ripple_strength = 3.0 + bass * 12.0 + synth * 8.0
+    rippled = np.zeros_like(reflected)
+    for y, row in enumerate(rows):
+        shift = int(math.sin(row * 0.055 + t * 2.4) * ripple_strength + math.sin(row * 0.135 + t * 4.1) * (1.5 + drums * 3.0))
+        rippled[y] = np.roll(reflected[y], shift)
+    fade = np.linspace(0.46 + lead * 0.10, 0.08, water_h, dtype=np.float32)[:, None]
+    water = (rippled.astype(np.float32) * fade).astype(np.uint8)
+    water = cv2.GaussianBlur(water, (0, 0), 1.1 + synth * 1.2)
+    water_noise = ((np.sin(np.arange(W)[None, :] * 0.043 + t * 4.0) + np.cos(rows[:, None] * 0.081 + t * 1.9)) * (3.0 + bass * 8.0)).astype(np.float32)
+    water = np.clip(water.astype(np.float32) + water_noise, 0, 255).astype(np.uint8)
+
+    full = np.zeros((H, W), dtype=np.uint8)
+    full[:water_y, :] = top
+    full[water_y:, :] = water
+    cv2.line(full, (0, water_y), (W, water_y), int(80 + 70 * (0.3 + bass * 0.7)), 2)
+    return full
+
+
 def _put(frame: np.ndarray, text: str, xy: tuple[int, int], scale: float = 0.5, color=(235, 235, 235), thickness: int = 1) -> None:
     cv2.putText(frame, text, xy, cv2.FONT_HERSHEY_SIMPLEX, scale, color, thickness, cv2.LINE_AA)
 
 
 def _render(args: argparse.Namespace) -> dict[str, Any]:
+    global W, H
+    W = int(args.width)
+    H = int(args.height)
     out_root = Path(args.output_root)
     out_root.mkdir(parents=True, exist_ok=True)
     raw_path = out_root / f"{args.run_id}_silent_raw.mp4"
@@ -234,7 +335,8 @@ def _render(args: argparse.Namespace) -> dict[str, Any]:
 
     decoded = _decode_stems(Path(args.stems), work_dir, args.seconds)
     envelopes = _stem_envelopes(decoded, args.seconds)
-    skyline = _fit_cover(_load_gray(args.skyline), W, H)
+    skyline_source = _load_gray(args.skyline)
+    skyline = _fit_cover(skyline_source, W, H)
     proof_a = _load_gray(args.proof_a)
     proof_b = _load_gray(args.proof_b)
     frame_count = int(args.seconds * FPS)
@@ -245,19 +347,23 @@ def _render(args: argparse.Namespace) -> dict[str, Any]:
     for frame_idx in range(frame_count):
         t = frame_idx / FPS
         env = {stem: float(envelopes[stem][frame_idx]) for stem in STEM_NAMES}
-        zoom = 1.035 + env["Bass"] * 0.035 + env["Drums"] * 0.018
-        pan_x = math.sin(t * 0.34) * (16 + env["Guitar"] * 22)
-        pan_y = math.cos(t * 0.27) * (8 + env["Synth"] * 14)
-        angle = math.sin(t * 0.42) * (0.45 + env["Drums"] * 0.85)
-        plate = _apply_camera(skyline, zoom, pan_x, pan_y, angle)
-        image = _ink_mix(plate, proof_a, proof_b, env, t)
+        if args.layout == "phone_water_reflection":
+            image = _ink_mix_phone_water(skyline_source, proof_a, proof_b, env, t, args.waterline, args.camera_drift)
+        else:
+            zoom = 1.035 + env["Bass"] * 0.035 + env["Drums"] * 0.018
+            pan_x = math.sin(t * 0.34) * (16 + env["Guitar"] * 22)
+            pan_y = math.cos(t * 0.27) * (8 + env["Synth"] * 14)
+            angle = math.sin(t * 0.42) * (0.45 + env["Drums"] * 0.85)
+            plate = _apply_camera(skyline, zoom, pan_x, pan_y, angle)
+            image = _ink_mix(plate, proof_a, proof_b, env, t)
         rgb = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
         # Minimal source/tech banner. It labels the proof without becoming the image.
         overlay = rgb.copy()
         cv2.rectangle(overlay, (0, H - 46), (W, H), (0, 0, 0), -1)
         cv2.addWeighted(overlay, 0.48, rgb, 0.52, 0, rgb)
-        _put(rgb, "TRUEVISION STATE PROOF | CLEVELAND LINEART + B/W GRAFFITI PROOFS | STEM-DRIVEN INK / CONTRAST / CAMERA PRESSURE", (24, H - 18), 0.43)
+        banner = "TRUEVISION STATE LAB | PHONE WATER REFLECTION | FULL ART FIT + SLOW CAMERA DRIFT" if args.layout == "phone_water_reflection" else "TRUEVISION STATE PROOF | CLEVELAND LINEART + B/W GRAFFITI PROOFS | STEM-DRIVEN INK / CONTRAST / CAMERA PRESSURE"
+        _put(rgb, banner, (24, H - 18), 0.43)
         writer.write(rgb)
     writer.release()
 
@@ -334,6 +440,9 @@ def _render(args: argparse.Namespace) -> dict[str, Any]:
         "fps": FPS,
         "width": W,
         "height": H,
+        "layout": args.layout,
+        "waterline": args.waterline if args.layout == "phone_water_reflection" else None,
+        "camera_drift": args.camera_drift,
         "encoder": used_encoder,
         "boundary": {
             "source_assets_used": True,
