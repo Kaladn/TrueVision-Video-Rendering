@@ -17,6 +17,14 @@ import numpy as np
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_OUTPUT_ROOT = ROOT / "outputs" / "stem_state_nightmare"
+DEFAULT_GUITAR_LASER_ALPHA = 0.35
+
+
+def build_generation_banner() -> str:
+    return (
+        "CORTEX EVOLVED  /  TRUEVISION STATE GENERATION  /  LOCAL FIRST  /  "
+        "STEM-DRIVEN LIGHT  /  RECEIPT-BACKED CREATION  /  MUSIC STATE MADE VISIBLE"
+    )
 
 
 def _safe_id(value: str) -> str:
@@ -58,6 +66,11 @@ def _read_wav_bytes(payload: bytes, *, duration: float | None = None) -> tuple[n
         usable = (samples.size // channels) * channels
         samples = samples[:usable].reshape(-1, channels).mean(axis=1)
     return np.ascontiguousarray(samples, dtype=np.float32), sample_rate
+
+
+def infer_wav_duration_seconds(path: Path) -> float:
+    with wave.open(str(path), "rb") as handle:
+        return float(handle.getnframes()) / float(handle.getframerate())
 
 
 def load_stem_samples(stems_zip: Path, *, duration: float) -> tuple[dict[str, np.ndarray], int, list[dict[str, Any]]]:
@@ -195,7 +208,15 @@ def _draw_depth_grid(frame: np.ndarray, bass: float, drums: float, t: float) -> 
         cv2.line(frame, (0, y), (width, y), tuple((np.asarray(color) * (0.55 + drums)).tolist()), 1, cv2.LINE_AA)
 
 
-def _draw_laser_ribbons(frame: np.ndarray, guitar: float, guitar_mid: float, synth: float, t: float) -> dict[str, float]:
+def _draw_laser_ribbons(
+    frame: np.ndarray,
+    guitar: float,
+    guitar_mid: float,
+    synth: float,
+    t: float,
+    *,
+    alpha: float = DEFAULT_GUITAR_LASER_ALPHA,
+) -> dict[str, float]:
     height, width = frame.shape[:2]
     layer = np.zeros_like(frame)
     origins = [
@@ -229,8 +250,13 @@ def _draw_laser_ribbons(frame: np.ndarray, guitar: float, guitar_mid: float, syn
         beam_energy += max(0.0, strength)
     bloom = cv2.GaussianBlur(layer, (0, 0), sigmaX=8 + guitar * 14, sigmaY=8 + synth * 10)
     sharp = cv2.GaussianBlur(layer, (0, 0), sigmaX=1.2, sigmaY=1.2)
-    frame[:] = np.clip(frame + bloom * 0.82 + sharp * 1.35, 0.0, 1.0)
-    return {"laser_beam_count": float(beam_count), "laser_energy": round(float(beam_energy / beam_count), 6)}
+    alpha = float(np.clip(alpha, 0.0, 1.0))
+    frame[:] = np.clip(frame + bloom * 0.82 * alpha + sharp * 1.35 * alpha, 0.0, 1.0)
+    return {
+        "laser_beam_count": float(beam_count),
+        "laser_energy": round(float(beam_energy / beam_count), 6),
+        "guitar_laser_alpha": round(alpha, 6),
+    }
 
 
 def _draw_center_state(frame: np.ndarray, vocals: float, bass: float, synth: float, t: float) -> None:
@@ -290,7 +316,36 @@ def _apply_mirror_prism(frame: np.ndarray, synth: float, fx: float, t: float) ->
     frame[:, :, 2] = np.roll(frame[:, :, 2], -chroma_shift, axis=1)
 
 
-def render_frame(frame_state: dict[str, Any], *, width: int, height: int, stem_map: dict[str, list[str]] | None = None) -> tuple[np.ndarray, dict[str, Any]]:
+def _draw_lower_banner(image: np.ndarray, *, text: str, t: float) -> None:
+    height, width = image.shape[:2]
+    banner_h = max(34, int(height * 0.062))
+    top = height - banner_h
+    overlay = image.copy()
+    cv2.rectangle(overlay, (0, top), (width, height), (0, 0, 0), -1)
+    image[:] = cv2.addWeighted(overlay, 0.54, image, 0.46, 0)
+    cv2.line(image, (0, top), (width, top), (40, 190, 210), 1, cv2.LINE_AA)
+
+    full_text = f"{text}     {text}"
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = max(0.48, height / 1500.0)
+    thickness = 1
+    text_w, text_h = cv2.getTextSize(full_text, font, scale, thickness)[0]
+    speed = 86.0
+    x = width - int((t * speed) % max(1, text_w + width))
+    y = top + int((banner_h + text_h) * 0.58)
+    while x < width:
+        cv2.putText(image, full_text, (x, y), font, scale, (215, 245, 248), thickness, cv2.LINE_AA)
+        x += text_w + 80
+
+
+def render_frame(
+    frame_state: dict[str, Any],
+    *,
+    width: int,
+    height: int,
+    stem_map: dict[str, list[str]] | None = None,
+    banner_text: str | None = None,
+) -> tuple[np.ndarray, dict[str, Any]]:
     stem_map = stem_map or build_stem_control_map()
     t = float(frame_state.get("time_seconds") or 0.0)
     frame_index = int(frame_state.get("frame_index") or 0)
@@ -317,6 +372,8 @@ def render_frame(frame_state: dict[str, Any], *, width: int, height: int, stem_m
         frame[:] = np.clip(frame + 0.12 * max(_meter(frame_state, "FX", "onset"), _meter(frame_state, "Drums", "onset")), 0.0, 1.0)
 
     image = np.clip(frame * 255.0, 0, 255).astype(np.uint8)
+    banner_text = banner_text or build_generation_banner()
+    _draw_lower_banner(image, text=banner_text, t=t)
     lane_log = {
         "stem_controls": {
             stem_name: {
@@ -334,6 +391,11 @@ def render_frame(frame_state: dict[str, Any], *, width: int, height: int, stem_m
             "openai_generation_used": False,
             "stems_drive_visual_lanes": True,
             "generated_media_is_evidence": False,
+        },
+        "banner": {
+            "position": "lower_scrolling",
+            "text": banner_text,
+            "purpose": "identity_and_generation_tech",
         },
     }
     return image, lane_log
@@ -365,13 +427,23 @@ def _video_command(output_path: Path, *, width: int, height: int, fps: int, enco
     return command
 
 
-def _write_video_only(path: Path, metrics: dict[str, Any], *, width: int, height: int, encoder: str, state_path: Path, stem_map: dict[str, list[str]]) -> str:
+def _write_video_only(
+    path: Path,
+    metrics: dict[str, Any],
+    *,
+    width: int,
+    height: int,
+    encoder: str,
+    state_path: Path,
+    stem_map: dict[str, list[str]],
+    banner_text: str,
+) -> str:
     fps = int(metrics["fps"])
     process = subprocess.Popen(_video_command(path, width=width, height=height, fps=fps, encoder=encoder), stdin=subprocess.PIPE)
     assert process.stdin is not None
     with state_path.open("w", encoding="utf-8") as state_file:
         for frame_state in metrics["frames"]:
-            frame, lane_log = render_frame(frame_state, width=width, height=height, stem_map=stem_map)
+            frame, lane_log = render_frame(frame_state, width=width, height=height, stem_map=stem_map, banner_text=banner_text)
             record = dict(frame_state)
             record["schema_version"] = "truevision_stem_state_nightmare_frame_v1"
             record["lane_log"] = lane_log
@@ -423,8 +495,12 @@ def render_video(
     height: int = 720,
     encoder: str = "libx264",
     style_reference_path: Path | None = None,
+    banner_text: str | None = None,
 ) -> dict[str, Any]:
     stem_map = build_stem_control_map()
+    if duration <= 0:
+        duration = infer_wav_duration_seconds(master_audio)
+    banner_text = banner_text or build_generation_banner()
     run_id = _safe_id(run_id)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -446,6 +522,11 @@ def render_video(
         "stem_control_map": stem_map,
         "sample_rate": sample_rate,
         "duration_seconds": duration,
+        "banner": {
+            "position": "lower_scrolling",
+            "text": banner_text,
+            "purpose": "identity_and_generation_tech",
+        },
         "fps": fps,
         "frame_count": metrics["frame_count"],
         "summary": metrics["summary"],
@@ -459,12 +540,30 @@ def render_video(
 
     used_encoder = encoder
     try:
-        _write_video_only(video_only_path, metrics, width=width, height=height, encoder=used_encoder, state_path=state_path, stem_map=stem_map)
+        _write_video_only(
+            video_only_path,
+            metrics,
+            width=width,
+            height=height,
+            encoder=used_encoder,
+            state_path=state_path,
+            stem_map=stem_map,
+            banner_text=banner_text,
+        )
     except Exception:
         if encoder == "libx264":
             raise
         used_encoder = "libx264"
-        _write_video_only(video_only_path, metrics, width=width, height=height, encoder=used_encoder, state_path=state_path, stem_map=stem_map)
+        _write_video_only(
+            video_only_path,
+            metrics,
+            width=width,
+            height=height,
+            encoder=used_encoder,
+            state_path=state_path,
+            stem_map=stem_map,
+            banner_text=banner_text,
+        )
     _mux_audio(video_only_path, master_audio, output_path, duration=duration)
 
     manifest = {
@@ -491,11 +590,17 @@ def render_video(
             "wall_seconds": round(time.perf_counter() - start, 6),
         },
         "stem_control_map": stem_map,
+        "banner": {
+            "position": "lower_scrolling",
+            "text": banner_text,
+            "purpose": "identity_and_generation_tech",
+        },
         "boundary": {
             "external_visual_assets_used": False,
             "openai_generation_used": False,
             "art_imports_used": False,
             "stems_drive_visual_lanes": True,
+            "guitar_laser_alpha": DEFAULT_GUITAR_LASER_ALPHA,
             "master_audio_drives_global_timing": True,
             "generated_media_is_evidence": False,
         },
@@ -512,6 +617,12 @@ def render_video(
         "stem_meter_summary_json": str(meter_path),
         "stem_count": len(stem_map),
         "visual_lane_count": sum(len(lanes) for lanes in stem_map.values()),
+        "guitar_laser_alpha": DEFAULT_GUITAR_LASER_ALPHA,
+        "banner": {
+            "position": "lower_scrolling",
+            "text": banner_text,
+            "purpose": "identity_and_generation_tech",
+        },
         "accepted_boundary": manifest["boundary"],
     }
     receipt_path.write_text(json.dumps(receipt, indent=2, allow_nan=False), encoding="utf-8")
@@ -526,12 +637,13 @@ def main() -> int:
     parser.add_argument("--stems-zip", required=True)
     parser.add_argument("--output-root", default=str(DEFAULT_OUTPUT_ROOT))
     parser.add_argument("--run-id", default="becoming_the_wolf_stem_state_nightmare_30s")
-    parser.add_argument("--duration", type=float, default=30.0)
+    parser.add_argument("--duration", type=float, default=30.0, help="Seconds to render. Use 0 for full master WAV duration.")
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--encoder", choices=["libx264", "h264_qsv"], default="libx264")
     parser.add_argument("--style-reference-path", default="")
+    parser.add_argument("--banner-text", default="")
     args = parser.parse_args()
     manifest = render_video(
         master_audio=Path(args.audio),
@@ -544,6 +656,7 @@ def main() -> int:
         height=args.height,
         encoder=args.encoder,
         style_reference_path=Path(args.style_reference_path) if args.style_reference_path else None,
+        banner_text=args.banner_text or None,
     )
     print(json.dumps(manifest, indent=2, allow_nan=False))
     return 0

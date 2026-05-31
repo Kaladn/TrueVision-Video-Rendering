@@ -11,7 +11,13 @@ SCRIPTS = ROOT / "scripts"
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
-from render_stem_state_nightmare import build_stem_control_map, compute_frame_metrics, render_frame
+from render_stem_state_nightmare import (
+    DEFAULT_GUITAR_LASER_ALPHA,
+    build_generation_banner,
+    build_stem_control_map,
+    compute_frame_metrics,
+    render_frame,
+)
 
 
 class StemStateNightmareTests(unittest.TestCase):
@@ -50,6 +56,22 @@ class StemStateNightmareTests(unittest.TestCase):
         self.assertEqual(frame.dtype.name, "uint8")
         self.assertGreater(frame.max(), 20)
         self.assertIn("Drums", lane_log["stem_controls"])
+
+    def test_guitar_lasers_are_35_percent_translucent_and_banner_is_logged(self):
+        mapping = build_stem_control_map()
+        frame_state = {
+            "frame_index": 12,
+            "time_seconds": 0.4,
+            "stems": {
+                stem_name: {"rms": 0.55, "onset": 0.35, "bass": 0.25, "mid": 0.5, "high": 0.4}
+                for stem_name in mapping
+            },
+        }
+        _, lane_log = render_frame(frame_state, width=320, height=180, stem_map=mapping)
+        self.assertAlmostEqual(lane_log["render_lanes"]["guitar_laser_alpha"], DEFAULT_GUITAR_LASER_ALPHA)
+        self.assertAlmostEqual(DEFAULT_GUITAR_LASER_ALPHA, 0.35)
+        self.assertIn("CORTEX EVOLVED", build_generation_banner())
+        self.assertEqual(lane_log["banner"]["position"], "lower_scrolling")
 
 
 if __name__ == "__main__":
