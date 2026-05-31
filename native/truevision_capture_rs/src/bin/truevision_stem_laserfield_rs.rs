@@ -9,6 +9,7 @@ use zip::ZipArchive;
 
 const STEMS: [&str; 6] = ["Drums", "Bass", "Guitar", "Vocals", "Synth", "FX"];
 const GUITAR_LASER_ALPHA: f32 = 0.35;
+const VISIBLE_STEM_METER_OVERLAY: bool = true;
 
 #[derive(Clone)]
 struct Args {
@@ -444,31 +445,20 @@ fn meters_for<'a>(tracks: &'a [StemTrack], name: &str, frame_index: usize) -> Me
 }
 
 fn render_frame(args: &Args, tracks: &[StemTrack], frame_index: usize, t: f32, frame: &mut [u8]) {
-    let drums = {
-        let m = meters_for(tracks, "Drums", frame_index);
-        m.rms.max(m.onset)
-    };
-    let bass = {
-        let m = meters_for(tracks, "Bass", frame_index);
-        m.rms.max(m.bass)
-    };
-    let guitar = {
-        let m = meters_for(tracks, "Guitar", frame_index);
-        m.rms.max(m.mid)
-    };
-    let guitar_mid = meters_for(tracks, "Guitar", frame_index).mid;
-    let vocals = {
-        let m = meters_for(tracks, "Vocals", frame_index);
-        m.rms.max(m.mid)
-    };
-    let synth = {
-        let m = meters_for(tracks, "Synth", frame_index);
-        m.rms.max(m.high)
-    };
-    let fx = {
-        let m = meters_for(tracks, "FX", frame_index);
-        m.rms.max(m.onset)
-    };
+    let drum_m = meters_for(tracks, "Drums", frame_index);
+    let bass_m = meters_for(tracks, "Bass", frame_index);
+    let guitar_m = meters_for(tracks, "Guitar", frame_index);
+    let vocal_m = meters_for(tracks, "Vocals", frame_index);
+    let synth_m = meters_for(tracks, "Synth", frame_index);
+    let fx_m = meters_for(tracks, "FX", frame_index);
+
+    let drums = drum_m.rms.max(drum_m.onset);
+    let bass = bass_m.rms.max(bass_m.bass);
+    let guitar = guitar_m.rms.max(guitar_m.mid);
+    let guitar_mid = guitar_m.mid;
+    let vocals = voice_pressure(vocal_m);
+    let synth = synth_m.rms.max(synth_m.high);
+    let fx = fx_m.rms.max(fx_m.onset);
 
     fill_background(frame, args.width, args.height, synth, guitar, fx);
     draw_depth_grid(frame, args.width, args.height, bass, drums, t);
@@ -476,12 +466,25 @@ fn render_frame(args: &Args, tracks: &[StemTrack], frame_index: usize, t: f32, f
     draw_laser_ribbons(frame, args.width, args.height, guitar, guitar_mid, synth, t);
     draw_shards(frame, args.width, args.height, drums, fx, t, frame_index);
     apply_mirror_prism(frame, args.width, args.height, synth, fx, t);
-    let drum_onset = meters_for(tracks, "Drums", frame_index).onset;
-    let fx_onset = meters_for(tracks, "FX", frame_index).onset;
+    draw_vocal_stem_lane(frame, args.width, args.height, vocal_m, t);
+    let drum_onset = drum_m.onset;
+    let fx_onset = fx_m.onset;
     if fx_onset > 0.62 || drum_onset > 0.72 {
         flash(frame, (fx_onset.max(drum_onset) * 26.0) as u8);
     }
+    if VISIBLE_STEM_METER_OVERLAY {
+        draw_visible_stem_meter_overlay(frame, args.width, args.height, tracks, frame_index);
+    }
     draw_lower_banner(frame, args.width, args.height, build_generation_banner(), t);
+}
+
+fn voice_pressure(meters: Meters) -> f32 {
+    meters
+        .rms
+        .max(meters.mid)
+        .max(meters.high * 0.78)
+        .max(meters.onset * 0.72)
+        .clamp(0.0, 1.0)
 }
 
 fn fill_background(frame: &mut [u8], width: usize, height: usize, synth: f32, guitar: f32, fx: f32) {
@@ -600,6 +603,156 @@ fn draw_laser_ribbons(frame: &mut [u8], width: usize, height: usize, guitar: f32
     }
 }
 
+fn draw_vocal_stem_lane(frame: &mut [u8], width: usize, height: usize, vocals: Meters, t: f32) {
+    let pressure = voice_pressure(vocals);
+    let cx = width as i32 / 2;
+    let top = (height as f32 * 0.14) as i32;
+    let bottom = (height as f32 * 0.86) as i32;
+    let cy = (height as f32 * 0.52) as i32;
+    let beam = Color::new(0.82 * 255.0, (0.92 + pressure * 0.08) * 255.0, 1.00 * 255.0);
+    let amber = Color::new(1.00 * 255.0, 0.62 * 255.0, 0.12 * 255.0);
+
+    draw_line(
+        frame,
+        width,
+        height,
+        cx,
+        top,
+        cx,
+        bottom,
+        beam,
+        0.20 + pressure * 0.42,
+        5 + (pressure * 18.0) as i32,
+    );
+    draw_line(
+        frame,
+        width,
+        height,
+        cx,
+        top,
+        cx,
+        bottom,
+        Color::new(1.0 * 255.0, 1.0 * 255.0, 1.0 * 255.0),
+        0.18 + pressure * 0.52,
+        1 + (pressure * 5.0) as i32,
+    );
+
+    let mut left_prev: Option<(i32, i32)> = None;
+    let mut right_prev: Option<(i32, i32)> = None;
+    for step in 0..96 {
+        let n = step as f32 / 95.0;
+        let y = top as f32 + n * (bottom - top) as f32;
+        let envelope = (1.0 - ((n - 0.5).abs() * 1.55)).clamp(0.0, 1.0);
+        let wave = (t * (5.2 + vocals.mid * 5.0) + step as f32 * (0.30 + vocals.high * 0.15)).sin();
+        let amp = width as f32 * (0.035 + pressure * 0.075) * envelope;
+        let spread = width as f32 * (0.075 + pressure * 0.045);
+        let left = (cx as f32 - spread - wave * amp) as i32;
+        let right = (cx as f32 + spread + wave * amp) as i32;
+        let point_y = y as i32;
+        if let Some((px, py)) = left_prev {
+            draw_line(frame, width, height, px, py, left, point_y, beam, 0.30 + pressure * 0.46, 2);
+        }
+        if let Some((px, py)) = right_prev {
+            draw_line(frame, width, height, px, py, right, point_y, beam, 0.30 + pressure * 0.46, 2);
+        }
+        if step % 8 == 0 {
+            let rib = (width as f32 * (0.018 + pressure * 0.048) * envelope) as i32;
+            draw_line(frame, width, height, cx - rib, point_y, cx + rib, point_y, amber, 0.18 + pressure * 0.28, 1);
+        }
+        left_prev = Some((left, point_y));
+        right_prev = Some((right, point_y));
+    }
+
+    for ring in 0..4 {
+        let scale = 1.0 + ring as f32 * 0.42;
+        let rx = (width as f32 * (0.060 + pressure * 0.070) * scale) as i32;
+        let ry = (height as f32 * (0.045 + pressure * 0.038) * scale) as i32;
+        draw_ellipse_outline(
+            frame,
+            width,
+            height,
+            cx,
+            cy,
+            rx,
+            ry,
+            t * (34.0 + vocals.high * 42.0) + ring as f32 * 27.0,
+            beam,
+            0.24 + pressure * 0.24,
+        );
+    }
+}
+
+fn draw_visible_stem_meter_overlay(frame: &mut [u8], width: usize, height: usize, tracks: &[StemTrack], frame_index: usize) {
+    let panel_x = 14;
+    let panel_y = 14;
+    let panel_w = (width as f32 * 0.25).clamp(190.0, 360.0) as i32;
+    let row_h = 16;
+    let panel_h = 24 + row_h * STEMS.len() as i32;
+    fill_rect(
+        frame,
+        width,
+        height,
+        panel_x - 8,
+        panel_y - 8,
+        panel_w + 16,
+        panel_h,
+        Color::new(0.0, 0.0, 0.0),
+        0.62,
+    );
+    draw_text(
+        frame,
+        width,
+        height,
+        "STEM LANES LIVE",
+        panel_x,
+        panel_y,
+        1,
+        Color::new(0.78 * 255.0, 0.94 * 255.0, 1.00 * 255.0),
+        0.95,
+    );
+    for (index, stem) in STEMS.iter().enumerate() {
+        let m = meters_for(tracks, stem, frame_index);
+        let value = match *stem {
+            "Drums" => m.rms.max(m.onset),
+            "Bass" => m.rms.max(m.bass),
+            "Guitar" => m.rms.max(m.mid),
+            "Vocals" => voice_pressure(m),
+            "Synth" => m.rms.max(m.high),
+            "FX" => m.rms.max(m.onset),
+            _ => m.rms,
+        }
+        .clamp(0.0, 1.0);
+        let y = panel_y + 18 + index as i32 * row_h;
+        draw_text(
+            frame,
+            width,
+            height,
+            stem,
+            panel_x,
+            y,
+            1,
+            stem_color(stem),
+            0.90,
+        );
+        let bar_x = panel_x + 62;
+        let bar_w = panel_w - 76;
+        fill_rect(frame, width, height, bar_x, y + 2, bar_w, 8, Color::new(0.05 * 255.0, 0.06 * 255.0, 0.07 * 255.0), 0.80);
+        fill_rect(frame, width, height, bar_x, y + 2, (bar_w as f32 * value) as i32, 8, stem_color(stem), 0.82);
+    }
+}
+
+fn stem_color(stem: &str) -> Color {
+    match stem {
+        "Drums" => Color::new(1.00 * 255.0, 0.28 * 255.0, 0.20 * 255.0),
+        "Bass" => Color::new(1.00 * 255.0, 0.68 * 255.0, 0.10 * 255.0),
+        "Guitar" => Color::new(0.90 * 255.0, 1.00 * 255.0, 0.18 * 255.0),
+        "Vocals" => Color::new(0.70 * 255.0, 0.92 * 255.0, 1.00 * 255.0),
+        "Synth" => Color::new(0.40 * 255.0, 0.42 * 255.0, 1.00 * 255.0),
+        "FX" => Color::new(1.00 * 255.0, 0.26 * 255.0, 0.92 * 255.0),
+        _ => Color::new(0.70 * 255.0, 0.70 * 255.0, 0.70 * 255.0),
+    }
+}
+
 fn draw_shards(frame: &mut [u8], width: usize, height: usize, drums: f32, fx: f32, t: f32, frame_index: usize) {
     let mut rng = XorShift::new(frame_index as u64 * 17 + 444);
     let shard_count = (10.0 + drums * 42.0 + fx * 34.0) as usize;
@@ -700,6 +853,17 @@ fn draw_text(frame: &mut [u8], width: usize, height: usize, text: &str, x: i32, 
     for ch in text.chars() {
         draw_char(frame, width, height, ch, cursor, y, scale, color, alpha);
         cursor += 6 * scale;
+    }
+}
+
+fn fill_rect(frame: &mut [u8], width: usize, height: usize, x: i32, y: i32, w: i32, h: i32, color: Color, alpha: f32) {
+    if w <= 0 || h <= 0 {
+        return;
+    }
+    for yy in y.max(0)..(y + h).min(height as i32) {
+        for xx in x.max(0)..(x + w).min(width as i32) {
+            blend_pixel(frame, width, height, xx, yy, color, alpha);
+        }
     }
 }
 
@@ -968,7 +1132,7 @@ fn build_meter_summary(args: &Args, tracks: &[StemTrack], sample_rate: usize, fr
         ));
     }
     format!(
-        "{{\n  \"schema_version\":\"truevision_stem_meter_summary_rs_v1\",\n  \"renderer\":\"rust\",\n  \"master_audio\":\"{}\",\n  \"stems_zip\":\"{}\",\n  \"sample_rate\":{},\n  \"fps\":{},\n  \"duration_seconds\":{},\n  \"frame_count\":{},\n  \"stem_sources\":[{}],\n  \"boundary\":{{\"python_render_loop\":false,\"stems_drive_visual_lanes\":true,\"guitar_laser_alpha\":0.35}}\n}}\n",
+        "{{\n  \"schema_version\":\"truevision_stem_meter_summary_rs_v1\",\n  \"renderer\":\"rust\",\n  \"master_audio\":\"{}\",\n  \"stems_zip\":\"{}\",\n  \"sample_rate\":{},\n  \"fps\":{},\n  \"duration_seconds\":{},\n  \"frame_count\":{},\n  \"stem_sources\":[{}],\n  \"boundary\":{{\"python_render_loop\":false,\"stems_drive_visual_lanes\":true,\"visible_stem_meter_overlay\":true,\"vocal_stem_visual_lane\":true,\"guitar_laser_alpha\":0.35}}\n}}\n",
         json_escape(&args.audio.display().to_string()),
         json_escape(&args.stems_zip.display().to_string()),
         sample_rate,
@@ -997,11 +1161,14 @@ fn frame_state_json(tracks: &[StemTrack], frame_index: usize, time_seconds: f64)
             m.high
         ));
     }
+    let vocal = meters_for(tracks, "Vocals", frame_index);
+    let vocal_pressure = voice_pressure(vocal);
     format!(
-        "{{\"schema_version\":\"truevision_stem_state_nightmare_frame_rs_v1\",\"renderer\":\"rust\",\"frame_index\":{},\"time_seconds\":{:.6},\"stem_controls\":{{{}}},\"render_lanes\":{{\"guitar_laser_alpha\":0.35}},\"banner\":{{\"position\":\"lower_scrolling\",\"purpose\":\"identity_and_generation_tech\"}},\"boundary\":{{\"python_render_loop\":false,\"stems_drive_visual_lanes\":true,\"generated_media_is_evidence\":false}}}}",
+        "{{\"schema_version\":\"truevision_stem_state_nightmare_frame_rs_v1\",\"renderer\":\"rust\",\"frame_index\":{},\"time_seconds\":{:.6},\"stem_controls\":{{{}}},\"render_lanes\":{{\"guitar_laser_alpha\":0.35,\"visible_stem_lanes\":[\"Drums\",\"Bass\",\"Guitar\",\"Vocals\",\"Synth\",\"FX\"],\"vocal_lane\":{{\"driver_stem\":\"Vocals\",\"visible\":true,\"shape\":\"center_voice_column_waveform\",\"voice_pressure\":{:.6}}}}},\"banner\":{{\"position\":\"lower_scrolling\",\"purpose\":\"identity_and_generation_tech\"}},\"boundary\":{{\"python_render_loop\":false,\"stems_drive_visual_lanes\":true,\"visible_stem_meter_overlay\":true,\"vocal_stem_visual_lane\":true,\"generated_media_is_evidence\":false}}}}",
         frame_index,
         time_seconds,
-        controls
+        controls,
+        vocal_pressure
     )
 }
 
@@ -1027,7 +1194,7 @@ fn manifest_json(
     wall_seconds: f64,
 ) -> String {
     format!(
-        "{{\n  \"schema_version\":\"truevision_stem_state_nightmare_manifest_rs_v1\",\n  \"renderer\":\"rust\",\n  \"run_id\":\"{}\",\n  \"source\":{{\"master_audio\":\"{}\",\"stems_zip\":\"{}\"}},\n  \"output\":{{\"mp4\":\"{}\",\"frame_state_jsonl\":\"{}\",\"stem_meter_summary_json\":\"{}\",\"width\":{},\"height\":{},\"fps\":{},\"duration_seconds\":{},\"frame_count\":{},\"encoder\":\"{}\",\"wall_seconds\":{:.6}}},\n  \"banner\":{{\"position\":\"lower_scrolling\",\"text\":\"{}\",\"purpose\":\"identity_and_generation_tech\"}},\n  \"sample_rate\":{},\n  \"boundary\":{{\"python_render_loop\":false,\"external_visual_assets_used\":false,\"openai_generation_used\":false,\"art_imports_used\":false,\"stems_drive_visual_lanes\":true,\"guitar_laser_alpha\":0.35,\"master_audio_drives_global_timing\":true,\"generated_media_is_evidence\":false}}\n}}\n",
+        "{{\n  \"schema_version\":\"truevision_stem_state_nightmare_manifest_rs_v1\",\n  \"renderer\":\"rust\",\n  \"run_id\":\"{}\",\n  \"source\":{{\"master_audio\":\"{}\",\"stems_zip\":\"{}\"}},\n  \"output\":{{\"mp4\":\"{}\",\"frame_state_jsonl\":\"{}\",\"stem_meter_summary_json\":\"{}\",\"width\":{},\"height\":{},\"fps\":{},\"duration_seconds\":{},\"frame_count\":{},\"encoder\":\"{}\",\"wall_seconds\":{:.6}}},\n  \"banner\":{{\"position\":\"lower_scrolling\",\"text\":\"{}\",\"purpose\":\"identity_and_generation_tech\"}},\n  \"sample_rate\":{},\n  \"boundary\":{{\"python_render_loop\":false,\"external_visual_assets_used\":false,\"openai_generation_used\":false,\"art_imports_used\":false,\"stems_drive_visual_lanes\":true,\"visible_stem_meter_overlay\":true,\"vocal_stem_visual_lane\":true,\"guitar_laser_alpha\":0.35,\"master_audio_drives_global_timing\":true,\"generated_media_is_evidence\":false}}\n}}\n",
         json_escape(&args.run_id),
         json_escape(&args.audio.display().to_string()),
         json_escape(&args.stems_zip.display().to_string()),
@@ -1048,7 +1215,7 @@ fn manifest_json(
 
 fn receipt_json(args: &Args, video_path: &PathBuf, manifest_path: &PathBuf, state_path: &PathBuf, wall_seconds: f64) -> String {
     format!(
-        "{{\n  \"schema_version\":\"truevision_stem_state_nightmare_receipt_rs_v1\",\n  \"renderer\":\"rust\",\n  \"run_id\":\"{}\",\n  \"status\":\"complete\",\n  \"output_mp4\":\"{}\",\n  \"manifest_json\":\"{}\",\n  \"frame_state_jsonl\":\"{}\",\n  \"elapsed_seconds\":{:.6},\n  \"boundary\":{{\"python_render_loop\":false,\"stems_drive_visual_lanes\":true,\"guitar_laser_alpha\":0.35,\"generated_media_is_evidence\":false}}\n}}\n",
+        "{{\n  \"schema_version\":\"truevision_stem_state_nightmare_receipt_rs_v1\",\n  \"renderer\":\"rust\",\n  \"run_id\":\"{}\",\n  \"status\":\"complete\",\n  \"output_mp4\":\"{}\",\n  \"manifest_json\":\"{}\",\n  \"frame_state_jsonl\":\"{}\",\n  \"elapsed_seconds\":{:.6},\n  \"boundary\":{{\"python_render_loop\":false,\"stems_drive_visual_lanes\":true,\"visible_stem_meter_overlay\":true,\"vocal_stem_visual_lane\":true,\"guitar_laser_alpha\":0.35,\"generated_media_is_evidence\":false}}\n}}\n",
         json_escape(&args.run_id),
         json_escape(&video_path.display().to_string()),
         json_escape(&manifest_path.display().to_string()),

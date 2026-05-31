@@ -89,11 +89,16 @@ class NativeStemLaserfieldRsTests(unittest.TestCase):
             self.assertEqual(manifest["renderer"], "rust")
             self.assertFalse(manifest["boundary"]["python_render_loop"])
             self.assertTrue(manifest["boundary"]["stems_drive_visual_lanes"])
+            self.assertTrue(manifest["boundary"]["visible_stem_meter_overlay"])
+            self.assertTrue(manifest["boundary"]["vocal_stem_visual_lane"])
             self.assertEqual(manifest["boundary"]["guitar_laser_alpha"], 0.35)
             self.assertEqual(manifest["banner"]["position"], "lower_scrolling")
             state_line = state_path.read_text(encoding="utf-8").splitlines()[0]
             self.assertIn('"stem_controls"', state_line)
             self.assertIn('"Guitar"', state_line)
+            self.assertIn('"visible_stem_lanes"', state_line)
+            self.assertIn('"vocal_lane"', state_line)
+            self.assertIn('"voice_pressure"', state_line)
 
 
 if __name__ == "__main__":
