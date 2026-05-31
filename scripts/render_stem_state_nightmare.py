@@ -4,8 +4,11 @@ import argparse
 import io
 import json
 import math
+import os
+import re
 import subprocess
 import time
+import unicodedata
 import wave
 import zipfile
 from pathlib import Path
@@ -25,6 +28,70 @@ def build_generation_banner() -> str:
         "CORTEX EVOLVED  /  TRUEVISION STATE GENERATION  /  LOCAL FIRST  /  "
         "STEM-DRIVEN LIGHT  /  RECEIPT-BACKED CREATION  /  MUSIC STATE MADE VISIBLE"
     )
+
+
+def _ascii_normalized(value: str) -> str:
+    replacements = {
+        "\u2018": "'",
+        "\u2019": "'",
+        "\u201c": '"',
+        "\u201d": '"',
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2026": "...",
+        "\u2192": "->",
+    }
+    for old, new in replacements.items():
+        value = value.replace(old, new)
+    value = unicodedata.normalize("NFKD", value)
+    return value.encode("ascii", "ignore").decode("ascii")
+
+
+def _split_lyric_line(line: str, *, max_chars: int = 34) -> list[str]:
+    line = re.sub(r"\s+", " ", line).strip(" -")
+    if not line:
+        return []
+    parts = [part.strip() for part in re.split(r"\s*/\s*|,\s*", line) if part.strip()]
+    if len(parts) > 1:
+        chunks: list[str] = []
+        for part in parts:
+            chunks.extend(_split_lyric_line(part, max_chars=max_chars))
+        return chunks
+    words = line.split()
+    chunks = []
+    current: list[str] = []
+    for word in words:
+        candidate = " ".join(current + [word])
+        if current and len(candidate) > max_chars:
+            chunks.append(" ".join(current))
+            current = [word]
+        else:
+            current.append(word)
+    if current:
+        chunks.append(" ".join(current))
+    return chunks
+
+
+def build_lyric_burn_lines(text: str | None) -> list[str]:
+    if not text or not text.strip():
+        return ["BECOMING THE WOLF"]
+    lines: list[str] = []
+    for raw_line in _ascii_normalized(text).splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        if line in {"[", "]"}:
+            continue
+        if line.startswith("[") and line.endswith("]"):
+            continue
+        if line.startswith("(") and line.endswith(")"):
+            continue
+        line = re.sub(r"^\([^)]*\)\s*", "", line).strip()
+        if not line:
+            continue
+        for chunk in _split_lyric_line(line):
+            lines.append(chunk.upper())
+    return lines or ["BECOMING THE WOLF"]
 
 
 def _safe_id(value: str) -> str:
@@ -338,6 +405,86 @@ def _draw_lower_banner(image: np.ndarray, *, text: str, t: float) -> None:
         x += text_w + 80
 
 
+def _active_lyric_text(lyric_lines: list[str], t: float, *, line_span_seconds: float) -> str:
+    if not lyric_lines:
+        return ""
+    index = int(max(0.0, t) / max(0.25, line_span_seconds))
+    return lyric_lines[min(index, len(lyric_lines) - 1)]
+
+
+def _draw_fog_laser_lyric_burn(
+    image: np.ndarray,
+    *,
+    text: str,
+    vocal: float,
+    onset: float,
+    drums: float,
+    bass: float,
+    fx: float,
+    t: float,
+) -> dict[str, Any]:
+    height, width = image.shape[:2]
+    burn_opacity = float(np.clip(vocal * 0.78 + onset * 0.58, 0.0, 1.0))
+    if not text or burn_opacity <= 0.015:
+        return {
+            "driver_stem": "Vocals",
+            "fog_laser_beam": True,
+            "active_text": text,
+            "burn_opacity": 0.0,
+            "edge_bloom": 0.0,
+        }
+
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    scale = min(1.25, max(0.48, width / max(1, len(text)) / 23.0))
+    thickness = max(1, int(round(height / 360)))
+    text_w, text_h = cv2.getTextSize(text, font, scale, thickness)[0]
+    x = max(18, (width - text_w) // 2)
+    y = int(height * 0.72)
+
+    fog_layer = np.zeros_like(image, dtype=np.uint8)
+    beam_color = (
+        int(120 + 80 * vocal),
+        int(210 + 35 * onset),
+        int(220 + 25 * drums),
+    )
+    target = (x + text_w // 2, y - text_h // 2)
+    left_origin = (int(width * (0.06 + 0.03 * math.sin(t))), int(height * (0.58 + 0.03 * math.cos(t * 0.7))))
+    right_origin = (int(width * (0.94 + 0.03 * math.cos(t * 0.8))), int(height * (0.58 + 0.03 * math.sin(t * 0.6))))
+    beam_width = max(6, int(10 + burn_opacity * 28 + bass * 20))
+    cv2.line(fog_layer, left_origin, target, beam_color, beam_width, cv2.LINE_AA)
+    cv2.line(fog_layer, right_origin, target, beam_color, beam_width, cv2.LINE_AA)
+    fog_layer = cv2.GaussianBlur(fog_layer, (0, 0), sigmaX=18 + burn_opacity * 24, sigmaY=9 + bass * 16)
+
+    text_layer = np.zeros_like(image, dtype=np.uint8)
+    shadow_offset = max(2, int(3 + bass * 8))
+    cv2.putText(text_layer, text, (x + shadow_offset, y + shadow_offset), font, scale, (15, 12, 9), thickness + 3, cv2.LINE_AA)
+    cv2.putText(text_layer, text, (x, y), font, scale, (255, 232, 160), thickness + 2, cv2.LINE_AA)
+    cv2.putText(text_layer, text, (x, y), font, scale, (245, 255, 255), thickness, cv2.LINE_AA)
+    bloom = cv2.GaussianBlur(text_layer, (0, 0), sigmaX=4 + vocal * 8, sigmaY=4 + fx * 10)
+
+    float_image = image.astype(np.float32)
+    float_image += fog_layer.astype(np.float32) * (0.10 + burn_opacity * 0.28)
+    float_image += bloom.astype(np.float32) * (0.08 + burn_opacity * 0.38)
+    float_image += text_layer.astype(np.float32) * (0.18 + burn_opacity * 0.55)
+
+    if fx > 0.22:
+        tear_rows = max(1, int(fx * 5))
+        for row_index in range(tear_rows):
+            row_y = int(np.clip(y - text_h + row_index * text_h / max(1, tear_rows), 0, height - 1))
+            row_h = max(1, int(2 + fx * 8))
+            shift = int(math.sin(t * 8.0 + row_index) * fx * 38)
+            float_image[row_y : min(height, row_y + row_h)] = np.roll(float_image[row_y : min(height, row_y + row_h)], shift, axis=1)
+
+    image[:] = np.clip(float_image, 0, 255).astype(np.uint8)
+    return {
+        "driver_stem": "Vocals",
+        "fog_laser_beam": True,
+        "active_text": text,
+        "burn_opacity": round(burn_opacity, 6),
+        "edge_bloom": round(float(0.08 + burn_opacity * 0.38), 6),
+    }
+
+
 def render_frame(
     frame_state: dict[str, Any],
     *,
@@ -345,6 +492,8 @@ def render_frame(
     height: int,
     stem_map: dict[str, list[str]] | None = None,
     banner_text: str | None = None,
+    lyric_lines: list[str] | None = None,
+    lyric_span_seconds: float = 2.6,
 ) -> tuple[np.ndarray, dict[str, Any]]:
     stem_map = stem_map or build_stem_control_map()
     t = float(frame_state.get("time_seconds") or 0.0)
@@ -372,6 +521,17 @@ def render_frame(
         frame[:] = np.clip(frame + 0.12 * max(_meter(frame_state, "FX", "onset"), _meter(frame_state, "Drums", "onset")), 0.0, 1.0)
 
     image = np.clip(frame * 255.0, 0, 255).astype(np.uint8)
+    active_lyric = _active_lyric_text(lyric_lines or [], t, line_span_seconds=lyric_span_seconds)
+    lyric_burn_log = _draw_fog_laser_lyric_burn(
+        image,
+        text=active_lyric,
+        vocal=vocals,
+        onset=_meter(frame_state, "Vocals", "onset"),
+        drums=drums,
+        bass=bass,
+        fx=fx,
+        t=t,
+    )
     banner_text = banner_text or build_generation_banner()
     _draw_lower_banner(image, text=banner_text, t=t)
     lane_log = {
@@ -397,6 +557,7 @@ def render_frame(
             "text": banner_text,
             "purpose": "identity_and_generation_tech",
         },
+        "lyric_burn": lyric_burn_log,
     }
     return image, lane_log
 
@@ -437,13 +598,23 @@ def _write_video_only(
     state_path: Path,
     stem_map: dict[str, list[str]],
     banner_text: str,
+    lyric_lines: list[str],
+    lyric_span_seconds: float,
 ) -> str:
     fps = int(metrics["fps"])
     process = subprocess.Popen(_video_command(path, width=width, height=height, fps=fps, encoder=encoder), stdin=subprocess.PIPE)
     assert process.stdin is not None
     with state_path.open("w", encoding="utf-8") as state_file:
         for frame_state in metrics["frames"]:
-            frame, lane_log = render_frame(frame_state, width=width, height=height, stem_map=stem_map, banner_text=banner_text)
+            frame, lane_log = render_frame(
+                frame_state,
+                width=width,
+                height=height,
+                stem_map=stem_map,
+                banner_text=banner_text,
+                lyric_lines=lyric_lines,
+                lyric_span_seconds=lyric_span_seconds,
+            )
             record = dict(frame_state)
             record["schema_version"] = "truevision_stem_state_nightmare_frame_v1"
             record["lane_log"] = lane_log
@@ -496,11 +667,14 @@ def render_video(
     encoder: str = "libx264",
     style_reference_path: Path | None = None,
     banner_text: str | None = None,
+    lyric_text: str | None = None,
+    lyric_span_seconds: float = 2.6,
 ) -> dict[str, Any]:
     stem_map = build_stem_control_map()
     if duration <= 0:
         duration = infer_wav_duration_seconds(master_audio)
     banner_text = banner_text or build_generation_banner()
+    lyric_lines = build_lyric_burn_lines(lyric_text)
     run_id = _safe_id(run_id)
     run_dir = output_root / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -527,6 +701,13 @@ def render_video(
             "text": banner_text,
             "purpose": "identity_and_generation_tech",
         },
+        "lyric_burn": {
+            "driver_stem": "Vocals",
+            "fog_laser_beam": True,
+            "line_count": len(lyric_lines),
+            "line_span_seconds": lyric_span_seconds,
+            "source": "provided_lyrics" if lyric_text and lyric_text.strip() else "fallback_title",
+        },
         "fps": fps,
         "frame_count": metrics["frame_count"],
         "summary": metrics["summary"],
@@ -549,6 +730,8 @@ def render_video(
             state_path=state_path,
             stem_map=stem_map,
             banner_text=banner_text,
+            lyric_lines=lyric_lines,
+            lyric_span_seconds=lyric_span_seconds,
         )
     except Exception:
         if encoder == "libx264":
@@ -563,6 +746,8 @@ def render_video(
             state_path=state_path,
             stem_map=stem_map,
             banner_text=banner_text,
+            lyric_lines=lyric_lines,
+            lyric_span_seconds=lyric_span_seconds,
         )
     _mux_audio(video_only_path, master_audio, output_path, duration=duration)
 
@@ -595,6 +780,13 @@ def render_video(
             "text": banner_text,
             "purpose": "identity_and_generation_tech",
         },
+        "lyric_burn": {
+            "driver_stem": "Vocals",
+            "fog_laser_beam": True,
+            "line_count": len(lyric_lines),
+            "line_span_seconds": lyric_span_seconds,
+            "source": "provided_lyrics" if lyric_text and lyric_text.strip() else "fallback_title",
+        },
         "boundary": {
             "external_visual_assets_used": False,
             "openai_generation_used": False,
@@ -623,6 +815,12 @@ def render_video(
             "text": banner_text,
             "purpose": "identity_and_generation_tech",
         },
+        "lyric_burn": {
+            "driver_stem": "Vocals",
+            "fog_laser_beam": True,
+            "line_count": len(lyric_lines),
+            "line_span_seconds": lyric_span_seconds,
+        },
         "accepted_boundary": manifest["boundary"],
     }
     receipt_path.write_text(json.dumps(receipt, indent=2, allow_nan=False), encoding="utf-8")
@@ -644,7 +842,15 @@ def main() -> int:
     parser.add_argument("--encoder", choices=["libx264", "h264_qsv"], default="libx264")
     parser.add_argument("--style-reference-path", default="")
     parser.add_argument("--banner-text", default="")
+    parser.add_argument("--lyrics-file", default="")
+    parser.add_argument("--lyrics-env", default="")
+    parser.add_argument("--lyric-span-seconds", type=float, default=2.6)
     args = parser.parse_args()
+    lyric_text = ""
+    if args.lyrics_file:
+        lyric_text = Path(args.lyrics_file).read_text(encoding="utf-8")
+    elif args.lyrics_env:
+        lyric_text = os.environ.get(args.lyrics_env, "")
     manifest = render_video(
         master_audio=Path(args.audio),
         stems_zip=Path(args.stems_zip),
@@ -657,6 +863,8 @@ def main() -> int:
         encoder=args.encoder,
         style_reference_path=Path(args.style_reference_path) if args.style_reference_path else None,
         banner_text=args.banner_text or None,
+        lyric_text=lyric_text or None,
+        lyric_span_seconds=args.lyric_span_seconds,
     )
     print(json.dumps(manifest, indent=2, allow_nan=False))
     return 0

@@ -14,6 +14,7 @@ if str(SCRIPTS) not in sys.path:
 from render_stem_state_nightmare import (
     DEFAULT_GUITAR_LASER_ALPHA,
     build_generation_banner,
+    build_lyric_burn_lines,
     build_stem_control_map,
     compute_frame_metrics,
     render_frame,
@@ -72,6 +73,24 @@ class StemStateNightmareTests(unittest.TestCase):
         self.assertAlmostEqual(DEFAULT_GUITAR_LASER_ALPHA, 0.35)
         self.assertIn("CORTEX EVOLVED", build_generation_banner())
         self.assertEqual(lane_log["banner"]["position"], "lower_scrolling")
+
+    def test_vocal_stem_drives_fog_laser_lyric_burn(self):
+        mapping = build_stem_control_map()
+        lines = build_lyric_burn_lines("BECOMING THE WOLF\nSTATE MADE VISIBLE")
+        frame_state = {
+            "frame_index": 24,
+            "time_seconds": 0.8,
+            "stems": {
+                stem_name: {"rms": 0.15, "onset": 0.05, "bass": 0.1, "mid": 0.1, "high": 0.1}
+                for stem_name in mapping
+            },
+        }
+        frame_state["stems"]["Vocals"] = {"rms": 0.82, "onset": 0.44, "bass": 0.1, "mid": 0.75, "high": 0.26}
+        _, lane_log = render_frame(frame_state, width=420, height=240, stem_map=mapping, lyric_lines=lines)
+        self.assertEqual(lane_log["lyric_burn"]["driver_stem"], "Vocals")
+        self.assertTrue(lane_log["lyric_burn"]["fog_laser_beam"])
+        self.assertGreater(lane_log["lyric_burn"]["burn_opacity"], 0.0)
+        self.assertIn(lane_log["lyric_burn"]["active_text"], lines)
 
 
 if __name__ == "__main__":
