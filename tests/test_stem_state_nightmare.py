@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import sys
 import unittest
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -12,7 +12,7 @@ if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
 
 from render_stem_state_nightmare import (
-    SPECTRUM_BAND_COUNT,
+    DEFAULT_GUITAR_LASER_ALPHA,
     build_generation_banner,
     build_stem_control_map,
     compute_frame_metrics,
@@ -29,35 +29,25 @@ class StemStateNightmareTests(unittest.TestCase):
                 self.assertGreaterEqual(len(lane_names), 2)
                 self.assertLessEqual(len(lane_names), 3)
 
-    def test_compute_frame_metrics_extracts_master_and_stem_spectrum_pairs(self):
+    def test_compute_frame_metrics_extracts_rms_and_onset(self):
         samples = {
-            "Master": np.sin(np.linspace(0, np.pi * 24, 1600, dtype=np.float32)),
-            "Drums": np.concatenate([np.zeros(800, dtype=np.float32), np.ones(800, dtype=np.float32)]),
-            "Bass": np.ones(1600, dtype=np.float32) * 0.25,
+            "Drums": np.concatenate([np.zeros(400, dtype=np.float32), np.ones(400, dtype=np.float32)]),
+            "Bass": np.ones(800, dtype=np.float32) * 0.25,
         }
-        metrics = compute_frame_metrics(samples, sample_rate=1600, fps=4, duration=1.0)
+        metrics = compute_frame_metrics(samples, sample_rate=800, fps=4, duration=1.0)
         self.assertEqual(metrics["frame_count"], 4)
         self.assertEqual(len(metrics["frames"]), 4)
-        self.assertIn("master", metrics["frames"][0])
-        self.assertEqual(len(metrics["frames"][0]["master"]["bands"]), SPECTRUM_BAND_COUNT)
-        self.assertEqual(len(metrics["frames"][0]["stems"]["Bass"]["bands"]), SPECTRUM_BAND_COUNT)
+        self.assertIn("Drums", metrics["frames"][2]["stems"])
         self.assertGreater(metrics["frames"][2]["stems"]["Drums"]["onset"], 0.0)
+        self.assertGreater(metrics["frames"][0]["stems"]["Bass"]["rms"], 0.0)
 
-    def test_render_frame_returns_spectrum_analyzer_with_edge_frame_not_lyrics(self):
+    def test_render_frame_returns_rgb_and_lane_log(self):
         mapping = build_stem_control_map()
         frame_state = {
             "frame_index": 4,
             "time_seconds": 0.133333333,
-            "master": {"rms": 0.5, "onset": 0.25, "bands": [0.5] * SPECTRUM_BAND_COUNT},
             "stems": {
-                stem_name: {
-                    "rms": 0.45,
-                    "onset": 0.2,
-                    "bass": 0.2,
-                    "mid": 0.4,
-                    "high": 0.3,
-                    "bands": [0.35] * SPECTRUM_BAND_COUNT,
-                }
+                stem_name: {"rms": 0.5, "onset": 0.25, "bass": 0.2, "mid": 0.4, "high": 0.3}
                 for stem_name in mapping
             },
         }
@@ -65,15 +55,23 @@ class StemStateNightmareTests(unittest.TestCase):
         self.assertEqual(frame.shape, (180, 320, 3))
         self.assertEqual(frame.dtype.name, "uint8")
         self.assertGreater(frame.max(), 20)
-        self.assertEqual(lane_log["analyzer"]["band_count"], SPECTRUM_BAND_COUNT)
-        self.assertEqual(lane_log["analyzer"]["pairing"], "master_wave_vs_stem")
-        self.assertEqual(lane_log["edge_frame"]["mode"], "spectrum_reactive_perimeter")
-        self.assertGreater(lane_log["edge_frame"]["intensity"], 0.0)
-        self.assertNotIn("lyric_burn", lane_log)
-        self.assertFalse(lane_log["boundary"]["lyrics_used"])
-        self.assertFalse(lane_log["boundary"]["center_lasers_used"])
-        self.assertTrue(lane_log["boundary"]["edge_frame_used"])
+        self.assertIn("Drums", lane_log["stem_controls"])
+
+    def test_guitar_lasers_are_35_percent_translucent_and_banner_is_logged(self):
+        mapping = build_stem_control_map()
+        frame_state = {
+            "frame_index": 12,
+            "time_seconds": 0.4,
+            "stems": {
+                stem_name: {"rms": 0.55, "onset": 0.35, "bass": 0.25, "mid": 0.5, "high": 0.4}
+                for stem_name in mapping
+            },
+        }
+        _, lane_log = render_frame(frame_state, width=320, height=180, stem_map=mapping)
+        self.assertAlmostEqual(lane_log["render_lanes"]["guitar_laser_alpha"], DEFAULT_GUITAR_LASER_ALPHA)
+        self.assertAlmostEqual(DEFAULT_GUITAR_LASER_ALPHA, 0.35)
         self.assertIn("CORTEX EVOLVED", build_generation_banner())
+        self.assertEqual(lane_log["banner"]["position"], "lower_scrolling")
 
 
 if __name__ == "__main__":
