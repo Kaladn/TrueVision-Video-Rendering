@@ -74,8 +74,8 @@ class NativeCortexPhotoStateRsTests(unittest.TestCase):
                     run_id,
                     "--audio",
                     str(master),
-                    "--stems-dir",
-                    str(stems_dir),
+                    "--audio-source",
+                    "master_wav",
                     "--image",
                     str(image),
                     "--plate-mode",
@@ -106,19 +106,31 @@ class NativeCortexPhotoStateRsTests(unittest.TestCase):
 
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             self.assertEqual(manifest["preset"], "cortex_photo_state_transform")
+            self.assertEqual(manifest["source"]["audio_source"], "master_wav")
             self.assertTrue(manifest["boundary"]["photo_state_transform"])
             self.assertTrue(manifest["boundary"]["glyph_schema_from_artwork"])
-            self.assertTrue(manifest["boundary"]["technical_identity_banner"])
+            self.assertTrue(manifest["boundary"]["source_pixel_transform_only"])
+            self.assertTrue(manifest["boundary"]["no_added_visual_artifacts"])
+            self.assertFalse(manifest["boundary"]["technical_identity_banner"])
             self.assertFalse(manifest["boundary"]["moving_objects"])
 
             state_line = state_path.read_text(encoding="utf-8").splitlines()[0]
             self.assertIn('"artifact_groups"', state_line)
             self.assertIn('"gold_edge_flame"', state_line)
             self.assertIn('"line_art_negative_trace"', state_line)
+            self.assertIn('"side_glyph_columns"', state_line)
+            self.assertIn('"core_panel_lines"', state_line)
+            self.assertIn('"side_glyph_column_pulse"', state_line)
+            self.assertIn('"core_panel_line_charge"', state_line)
+            self.assertIn('"sky_sun_glow"', state_line)
+            self.assertIn('"sky_sun_illumination"', state_line)
+            self.assertIn('"audio_meter_bound_artifact_groups"', state_line)
             self.assertIn('"camera_pressure"', state_line)
-            self.assertIn('"banner"', state_line)
+            self.assertIn('"technical_provenance"', state_line)
             self.assertIn('"hardware"', state_line)
             self.assertIn('"artwork_color_schema"', state_line)
+            self.assertIn('"source_pixel_transform_only":true', state_line)
+            self.assertIn('"no_added_visual_artifacts":true', state_line)
 
 
 if __name__ == "__main__":

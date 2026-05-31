@@ -23,6 +23,7 @@ struct Args {
     run_id: String,
     audio: PathBuf,
     stems_dir: PathBuf,
+    audio_source: String,
     image: PathBuf,
     plate_mode: String,
     width: usize,
@@ -61,19 +62,9 @@ struct Masks {
     smoke: f32,
     ember: f32,
     edge: f32,
-}
-
-#[derive(Clone, Copy)]
-struct Color {
-    r: f32,
-    g: f32,
-    b: f32,
-}
-
-impl Color {
-    fn new(r: f32, g: f32, b: f32) -> Self {
-        Self { r, g, b }
-    }
+    side_glyph_columns: f32,
+    core_panel_lines: f32,
+    sky_sun_glow: f32,
 }
 
 struct Plate {
@@ -104,7 +95,11 @@ fn run() -> Result<(), String> {
     let group_path = run_dir.join(format!("{}_artifact_groups.json", args.run_id));
     let frame_count = (args.duration * args.fps as f64).round().max(1.0) as usize;
 
-    let tracks = load_stem_tracks(&args.stems_dir, args.duration, args.fps, frame_count)?;
+    let tracks = if args.audio_source == "master_wav" {
+        load_master_wav_tracks(&args.audio, args.duration, args.fps, frame_count)?
+    } else {
+        load_stem_tracks(&args.stems_dir, args.duration, args.fps, frame_count)?
+    };
     let plate = decode_plate(&args.image, args.width, args.height, &args.plate_mode)?;
     File::create(&group_path)
         .map_err(|e| format!("artifact groups open failed: {e}"))?
@@ -188,6 +183,7 @@ fn parse_args() -> Result<Args, String> {
         run_id: "cortex_photo_state_rs".to_string(),
         audio: PathBuf::new(),
         stems_dir: PathBuf::new(),
+        audio_source: "stems".to_string(),
         image: PathBuf::new(),
         plate_mode: "portrait_fit".to_string(),
         width: 1080,
@@ -208,6 +204,7 @@ fn parse_args() -> Result<Args, String> {
             "--run-id" => args.run_id = slug(&value),
             "--audio" => args.audio = PathBuf::from(value),
             "--stems-dir" => args.stems_dir = PathBuf::from(value),
+            "--audio-source" => args.audio_source = slug(&value),
             "--image" => args.image = PathBuf::from(value),
             "--plate-mode" => args.plate_mode = slug(&value),
             "--width" => args.width = value.parse().map_err(|_| "bad width".to_string())?,
@@ -227,7 +224,10 @@ fn parse_args() -> Result<Args, String> {
     if args.audio.as_os_str().is_empty() {
         return Err("--audio is required".to_string());
     }
-    if args.stems_dir.as_os_str().is_empty() {
+    if args.audio_source != "stems" && args.audio_source != "master_wav" {
+        return Err("--audio-source must be stems or master_wav".to_string());
+    }
+    if args.audio_source == "stems" && args.stems_dir.as_os_str().is_empty() {
         return Err("--stems-dir is required".to_string());
     }
     if args.image.as_os_str().is_empty() {
@@ -261,6 +261,93 @@ fn load_stem_tracks(
         });
     }
     Ok(tracks)
+}
+
+fn load_master_wav_tracks(
+    audio_path: &Path,
+    duration: f64,
+    fps: usize,
+    frame_count: usize,
+) -> Result<Vec<StemTrack>, String> {
+    let samples = decode_audio_with_ffmpeg(audio_path, duration)?;
+    let base_scale = stem_activity_scale(&samples).max(0.35);
+    let base = compute_meters(&samples, SAMPLE_RATE, fps, frame_count);
+    let mut tracks = Vec::new();
+    for (id, label, lane) in STEMS {
+        let meters = derive_master_lane_meters(&base, id);
+        tracks.push(StemTrack {
+            id,
+            label,
+            lane,
+            source_path: audio_path.to_path_buf(),
+            activity_scale: base_scale,
+            meters,
+        });
+    }
+    Ok(tracks)
+}
+
+fn derive_master_lane_meters(base: &[Meters], id: &str) -> Vec<Meters> {
+    base.iter()
+        .map(|m| match id {
+            "lead_vocals" => Meters {
+                rms: (m.rms * 0.62 + m.mid * 0.38).clamp(0.0, 1.0),
+                onset: m.onset * 0.55,
+                bass: m.bass * 0.30,
+                mid: (m.mid * 0.84 + m.rms * 0.16).clamp(0.0, 1.0),
+                high: m.high * 0.34,
+            },
+            "backing_vocals" => Meters {
+                rms: (m.rms * 0.40 + m.high * 0.20).clamp(0.0, 1.0),
+                onset: m.onset * 0.35,
+                bass: m.bass * 0.12,
+                mid: m.mid * 0.48,
+                high: m.high * 0.56,
+            },
+            "drums" => Meters {
+                rms: (m.rms * 0.30 + m.onset * 0.60).clamp(0.0, 1.0),
+                onset: m.onset,
+                bass: (m.bass * 0.45 + m.onset * 0.30).clamp(0.0, 1.0),
+                mid: m.mid * 0.30,
+                high: (m.high * 0.55 + m.onset * 0.30).clamp(0.0, 1.0),
+            },
+            "bass" => Meters {
+                rms: (m.rms * 0.35 + m.bass * 0.55).clamp(0.0, 1.0),
+                onset: m.onset * 0.25,
+                bass: m.bass,
+                mid: m.mid * 0.14,
+                high: m.high * 0.08,
+            },
+            "guitar" => Meters {
+                rms: (m.rms * 0.32 + m.mid * 0.36 + m.high * 0.20).clamp(0.0, 1.0),
+                onset: m.onset * 0.48,
+                bass: m.bass * 0.16,
+                mid: m.mid * 0.78,
+                high: m.high * 0.62,
+            },
+            "percussion" => Meters {
+                rms: (m.onset * 0.55 + m.high * 0.35).clamp(0.0, 1.0),
+                onset: m.onset,
+                bass: m.bass * 0.08,
+                mid: m.mid * 0.28,
+                high: m.high * 0.82,
+            },
+            "synth" => Meters {
+                rms: (m.rms * 0.55 + m.high * 0.18).clamp(0.0, 1.0),
+                onset: m.onset * 0.20,
+                bass: m.bass * 0.24,
+                mid: m.mid * 0.44,
+                high: m.high * 0.70,
+            },
+            _ => Meters {
+                rms: m.rms * 0.42,
+                onset: m.onset * 0.22,
+                bass: m.bass * 0.36,
+                mid: m.mid * 0.30,
+                high: m.high * 0.22,
+            },
+        })
+        .collect()
 }
 
 fn find_stem(stems_dir: &Path, label: &str) -> Result<PathBuf, String> {
@@ -487,6 +574,21 @@ fn compute_masks(pixels: &[u8], width: usize, height: usize) -> Vec<Masks> {
             let smoke = smoothstep(0.16, 0.58, lum) * smoothstep(0.0, 0.32, 1.0 - sat);
             let ember = smoothstep(0.18, 0.86, r) * smoothstep(0.00, 0.36, g) * smoothstep(0.0, 0.18, b);
             let edge = local_edge(pixels, width, height, x, y);
+            let nx = if width > 1 { x as f32 / (width - 1) as f32 } else { 0.0 };
+            let ny = if height > 1 { y as f32 / (height - 1) as f32 } else { 0.0 };
+            let gold_or_line = (gold * 0.78 + text * 0.34 + edge * 0.54).clamp(0.0, 1.0);
+            let side_window = smoothstep(0.16, 0.30, ny) * (1.0 - smoothstep(0.72, 0.88, ny));
+            let left_column = gaussian(nx, 0.145, 0.026);
+            let right_column = gaussian(nx, 0.855, 0.026);
+            let side_glyph_columns = (left_column + right_column).clamp(0.0, 1.0) * side_window * gold_or_line;
+            let core_window = smoothstep(0.20, 0.34, ny) * (1.0 - smoothstep(0.58, 0.76, ny));
+            let core_left_line = gaussian(nx, 0.430, 0.014);
+            let core_right_line = gaussian(nx, 0.570, 0.014);
+            let core_panel_lines = (core_left_line + core_right_line).clamp(0.0, 1.0) * core_window * gold_or_line;
+            let horizon_window = smoothstep(0.45, 0.62, ny) * (1.0 - smoothstep(0.88, 0.99, ny));
+            let horizon_center = gaussian(nx, 0.50, 0.34);
+            let warm_sky = smoothstep(0.10, 0.62, r - b) * smoothstep(0.14, 0.76, lum);
+            let sky_sun_glow = horizon_window * horizon_center * warm_sky * (1.0 - text * 0.70);
             masks[y * width + x] = Masks {
                 gold,
                 text,
@@ -494,10 +596,18 @@ fn compute_masks(pixels: &[u8], width: usize, height: usize) -> Vec<Masks> {
                 smoke,
                 ember,
                 edge,
+                side_glyph_columns,
+                core_panel_lines,
+                sky_sun_glow,
             };
         }
     }
     masks
+}
+
+fn gaussian(value: f32, center: f32, sigma: f32) -> f32 {
+    let d = (value - center) / sigma.max(0.0001);
+    (-0.5 * d * d).exp().clamp(0.0, 1.0)
 }
 
 fn local_edge(pixels: &[u8], width: usize, height: usize, x: usize, y: usize) -> f32 {
@@ -581,6 +691,14 @@ fn render_frame(args: &Args, plate: &Plate, tracks: &[StemTrack], frame_index: u
             g += smoke_wave * 26.0;
             b += smoke_wave * 34.0;
 
+            let sun_breath = m.sky_sun_glow
+                * (0.035 + bass.bass * 0.070 + lead.rms * 0.055 + synth.rms * 0.035)
+                * (0.74 + 0.26 * (t * 0.72).sin());
+            let sun_cap = 232.0;
+            r = (r + sun_breath * 86.0).min(sun_cap);
+            g = (g + sun_breath * 48.0).min(sun_cap * 0.86);
+            b = (b + sun_breath * 14.0).min(sun_cap * 0.48);
+
             let edge_trace = m.edge * (0.035 + synth.high * 0.22 + backing.mid * 0.11);
             let negative = 255.0 - (r + g + b) / 3.0;
             r += edge_trace * negative * 0.75;
@@ -592,14 +710,25 @@ fn render_frame(args: &Args, plate: &Plate, tracks: &[StemTrack], frame_index: u
             g += ember_tick * 44.0;
             b += ember_tick * 4.0;
 
+            let side_column_pulse = m.side_glyph_columns
+                * (0.08 + backing.mid * 0.18 + synth.high * 0.16 + guitar.high * 0.08)
+                * (0.65 + 0.35 * (t * 2.2 + sy as f32 * 0.031).sin());
+            r += side_column_pulse * 118.0;
+            g += side_column_pulse * 78.0;
+            b += side_column_pulse * 16.0;
+
+            let core_line_charge = m.core_panel_lines
+                * (0.10 + lead.mid * 0.22 + drums.onset * 0.24 + bass.bass * 0.08)
+                * (0.70 + 0.30 * (t * 3.1 + sx as f32 * 0.018).cos());
+            r += core_line_charge * 96.0;
+            g += core_line_charge * 92.0;
+            b += core_line_charge * 64.0;
+
             frame[out_i] = r.clamp(0.0, 255.0) as u8;
             frame[out_i + 1] = g.clamp(0.0, 255.0) as u8;
             frame[out_i + 2] = b.clamp(0.0, 255.0) as u8;
         }
     }
-
-    draw_trace_sweeps(frame, args.width, args.height, lead, backing, synth, t);
-    draw_technical_banner(frame, args.width, args.height, t);
 }
 
 #[derive(Clone, Copy)]
@@ -611,116 +740,15 @@ struct CameraPressure {
 }
 
 fn camera_pressure(drums: Meters, bass: Meters, guitar: Meters, lead: Meters, synth: Meters, t: f32) -> CameraPressure {
-    let zoom = 1.018 + bass.bass * 0.035 + drums.onset * 0.035 + lead.rms * 0.012;
-    let pan_x = (t * 0.23 + guitar.mid * 1.5).sin() * (0.006 + guitar.mid * 0.010);
-    let pan_y = (t * 0.17 + synth.rms).cos() * (0.004 + bass.bass * 0.006);
-    let rotation = (t * 0.43).sin() * (0.006 + guitar.rms * 0.012 + drums.onset * 0.010);
+    let zoom = 1.006 + bass.bass * 0.020 + drums.onset * 0.018 + lead.rms * 0.008;
+    let pan_x = (t * 0.19 + guitar.mid * 1.2).sin() * (0.0025 + guitar.mid * 0.0045);
+    let pan_y = (t * 0.15 + synth.rms).cos() * (0.0020 + bass.bass * 0.0035);
+    let rotation = (t * 0.34).sin() * (0.0022 + guitar.rms * 0.0045 + drums.onset * 0.0040);
     CameraPressure {
-        zoom: zoom.min(1.105),
+        zoom: zoom.min(1.055),
         pan_x,
         pan_y,
         rotation,
-    }
-}
-
-fn draw_trace_sweeps(frame: &mut [u8], width: usize, height: usize, lead: Meters, backing: Meters, synth: Meters, t: f32) {
-    let y0 = height as f32 * 0.18;
-    let y1 = height as f32 * 0.82;
-    for trace in 0..5 {
-        let x = width as f32 * (0.18 + trace as f32 * 0.16 + (t * 0.04 + trace as f32).sin() * 0.012);
-        let color = if trace % 2 == 0 {
-            Color::new(236.0, 178.0, 76.0)
-        } else {
-            Color::new(206.0, 204.0, 188.0)
-        };
-        let alpha = 0.05 + synth.high * 0.06 + backing.mid * 0.05 + lead.mid * 0.03;
-        draw_line(frame, width, height, x as i32, y0 as i32, (x + (t * 0.9).sin() * 18.0) as i32, y1 as i32, color, alpha, 1);
-    }
-}
-
-fn draw_technical_banner(frame: &mut [u8], width: usize, height: usize, t: f32) {
-    let banner_h = (height as f32 * 0.042).max(30.0) as i32;
-    let y = height as i32 - banner_h;
-    fill_rect(frame, width, height, 0, y, width as i32, banner_h, Color::new(0.0, 0.0, 0.0), 0.64);
-    let text = "INTEL ARC / H264_QSV / RUST TRUEVISION / STEM-DRIVEN PHOTO-STATE / PIXEL GROUPS: GOLD TEXT SHADOW SMOKE TRACE / LOCAL GENERATION";
-    let text_w = text.len() as i32 * 6 * 2;
-    let x = width as i32 - ((t * 64.0) as i32 % (text_w + width as i32));
-    draw_text(frame, width, height, text, x, y + 8, 2, Color::new(222.0, 172.0, 72.0), 0.92);
-}
-
-fn draw_text(frame: &mut [u8], width: usize, height: usize, text: &str, x: i32, y: i32, scale: i32, color: Color, alpha: f32) {
-    let mut cursor = x;
-    for ch in text.chars() {
-        if cursor > width as i32 + 8 {
-            break;
-        }
-        if cursor > -16 {
-            draw_char(frame, width, height, ch, cursor, y, scale, color, alpha);
-        }
-        cursor += 6 * scale;
-    }
-}
-
-fn draw_char(frame: &mut [u8], width: usize, height: usize, ch: char, x: i32, y: i32, scale: i32, color: Color, alpha: f32) {
-    let glyph = glyph(ch);
-    for (row, pattern) in glyph.iter().enumerate() {
-        for (col, bit) in pattern.chars().enumerate() {
-            if bit == '1' {
-                for sy in 0..scale {
-                    for sx in 0..scale {
-                        blend_pixel(frame, width, height, x + col as i32 * scale + sx, y + row as i32 * scale + sy, color, alpha);
-                    }
-                }
-            }
-        }
-    }
-}
-
-fn glyph(ch: char) -> [&'static str; 7] {
-    match ch.to_ascii_uppercase() {
-        'A' => ["01110", "10001", "10001", "11111", "10001", "10001", "10001"],
-        'B' => ["11110", "10001", "10001", "11110", "10001", "10001", "11110"],
-        'C' => ["01111", "10000", "10000", "10000", "10000", "10000", "01111"],
-        'D' => ["11110", "10001", "10001", "10001", "10001", "10001", "11110"],
-        'E' => ["11111", "10000", "10000", "11110", "10000", "10000", "11111"],
-        'F' => ["11111", "10000", "10000", "11110", "10000", "10000", "10000"],
-        'G' => ["01111", "10000", "10000", "10111", "10001", "10001", "01111"],
-        'H' => ["10001", "10001", "10001", "11111", "10001", "10001", "10001"],
-        'I' => ["11111", "00100", "00100", "00100", "00100", "00100", "11111"],
-        'J' => ["00111", "00010", "00010", "00010", "10010", "10010", "01100"],
-        'K' => ["10001", "10010", "10100", "11000", "10100", "10010", "10001"],
-        'L' => ["10000", "10000", "10000", "10000", "10000", "10000", "11111"],
-        'M' => ["10001", "11011", "10101", "10101", "10001", "10001", "10001"],
-        'N' => ["10001", "11001", "10101", "10011", "10001", "10001", "10001"],
-        'O' => ["01110", "10001", "10001", "10001", "10001", "10001", "01110"],
-        'P' => ["11110", "10001", "10001", "11110", "10000", "10000", "10000"],
-        'Q' => ["01110", "10001", "10001", "10001", "10101", "10010", "01101"],
-        'R' => ["11110", "10001", "10001", "11110", "10100", "10010", "10001"],
-        'S' => ["01111", "10000", "10000", "01110", "00001", "00001", "11110"],
-        'T' => ["11111", "00100", "00100", "00100", "00100", "00100", "00100"],
-        'U' => ["10001", "10001", "10001", "10001", "10001", "10001", "01110"],
-        'V' => ["10001", "10001", "10001", "10001", "10001", "01010", "00100"],
-        'W' => ["10001", "10001", "10001", "10101", "10101", "11011", "10001"],
-        'X' => ["10001", "10001", "01010", "00100", "01010", "10001", "10001"],
-        'Y' => ["10001", "10001", "01010", "00100", "00100", "00100", "00100"],
-        'Z' => ["11111", "00001", "00010", "00100", "01000", "10000", "11111"],
-        '0' => ["01110", "10011", "10101", "10101", "11001", "10001", "01110"],
-        '1' => ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
-        '2' => ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
-        '3' => ["11110", "00001", "00001", "01110", "00001", "00001", "11110"],
-        '4' => ["10010", "10010", "10010", "11111", "00010", "00010", "00010"],
-        '5' => ["11111", "10000", "10000", "11110", "00001", "00001", "11110"],
-        '6' => ["01111", "10000", "10000", "11110", "10001", "10001", "01110"],
-        '7' => ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
-        '8' => ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
-        '9' => ["01110", "10001", "10001", "01111", "00001", "00001", "11110"],
-        '/' => ["00001", "00001", "00010", "00100", "01000", "10000", "10000"],
-        ':' => ["00000", "00100", "00100", "00000", "00100", "00100", "00000"],
-        '-' => ["00000", "00000", "00000", "11111", "00000", "00000", "00000"],
-        '_' => ["00000", "00000", "00000", "00000", "00000", "00000", "11111"],
-        '.' => ["00000", "00000", "00000", "00000", "00000", "01100", "01100"],
-        ' ' => ["00000", "00000", "00000", "00000", "00000", "00000", "00000"],
-        _ => ["00000", "00000", "00000", "00000", "00000", "00000", "00000"],
     }
 }
 
@@ -733,6 +761,9 @@ fn artifact_groups_json(args: &Args, plate: &Plate, tracks: &[StemTrack]) -> Str
         sums.smoke += mask.smoke;
         sums.ember += mask.ember;
         sums.edge += mask.edge;
+        sums.side_glyph_columns += mask.side_glyph_columns;
+        sums.core_panel_lines += mask.core_panel_lines;
+        sums.sky_sun_glow += mask.sky_sun_glow;
     }
     let total = plate.masks.len().max(1) as f32;
     let mut stem_sources = String::new();
@@ -750,7 +781,7 @@ fn artifact_groups_json(args: &Args, plate: &Plate, tracks: &[StemTrack]) -> Str
         ));
     }
     format!(
-        "{{\n  \"schema_version\":\"cortex_photo_artifact_groups_v1\",\n  \"source_image\":\"{}\",\n  \"artifact_groups\":{{\"gold_items\":{:.6},\"text_glyphs\":{:.6},\"shadow_regions\":{:.6},\"smoke_atmosphere\":{:.6},\"ember_points\":{:.6},\"line_art_edges\":{:.6}}},\n  \"stem_sources\":[{}],\n  \"glyph_schema\":\"artwork_color_schema_gold_white_on_black\",\n  \"plate_mode\":\"{}\"\n}}\n",
+        "{{\n  \"schema_version\":\"cortex_photo_artifact_groups_v1\",\n  \"source_image\":\"{}\",\n  \"artifact_groups\":{{\"gold_items\":{:.6},\"text_glyphs\":{:.6},\"shadow_regions\":{:.6},\"smoke_atmosphere\":{:.6},\"ember_points\":{:.6},\"line_art_edges\":{:.6},\"side_glyph_columns\":{:.6},\"core_panel_lines\":{:.6},\"sky_sun_glow\":{:.6}}},\n  \"stem_sources\":[{}],\n  \"glyph_schema\":\"artwork_color_schema_gold_white_on_black\",\n  \"plate_mode\":\"{}\",\n  \"audio_source\":\"{}\"\n}}\n",
         json_escape(&args.image.display().to_string()),
         sums.gold / total,
         sums.text / total,
@@ -758,8 +789,12 @@ fn artifact_groups_json(args: &Args, plate: &Plate, tracks: &[StemTrack]) -> Str
         sums.smoke / total,
         sums.ember / total,
         sums.edge / total,
+        sums.side_glyph_columns / total,
+        sums.core_panel_lines / total,
+        sums.sky_sun_glow / total,
         stem_sources,
-        json_escape(&args.plate_mode)
+        json_escape(&args.plate_mode),
+        json_escape(&args.audio_source)
     )
 }
 
@@ -776,10 +811,11 @@ fn frame_state_json(args: &Args, tracks: &[StemTrack], frame_index: usize, time_
         ));
     }
     format!(
-        "{{\"schema_version\":\"cortex_photo_state_frame_rs_v1\",\"renderer\":\"rust\",\"preset\":\"cortex_photo_state_transform\",\"frame_index\":{},\"time_seconds\":{:.6},\"source_image\":\"{}\",\"stem_controls\":{{{}}},\"artifact_groups\":[\"gold_items\",\"text_glyphs\",\"shadow_regions\",\"smoke_atmosphere\",\"ember_points\",\"line_art_edges\"],\"elemental_transforms\":[\"gold_edge_flame\",\"white_text_charge\",\"shadow_pressure\",\"smoke_density_wave\",\"ember_tick\",\"line_art_negative_trace\",\"camera_pressure\"],\"banner\":{{\"hardware\":\"Intel Arc / QSV encode\",\"software\":\"Rust TrueVision + FFmpeg\",\"public_method\":\"stem-driven photo-state transform\",\"glyph_schema\":\"artwork_color_schema_gold_white_on_black\",\"artwork_color_schema\":\"gold_white_on_black\"}},\"boundary\":{{\"photo_state_transform\":true,\"glyph_schema_from_artwork\":true,\"technical_identity_banner\":true,\"moving_objects\":false,\"generated_media_is_evidence\":false}}}}",
+        "{{\"schema_version\":\"cortex_photo_state_frame_rs_v1\",\"renderer\":\"rust\",\"preset\":\"cortex_photo_state_transform\",\"frame_index\":{},\"time_seconds\":{:.6},\"source_image\":\"{}\",\"audio_source\":\"{}\",\"stem_controls\":{{{}}},\"artifact_groups\":[\"gold_items\",\"text_glyphs\",\"shadow_regions\",\"smoke_atmosphere\",\"ember_points\",\"line_art_edges\",\"side_glyph_columns\",\"core_panel_lines\",\"sky_sun_glow\"],\"audio_meter_bound_artifact_groups\":[\"side_glyph_columns\",\"core_panel_lines\",\"sky_sun_glow\"],\"elemental_transforms\":[\"gold_edge_flame\",\"white_text_charge\",\"shadow_pressure\",\"smoke_density_wave\",\"ember_tick\",\"line_art_negative_trace\",\"side_glyph_column_pulse\",\"core_panel_line_charge\",\"sky_sun_illumination\",\"camera_pressure\"],\"technical_provenance\":{{\"hardware\":\"Intel Arc / QSV encode\",\"software\":\"Rust TrueVision + FFmpeg\",\"public_method\":\"source-photo-pixel-state transform\",\"glyph_schema\":\"artwork_color_schema_gold_white_on_black\",\"artwork_color_schema\":\"gold_white_on_black\"}},\"boundary\":{{\"photo_state_transform\":true,\"source_pixel_transform_only\":true,\"no_added_visual_artifacts\":true,\"glyph_schema_from_artwork\":true,\"technical_identity_banner\":false,\"moving_objects\":false,\"generated_media_is_evidence\":false}}}}",
         frame_index,
         time_seconds,
         json_escape(&args.image.display().to_string()),
+        json_escape(&args.audio_source),
         controls
     )
 }
@@ -793,10 +829,11 @@ fn manifest_json(
     wall_seconds: f64,
 ) -> String {
     format!(
-        "{{\n  \"schema_version\":\"cortex_photo_state_manifest_rs_v1\",\n  \"renderer\":\"rust\",\n  \"preset\":\"cortex_photo_state_transform\",\n  \"run_id\":\"{}\",\n  \"source\":{{\"master_audio\":\"{}\",\"stems_dir\":\"{}\",\"image\":\"{}\",\"plate_mode\":\"{}\"}},\n  \"output\":{{\"mp4\":\"{}\",\"frame_state_jsonl\":\"{}\",\"artifact_groups_json\":\"{}\",\"width\":{},\"height\":{},\"fps\":{},\"duration_seconds\":{},\"frame_count\":{},\"encoder\":\"{}\",\"wall_seconds\":{:.6}}},\n  \"visual_contract\":{{\"method\":\"stem_driven_photo_state_transform\",\"hardware\":\"Intel Arc / h264_qsv encode\",\"software\":\"Rust TrueVision + FFmpeg\",\"public_method\":\"photo artifact groups plus stem meters drive highlights, traces, shadow pressure, smoke, and camera pressure\",\"glyph_schema\":\"artwork_color_schema_gold_white_on_black\"}},\n  \"boundary\":{{\"photo_state_transform\":true,\"glyph_schema_from_artwork\":true,\"technical_identity_banner\":true,\"moving_objects\":false,\"generated_media_is_evidence\":false}}\n}}\n",
+        "{{\n  \"schema_version\":\"cortex_photo_state_manifest_rs_v1\",\n  \"renderer\":\"rust\",\n  \"preset\":\"cortex_photo_state_transform\",\n  \"run_id\":\"{}\",\n  \"source\":{{\"master_audio\":\"{}\",\"stems_dir\":\"{}\",\"audio_source\":\"{}\",\"image\":\"{}\",\"plate_mode\":\"{}\"}},\n  \"output\":{{\"mp4\":\"{}\",\"frame_state_jsonl\":\"{}\",\"artifact_groups_json\":\"{}\",\"width\":{},\"height\":{},\"fps\":{},\"duration_seconds\":{},\"frame_count\":{},\"encoder\":\"{}\",\"wall_seconds\":{:.6}}},\n  \"visual_contract\":{{\"method\":\"source_photo_pixel_state_transform\",\"hardware\":\"Intel Arc / h264_qsv encode\",\"software\":\"Rust TrueVision + FFmpeg\",\"public_method\":\"source photo artifact groups plus audio meters transform existing pixels only\",\"glyph_schema\":\"artwork_color_schema_gold_white_on_black\"}},\n  \"boundary\":{{\"photo_state_transform\":true,\"source_pixel_transform_only\":true,\"no_added_visual_artifacts\":true,\"glyph_schema_from_artwork\":true,\"technical_identity_banner\":false,\"moving_objects\":false,\"generated_media_is_evidence\":false}}\n}}\n",
         json_escape(&args.run_id),
         json_escape(&args.audio.display().to_string()),
         json_escape(&args.stems_dir.display().to_string()),
+        json_escape(&args.audio_source),
         json_escape(&args.image.display().to_string()),
         json_escape(&args.plate_mode),
         json_escape(&video_path.display().to_string()),
@@ -814,65 +851,14 @@ fn manifest_json(
 
 fn receipt_json(args: &Args, video_path: &PathBuf, manifest_path: &PathBuf, state_path: &PathBuf, wall_seconds: f64) -> String {
     format!(
-        "{{\n  \"schema_version\":\"cortex_photo_state_receipt_rs_v1\",\n  \"renderer\":\"rust\",\n  \"preset\":\"cortex_photo_state_transform\",\n  \"run_id\":\"{}\",\n  \"status\":\"complete\",\n  \"output_mp4\":\"{}\",\n  \"manifest_json\":\"{}\",\n  \"frame_state_jsonl\":\"{}\",\n  \"elapsed_seconds\":{:.6},\n  \"boundary\":{{\"photo_state_transform\":true,\"glyph_schema_from_artwork\":true,\"technical_identity_banner\":true,\"moving_objects\":false,\"generated_media_is_evidence\":false}}\n}}\n",
+        "{{\n  \"schema_version\":\"cortex_photo_state_receipt_rs_v1\",\n  \"renderer\":\"rust\",\n  \"preset\":\"cortex_photo_state_transform\",\n  \"run_id\":\"{}\",\n  \"status\":\"complete\",\n  \"audio_source\":\"{}\",\n  \"output_mp4\":\"{}\",\n  \"manifest_json\":\"{}\",\n  \"frame_state_jsonl\":\"{}\",\n  \"elapsed_seconds\":{:.6},\n  \"boundary\":{{\"photo_state_transform\":true,\"source_pixel_transform_only\":true,\"no_added_visual_artifacts\":true,\"glyph_schema_from_artwork\":true,\"technical_identity_banner\":false,\"moving_objects\":false,\"generated_media_is_evidence\":false}}\n}}\n",
         json_escape(&args.run_id),
+        json_escape(&args.audio_source),
         json_escape(&video_path.display().to_string()),
         json_escape(&manifest_path.display().to_string()),
         json_escape(&state_path.display().to_string()),
         wall_seconds
     )
-}
-
-fn blend_pixel(frame: &mut [u8], width: usize, height: usize, x: i32, y: i32, color: Color, alpha: f32) {
-    if x < 0 || y < 0 || x >= width as i32 || y >= height as i32 || alpha <= 0.0 {
-        return;
-    }
-    let i = (y as usize * width + x as usize) * 3;
-    frame[i] = (frame[i] as f32 + color.r * alpha).clamp(0.0, 255.0) as u8;
-    frame[i + 1] = (frame[i + 1] as f32 + color.g * alpha).clamp(0.0, 255.0) as u8;
-    frame[i + 2] = (frame[i + 2] as f32 + color.b * alpha).clamp(0.0, 255.0) as u8;
-}
-
-fn draw_line(frame: &mut [u8], width: usize, height: usize, x0: i32, y0: i32, x1: i32, y1: i32, color: Color, alpha: f32, thickness: i32) {
-    let dx = (x1 - x0).abs();
-    let dy = -(y1 - y0).abs();
-    let sx = if x0 < x1 { 1 } else { -1 };
-    let sy = if y0 < y1 { 1 } else { -1 };
-    let mut err = dx + dy;
-    let mut x = x0;
-    let mut y = y0;
-    loop {
-        for oy in -thickness..=thickness {
-            for ox in -thickness..=thickness {
-                if ox * ox + oy * oy <= thickness * thickness {
-                    blend_pixel(frame, width, height, x + ox, y + oy, color, alpha);
-                }
-            }
-        }
-        if x == x1 && y == y1 {
-            break;
-        }
-        let e2 = 2 * err;
-        if e2 >= dy {
-            err += dy;
-            x += sx;
-        }
-        if e2 <= dx {
-            err += dx;
-            y += sy;
-        }
-    }
-}
-
-fn fill_rect(frame: &mut [u8], width: usize, height: usize, x: i32, y: i32, w: i32, h: i32, color: Color, alpha: f32) {
-    if w <= 0 || h <= 0 {
-        return;
-    }
-    for yy in y.max(0)..(y + h).min(height as i32) {
-        for xx in x.max(0)..(x + w).min(width as i32) {
-            blend_pixel(frame, width, height, xx, yy, color, alpha);
-        }
-    }
 }
 
 fn video_encode_args(args: &Args, video_path: &PathBuf) -> Vec<String> {
