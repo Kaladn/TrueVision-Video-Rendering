@@ -15,6 +15,9 @@ docs/MACHINE_TO_MACHINE_NETWORK_SHARE_HANDOFF_*.md
 outputs/**
 !outputs/.gitkeep
 
+artifacts/**
+!artifacts/.gitkeep
+
 connected_artifacts/**
 !connected_artifacts/.gitkeep
 
@@ -45,6 +48,8 @@ storage/templates/**
 !storage/templates/.gitkeep
 storage/tmp/**
 !storage/tmp/.gitkeep
+storage/models/**
+!storage/models/.gitkeep
 storage/screenshots/**
 !storage/screenshots/.gitkeep
 storage/config/coordinate_maps/*.json
