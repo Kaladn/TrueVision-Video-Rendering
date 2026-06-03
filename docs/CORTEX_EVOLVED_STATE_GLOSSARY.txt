@@ -1,0 +1,162 @@
+Cortex Evolved State Glossary
+Date: 2026-06-01
+
+Purpose
+This glossary keeps AnchorWorks, SecureCore, TrueVision, and TrueAudio language clean.
+The goal is to stop mixing "video making" language with state-machine language.
+
+
+System Roles
+============
+
+AnchorWorks
+Meaning, language, anchors, counts, ClearSpeak, memory, and operator-facing interpretation.
+
+Short law:
+AnchorWorks interprets meaning.
+
+
+SecureCore
+Policy, gates, safety, runtime verification, receipts, provenance, and retention authority.
+
+Short law:
+SecureCore proves safety.
+
+
+TrueVision
+Visual state logging, visual state recognition, visual transform operators, replay/proof surfaces.
+
+Short law:
+TrueVision records and transforms visual state.
+
+
+TrueAudio
+Audio state logging, stem meters, timing, pulse, spectrum, vocal pressure, section pressure.
+
+Short law:
+TrueAudio records and meters sound state.
+
+
+Core Terms
+==========
+
+State
+Measured condition at a time and region.
+
+
+Transform
+A measured change from one state to another.
+
+
+Operator
+A reusable transform rule that can be applied to compatible state.
+
+
+State Event
+Timed detection of a visual or audio change.
+
+
+Region
+The area affected by a state event or transform.
+
+
+Mask
+A bounded selection of source pixels, cells, or samples that a transform is allowed to affect.
+
+
+Plate
+An input visual surface. It is not automatically evidence. Its state may be logged.
+
+
+Stem Driver
+An audio stem or derived audio lane used to modulate a transform.
+
+
+Evidence Metrics
+Measured support for a state event, such as luma delta, edge density, bloom pressure,
+motion energy, texture shimmer, RMS, transient strength, or spectral energy.
+
+
+Reusable Transform Candidate
+A detected state change that may become a reusable operator after review.
+
+
+Generated Proof
+Output media made to show the transform. It is synthetic and not source truth.
+
+
+Source Truth
+Approved state logs, manifests, receipts, cell state, timing metadata, and reviewed operator packets.
+
+
+Receipt
+A durable record proving what ran, what was read, what was written, and what boundaries applied.
+
+
+Manifest
+A structured description of a run, artifact, source, tool, or output.
+
+
+State Recognition
+Detecting what changed, where it changed, when it changed, and how strong the change was.
+
+
+State Transform
+Applying a measured change behavior to an approved compatible state region.
+
+
+Proof Surface
+The visible or audible output used to inspect a state transform. It is not evidence by itself.
+
+
+Useful Language
+===============
+
+Prefer:
+
+state event
+state transform
+transform operator
+source-state mask
+stem-driven pressure
+proof surface
+recognition report
+manifest
+receipt
+operator approval
+state-backed replay
+generated proof
+
+
+Avoid:
+
+make a video
+add an object
+animate the camera
+draw a phoenix
+AI knows
+make it pretty
+random visualizer
+source truth from generated media
+raw video as proof
+
+
+System Laws
+===========
+
+TrueVision records state.
+TrueAudio meters sound.
+AnchorWorks interprets meaning.
+SecureCore proves safety.
+
+State first.
+Transform second.
+Proof last.
+Receipts always.
+
+Generated media is output, not authority.
+Search/captions/model output may support labels, but logs remain evidence.
+Recognition proposes.
+Raw/local state supports.
+Operator review promotes.
+
