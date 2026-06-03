@@ -1,0 +1,71 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truespeech_align_lyrics_candidate",
+  "display_name": "TrueSpeech Align Lyrics Candidate",
+  "category": "40_trueaudio_state",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truespeech_align_lyrics_candidate.py",
+  "implementation_paths": [
+    "scripts/truespeech_align_lyrics_candidate.py",
+    "trueaudio_runtime/lyrics.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "speech_segment_candidates",
+    "lyrics_text",
+    "lyrics_path"
+  ],
+  "output_types": [
+    "lyric_alignment_candidates",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "storage/reports",
+    "storage/manifests",
+    "storage/receipts"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_candidate_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "audio_rms",
+    "spectrum_energy",
+    "onset_timing",
+    "stem_energy",
+    "speech_segments",
+    "lyrics_alignment"
+  ],
+  "forward_inputs": [
+    "speech_segment_candidates",
+    "lyrics_text",
+    "lyrics_path"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "lyric_alignment_candidates",
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "speech_state",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

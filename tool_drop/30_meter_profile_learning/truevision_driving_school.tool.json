@@ -1,0 +1,64 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_driving_school",
+  "display_name": "TrueVision Driving School",
+  "category": "30_meter_profile_learning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_driving_school.py",
+  "implementation_paths": [
+    "scripts/truevision_driving_school.py",
+    "truevision_runtime/learning_intake/driving_school.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "local_video_files"
+  ],
+  "output_types": [
+    "driving_profile_manifest",
+    "candidate_sheets",
+    "mock_road_world_v1"
+  ],
+  "writes": [
+    "storage/artifacts/driving_school",
+    "storage/manifests",
+    "storage/receipts"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "local_file_read_profile_write_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "road_geometry",
+    "forward_motion",
+    "fog_visibility",
+    "roadside_candidates"
+  ],
+  "forward_inputs": [
+    "local_video_files"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "driving_profile_manifest",
+    "candidate_sheets"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "high_speed_awareness",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

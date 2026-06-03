@@ -1,0 +1,64 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_focus_lens",
+  "display_name": "TrueVision State Focus Lens",
+  "category": "20_state_recognition",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_state_focus_lens.py",
+  "implementation_paths": [
+    "scripts/truevision_state_focus_lens.py",
+    "truevision_runtime/learning_intake/lightfield_focus.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "output_types": [
+    "focus_profile_json",
+    "receipt"
+  ],
+  "writes": [
+    "storage/artifacts/state_focus_lens",
+    "storage/manifests/state_focus_lens",
+    "storage/receipts/state_focus_lens"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_profile_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_focus",
+    "region_persistence",
+    "layer_extraction"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "focus_profile_json",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_focus",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

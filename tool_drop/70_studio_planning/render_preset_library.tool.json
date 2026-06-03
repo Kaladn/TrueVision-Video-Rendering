@@ -1,0 +1,63 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "render_preset_library",
+  "display_name": "Render Preset Library",
+  "category": "70_studio_planning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "av_tool_runner",
+  "entrypoint": "truevision_runtime.av_tools.av_tool_runner:run_av_tool_call",
+  "implementation_paths": [
+    "truevision_runtime/av_tools/av_tool_runner.py",
+    "truevision_runtime/studio/studio_tooling.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "preset_name",
+    "preset_payload"
+  ],
+  "output_types": [
+    "preset_listing",
+    "preset_manifest"
+  ],
+  "writes": [
+    "storage/presets",
+    "storage/templates"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "template_write_gate",
+  "observes_state": false,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "tool_selection",
+    "render_contract",
+    "preset_catalog"
+  ],
+  "forward_inputs": [
+    "preset_name",
+    "preset_payload"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "preset_listing",
+    "preset_manifest"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_planning_surface",
+  "can_witness": false,
+  "can_profile": true,
+  "can_plan": true,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

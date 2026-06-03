@@ -1,0 +1,77 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_document_state_movie",
+  "display_name": "TrueVision Document State Movie",
+  "category": "50_state_replay_player",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "python_module",
+  "entrypoint": "truevision_runtime.document_state.document_state_movie",
+  "implementation_paths": [
+    "truevision_runtime/document_state/document_state_movie.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "document_page_frames",
+    "document_state_movie_manifest",
+    "cell_state_npz"
+  ],
+  "output_types": [
+    "document_state_movie_manifest",
+    "document_state_frame_records_jsonl",
+    "cell_state_npz",
+    "glyph_pattern_candidates",
+    "derived_page_surface",
+    "surface_receipt"
+  ],
+  "writes": [
+    "storage/artifacts/document_state_movie",
+    "storage/receipts/document_state_movie"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "file_write_and_optional_surface_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "document_visual_state",
+    "glyph_pattern_state",
+    "page_frame_state"
+  ],
+  "forward_inputs": [
+    "document_page_frames"
+  ],
+  "reverse_inputs": [
+    "document_state_movie_manifest",
+    "cell_state_npz"
+  ],
+  "state_outputs": [
+    "document_state_movie_manifest",
+    "document_state_frame_records_jsonl",
+    "cell_state_npz",
+    "glyph_pattern_candidates",
+    "surface_receipt"
+  ],
+  "media_outputs_optional": [
+    "derived_page_surface"
+  ],
+  "behavior_family": "document_visual_state",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false,
+  "boundary": {
+    "anchorworks_runtime_dependency": false,
+    "pages_are_visual_state": true,
+    "surface_is_derived_display": true,
+    "generated_media_is_evidence": false,
+    "unknown_glyphs_remain_unknown": true
+  }
+}

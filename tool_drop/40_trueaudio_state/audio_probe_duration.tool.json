@@ -1,0 +1,62 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "audio_probe_duration",
+  "display_name": "Audio Probe Duration",
+  "category": "40_trueaudio_state",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "av_tool_runner",
+  "entrypoint": "truevision_runtime.av_tools.av_tool_runner:run_av_tool_call",
+  "implementation_paths": [
+    "truevision_runtime/av_tools/av_tool_runner.py"
+  ],
+  "runtime": "python_ffprobe",
+  "input_types": [
+    "audio_path",
+    "media_path"
+  ],
+  "output_types": [
+    "duration_seconds"
+  ],
+  "writes": [],
+  "calls_tools": [
+    "ffprobe"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_only_media_probe_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "audio_rms",
+    "spectrum_energy",
+    "onset_timing",
+    "stem_energy",
+    "speech_segments",
+    "lyrics_alignment"
+  ],
+  "forward_inputs": [
+    "audio_path",
+    "media_path"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "duration_seconds"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "audio_state",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

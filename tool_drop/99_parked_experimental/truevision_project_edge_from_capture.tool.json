@@ -1,0 +1,61 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_project_edge_from_capture",
+  "display_name": "TrueVision Project Edge From Capture",
+  "category": "99_parked_experimental",
+  "status": "parked_experimental",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_project_edge_from_capture.py",
+  "implementation_paths": [
+    "scripts/truevision_project_edge_from_capture.py",
+    "trueframegen/temporal_causality_projector.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_run",
+    "audio_path"
+  ],
+  "output_types": [
+    "temporal_projection_proof"
+  ],
+  "writes": [
+    "outputs",
+    "storage/reports"
+  ],
+  "calls_tools": [
+    "ffmpeg"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "parked_not_active",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [],
+  "forward_inputs": [
+    "capture_run",
+    "audio_path"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "render_manifest",
+    "render_receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "temporal_projection",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

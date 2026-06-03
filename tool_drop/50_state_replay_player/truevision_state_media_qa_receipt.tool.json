@@ -1,0 +1,57 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_media_qa_receipt",
+  "display_name": "TrueVision State Media QA Receipt",
+  "category": "50_state_replay_player",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_state_media_qa_receipt.py",
+  "implementation_paths": [
+    "scripts/truevision_state_media_qa_receipt.py",
+    "truevision_runtime/state_media_qa.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "generated_media_manifest",
+    "state_log"
+  ],
+  "output_types": [
+    "qa_receipt"
+  ],
+  "writes": [
+    "storage/receipts",
+    "storage/reports"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_manifest_write_receipt_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_source_contract",
+    "receipt_manifest_contract"
+  ],
+  "forward_inputs": [
+    "generated_media_manifest",
+    "state_log"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "qa_receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_surface_qa",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

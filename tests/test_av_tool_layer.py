@@ -36,6 +36,24 @@ class AVToolLayerTests(unittest.TestCase):
         self.assertNotIn("security_enforce", names)
         self.assertTrue(all(tool["domain"] == "audio_video" for tool in tools))
 
+    def test_registry_exposes_state_language_metadata(self):
+        tools = {tool["name"]: tool for tool in list_av_tools()}
+
+        atmosphere = tools["atmosphere_profile_from_capture"]
+        self.assertEqual(atmosphere["behavior_family"], "fog_reveal")
+        self.assertTrue(atmosphere["can_witness"])
+        self.assertTrue(atmosphere["can_profile"])
+        self.assertFalse(atmosphere["can_surface"])
+        self.assertIn("witness", atmosphere["state_language"]["supported_stages"])
+        self.assertIn("profile", atmosphere["state_language"]["supported_stages"])
+
+        preview = tools["video_render_preview"]
+        self.assertTrue(preview["can_plan"])
+        self.assertTrue(preview["can_surface"])
+        self.assertFalse(preview["copies_source_media"])
+        self.assertFalse(preview["raw_media_saved"])
+        self.assertFalse(preview["state_language"]["media_is_source_truth"])
+
     def test_policy_rejects_unknown_and_path_escape(self):
         with self.assertRaises(AVToolPolicyError):
             validate_tool_call({"tool": "filesystem_delete", "args": {"path": "D:/"}})

@@ -1,0 +1,67 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_capture_rs",
+  "display_name": "TrueVision Native Capture RS",
+  "category": "90_native_rust_power",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "rust_source",
+  "entrypoint": "native/truevision_capture_rs/src/main.rs",
+  "implementation_paths": [
+    "native/truevision_capture_rs/Cargo.toml",
+    "native/truevision_capture_rs/src/main.rs"
+  ],
+  "runtime": "rust",
+  "input_types": [
+    "screen_region",
+    "duration",
+    "fps",
+    "grid"
+  ],
+  "output_types": [
+    "tvcells",
+    "records_jsonl",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "storage/artifacts/truevision_captures"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "requires_state_capture_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "native_state_capture",
+    "tvcells",
+    "cell_state"
+  ],
+  "forward_inputs": [
+    "screen_region",
+    "duration",
+    "fps",
+    "grid"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "tvcells",
+    "records_jsonl",
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "native_state_witness",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

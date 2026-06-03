@@ -1,0 +1,59 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_receipt_manifest_rules",
+  "display_name": "TrueVision Receipt And Manifest Rules",
+  "category": "00_core_contracts",
+  "status": "contract_reference",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "contract_doc",
+  "entrypoint": "docs/TRUEVISION_RECEIPT_AND_MANIFEST_RULES.md",
+  "implementation_paths": [
+    "docs/TRUEVISION_RECEIPT_AND_MANIFEST_RULES.md",
+    "truevision_runtime/av_tools/av_tool_receipts.py"
+  ],
+  "runtime": "contract",
+  "input_types": [
+    "tool_result",
+    "run_metadata"
+  ],
+  "output_types": [
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "storage/manifests",
+    "storage/receipts"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_only_contract",
+  "observes_state": false,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_source_contract",
+    "receipt_manifest_contract"
+  ],
+  "forward_inputs": [
+    "tool_result",
+    "run_metadata"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_contract",
+  "can_witness": false,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

@@ -1,0 +1,93 @@
+{
+  "schema_version": "truevision_effect_selection_policy_v1",
+  "minimum_select_score": 0.34,
+  "always_report_rejections": [
+    "render_trudepth_rave_laser_sample",
+    "render_stem_state_nightmare",
+    "truevision_yolo_event_focus"
+  ],
+  "need_rules": {
+    "atmosphere_depth": {
+      "keywords": ["smoke", "smoky", "fog", "fog_reveal", "depth_haze", "haze", "twilight", "visibility"],
+      "preferred_tools": ["atmosphere_profile_from_capture", "atmosphere_toolset_create", "truevision_atmosphere_tools", "truevision_state_focus_lens", "render_truedepth_fog_reveal_samples"],
+      "weight": 0.36,
+      "reason": "scene visibility/depth state requires atmosphere profiling",
+      "emphasis": "fog"
+    },
+    "impact_light": {
+      "keywords": ["impact", "shockwave", "fire", "destructive", "bloom", "life_energy", "color_transition"],
+      "preferred_tools": ["meter_grid_from_capture", "element_creation_profile_from_capture", "truevision_state_recognition", "truevision_geometry_engine"],
+      "weight": 0.34,
+      "reason": "scene impact/light transition requires measured meter and creation profiles",
+      "emphasis": "impact"
+    },
+    "growth_recovery": {
+      "keywords": ["growth", "growth_recovery", "healed", "forest", "reveal", "regrowth"],
+      "preferred_tools": ["element_creation_profile_from_capture", "truevision_geometry_engine", "truevision_signature_profile_extract"],
+      "weight": 0.30,
+      "reason": "scene recovery state requires reusable transform/profile extraction",
+      "emphasis": "growth"
+    },
+    "audio_timing": {
+      "keywords": ["stem", "audio", "music", "beat", "timing"],
+      "preferred_tools": ["audio_extract_features", "audio_analyze_levels", "trueaudio_log_file_replayable"],
+      "weight": 0.30,
+      "reason": "scene timing requires audio-state features",
+      "emphasis": "default"
+    },
+    "document_visual_state": {
+      "keywords": ["document", "page", "pages", "glyph", "glyphs", "docufilm", "document_film", "document_state_movie", "visual_state"],
+      "preferred_tools": ["truevision_document_state_movie"],
+      "weight": 0.38,
+      "reason": "document/page surface must be witnessed as visual state before meaning layers consume it",
+      "emphasis": "default"
+    },
+    "laser_rejection": {
+      "keywords": ["laser", "lasers", "beam"],
+      "preferred_tools": ["render_trudepth_rave_laser_sample"],
+      "rejected_tools": ["render_trudepth_rave_laser_sample"],
+      "weight": 0.10,
+      "penalty": 0.65,
+      "reason": "scene explicitly mentions artificial beam behavior",
+      "reject_reason": "laser effect is not motivated by this scene contract unless explicitly approved"
+    }
+  },
+  "tool_rules": {
+    "atmosphere_profile_from_capture": {
+      "emphasis": "fog",
+      "positive_keywords": ["smoke", "fog", "haze", "depth"]
+    },
+    "atmosphere_toolset_create": {
+      "emphasis": "fog",
+      "positive_keywords": ["smoke", "fog", "haze"]
+    },
+    "element_creation_profile_from_capture": {
+      "emphasis": "impact",
+      "positive_keywords": ["fire", "impact", "growth", "transition", "healed"]
+    },
+    "meter_grid_from_capture": {
+      "emphasis": "impact",
+      "positive_keywords": ["light", "fire", "impact", "shockwave", "bloom"]
+    },
+    "truevision_state_recognition": {
+      "emphasis": "default",
+      "positive_keywords": ["change", "transition", "state"]
+    },
+    "truevision_geometry_engine": {
+      "emphasis": "growth",
+      "positive_keywords": ["forest", "trail", "geometry", "shockwave"]
+    },
+    "render_trudepth_rave_laser_sample": {
+      "emphasis": "default",
+      "forbidden_keywords": ["laser", "lasers", "unmotivated_lasers"]
+    },
+    "render_truedepth_fog_reveal_samples": {
+      "emphasis": "fog",
+      "positive_keywords": ["fog", "haze", "reveal", "depth"]
+    },
+    "truevision_document_state_movie": {
+      "emphasis": "default",
+      "positive_keywords": ["document", "page", "glyph", "docufilm", "document_film", "visual_state"]
+    }
+  }
+}

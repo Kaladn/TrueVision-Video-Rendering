@@ -1,0 +1,65 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_studio_server",
+  "display_name": "TrueVision Studio Server",
+  "category": "70_studio_planning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_studio_server.py",
+  "implementation_paths": [
+    "scripts/truevision_studio_server.py",
+    "truevision_runtime/studio/studio_tooling.py"
+  ],
+  "runtime": "python_http",
+  "input_types": [
+    "local_http_request",
+    "tool_call_packet"
+  ],
+  "output_types": [
+    "tool_result",
+    "artifact_json"
+  ],
+  "writes": [
+    "storage",
+    "connected_artifacts"
+  ],
+  "calls_tools": [
+    "av_tool_runner",
+    "studio_tooling"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "local_http_gate",
+  "observes_state": false,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "tool_selection",
+    "render_contract",
+    "preset_catalog"
+  ],
+  "forward_inputs": [
+    "local_http_request",
+    "tool_call_packet"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "artifact_json"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_planning_surface",
+  "can_witness": false,
+  "can_profile": true,
+  "can_plan": true,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

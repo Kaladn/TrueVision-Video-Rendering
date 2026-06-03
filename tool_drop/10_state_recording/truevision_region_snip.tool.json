@@ -1,0 +1,62 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_region_snip",
+  "display_name": "TrueVision Region Snip",
+  "category": "10_state_recording",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_region_snip.py",
+  "implementation_paths": [
+    "scripts/truevision_region_snip.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "operator_selected_region",
+    "motion_detected_region"
+  ],
+  "output_types": [
+    "region_preset",
+    "recorder_command"
+  ],
+  "writes": [
+    "presets",
+    "connected_artifacts"
+  ],
+  "calls_tools": [
+    "truevision_resonance_recorder",
+    "truevision_capture_rs"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "requires_operator_region_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "screen_state",
+    "cell_state",
+    "visual_resonance",
+    "capture_manifest"
+  ],
+  "forward_inputs": [
+    "operator_selected_region",
+    "motion_detected_region"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "region_preset"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_witness",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

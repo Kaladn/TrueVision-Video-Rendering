@@ -1,0 +1,70 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "atmosphere_toolset_create",
+  "display_name": "Atmosphere Toolset Create",
+  "category": "30_meter_profile_learning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "av_tool_runner",
+  "entrypoint": "truevision_runtime.av_tools.av_tool_runner:run_av_tool_call",
+  "implementation_paths": [
+    "truevision_runtime/av_tools/av_tool_runner.py",
+    "truevision_runtime/state_patterns/atmosphere_weather.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "element_ids"
+  ],
+  "output_types": [
+    "toolset_template",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "storage/templates",
+    "storage/manifests",
+    "storage/artifacts/weather"
+  ],
+  "calls_tools": [
+    "atmosphere_profile_from_capture"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_template_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "fog_reveal",
+    "haze_veil",
+    "scatter_lift",
+    "depth_fade",
+    "edge_recovery"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "element_ids"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "toolset_template",
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "fog_reveal",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

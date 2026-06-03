@@ -1,0 +1,32 @@
+{
+  "schema_version": "truevision_truevideo_usage_policy_v1",
+  "tool_id": "truevideo_lifelike_scene_generator",
+  "requires_approval": true,
+  "allowed_when_keywords": [
+    "lifelike",
+    "human",
+    "humans",
+    "actor",
+    "actors",
+    "natural_camera",
+    "realistic_world",
+    "forest_walk"
+  ],
+  "not_allowed_when_keywords": [
+    "fog",
+    "smoke",
+    "laser",
+    "lightning",
+    "shimmer",
+    "bloom",
+    "meter",
+    "profile",
+    "recording",
+    "recognition"
+  ],
+  "boundary": {
+    "not_evidence": true,
+    "model_call_required": true,
+    "operator_approval_required": true
+  }
+}

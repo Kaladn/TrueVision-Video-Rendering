@@ -1,0 +1,69 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "trueaudio_replay_replayable",
+  "display_name": "TrueAudio Replay Replayable",
+  "category": "50_state_replay_player",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/trueaudio_replay_replayable.py",
+  "implementation_paths": [
+    "scripts/trueaudio_replay_replayable.py",
+    "trueaudio_runtime/replayable.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "replayable_audio_state_npz"
+  ],
+  "output_types": [
+    "derived_audio_replay_wav",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "outputs",
+    "storage/manifests",
+    "storage/receipts"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "generated_audio_write_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "audio_rms",
+    "spectrum_energy",
+    "onset_timing",
+    "stem_energy",
+    "speech_segments",
+    "lyrics_alignment"
+  ],
+  "forward_inputs": [
+    "replayable_audio_state_npz"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [
+    "derived_audio_replay_wav"
+  ],
+  "behavior_family": "audio_state",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

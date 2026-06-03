@@ -1,0 +1,71 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "meter_grid_from_capture",
+  "display_name": "Meter Grid From Capture",
+  "category": "30_meter_profile_learning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "av_tool_runner",
+  "entrypoint": "truevision_runtime.av_tools.av_tool_runner:run_av_tool_call",
+  "implementation_paths": [
+    "truevision_runtime/av_tools/av_tool_runner.py",
+    "truevision_runtime/learning_intake/meter_grid.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "output_types": [
+    "meter_profile_json",
+    "event_graphs",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "storage/artifacts/meter_grid",
+    "storage/manifests/meter_grid",
+    "storage/receipts/meter_grid",
+    "storage/reports/meter_grid"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_profile_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "meter_grid",
+    "luma",
+    "motion",
+    "edge",
+    "texture",
+    "bloom"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "meter_profile_json",
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "meter_grid",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

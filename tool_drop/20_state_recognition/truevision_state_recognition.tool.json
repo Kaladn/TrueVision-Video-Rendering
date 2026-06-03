@@ -1,0 +1,68 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_recognition",
+  "display_name": "TrueVision State Recognition",
+  "category": "20_state_recognition",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_state_recognition.py",
+  "implementation_paths": [
+    "scripts/truevision_state_recognition.py",
+    "truevision_runtime/state_recognition.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "video_file",
+    "frame_state_jsonl"
+  ],
+  "output_types": [
+    "state_recognition_report_json",
+    "state_recognition_summary_md",
+    "state_recognition_events_csv"
+  ],
+  "writes": [
+    "storage/reports/state_recognition"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_report_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "line_state",
+    "light_state",
+    "surface_state",
+    "atmosphere_state",
+    "motion_state"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "video_file",
+    "frame_state_jsonl"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "state_recognition_report_json",
+    "state_recognition_summary_md",
+    "state_recognition_events_csv"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_change_recognition",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

@@ -1,0 +1,75 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "cleveland_graffiti_state_proof",
+  "display_name": "Cleveland Graffiti State Proof",
+  "category": "80_finalized_copy_only",
+  "status": "finalized_copy_only",
+  "edit_policy": "copy_only",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/render_cleveland_graffiti_state_proof.py",
+  "implementation_paths": [
+    "scripts/render_cleveland_graffiti_state_proof.py",
+    "truevision_runtime/finalized_tools_registry.json"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "audio",
+    "stems",
+    "skyline",
+    "proof_a",
+    "proof_b"
+  ],
+  "output_types": [
+    "generated_proof_media",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "outputs"
+  ],
+  "calls_tools": [
+    "ffmpeg"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "generated_media_write_gate_after_operator_approval",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_render",
+    "stem_state_transform",
+    "pixel_state_transform"
+  ],
+  "forward_inputs": [
+    "audio",
+    "stems",
+    "skyline",
+    "proof_a",
+    "proof_b"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [
+    "generated_proof_media"
+  ],
+  "behavior_family": "pixel_state_transform",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

@@ -1,0 +1,64 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_signature_profile_extract",
+  "display_name": "TrueVision Signature Profile Extract",
+  "category": "20_state_recognition",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_signature_profile_extract.py",
+  "implementation_paths": [
+    "scripts/truevision_signature_profile_extract.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "output_types": [
+    "motion_profile",
+    "look_signature_profile",
+    "profile_bundle"
+  ],
+  "writes": [
+    "storage/artifacts",
+    "storage/reports"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_profile_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "motion_signature",
+    "look_signature",
+    "state_signature"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "motion_profile",
+    "look_signature_profile",
+    "profile_bundle"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_signature",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

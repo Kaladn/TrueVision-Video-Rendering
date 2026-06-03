@@ -1,0 +1,65 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_loop_law",
+  "display_name": "TrueVision State Loop Law",
+  "category": "00_core_contracts",
+  "status": "contract_reference",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "contract_doc",
+  "entrypoint": "docs/TRUEVISION_STATE_LOOP_LAW.md",
+  "implementation_paths": [
+    "docs/TRUEVISION_STATE_LOOP_LAW.md"
+  ],
+  "runtime": "documentation",
+  "input_types": [
+    "surface",
+    "state",
+    "behavior_profile",
+    "scene_goal"
+  ],
+  "output_types": [
+    "state_loop_contract"
+  ],
+  "writes": [],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_only",
+  "observes_state": false,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_loop_contract",
+    "two_way_behavior_family",
+    "witness_profile_plan_replay_surface"
+  ],
+  "forward_inputs": [
+    "surface",
+    "state",
+    "behavior_profile",
+    "scene_goal"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "state_loop_contract"
+  ],
+  "media_outputs_optional": [],
+  "state_vocabulary": [
+    "witness",
+    "profile",
+    "plan",
+    "replay",
+    "surface"
+  ],
+  "behavior_family": "state_loop_contract",
+  "can_witness": false,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

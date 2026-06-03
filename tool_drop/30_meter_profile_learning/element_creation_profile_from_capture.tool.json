@@ -1,0 +1,70 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "element_creation_profile_from_capture",
+  "display_name": "Element Creation Profile From Capture",
+  "category": "30_meter_profile_learning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "av_tool_runner",
+  "entrypoint": "truevision_runtime.av_tools.av_tool_runner:run_av_tool_call",
+  "implementation_paths": [
+    "truevision_runtime/av_tools/av_tool_runner.py",
+    "truevision_runtime/learning_intake/element_creation_profile.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "element_id"
+  ],
+  "output_types": [
+    "creation_profile_json",
+    "purge_report",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "storage/artifacts/element_creation_profiles",
+    "storage/manifests/element_creation_profiles",
+    "storage/receipts/element_creation_profiles",
+    "storage/reports/element_creation_profiles"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_profile_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "element_creation",
+    "light_bloom",
+    "shadow_deepening",
+    "transform_behavior"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "element_id"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "creation_profile_json",
+    "purge_report",
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "transform_operator_profile",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

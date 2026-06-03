@@ -1,0 +1,61 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_yolo_event_focus",
+  "display_name": "TrueVision YOLO Event Focus",
+  "category": "99_parked_experimental",
+  "status": "parked_experimental",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_yolo_event_focus.py",
+  "implementation_paths": [
+    "scripts/truevision_yolo_event_focus.py",
+    "truevision_runtime/yolo_event_focus.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "video",
+    "model_weights"
+  ],
+  "output_types": [
+    "candidate_event_focus_report"
+  ],
+  "writes": [
+    "storage/reports"
+  ],
+  "calls_tools": [
+    "yolo"
+  ],
+  "source_truth_compliant": false,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "not_active_without_model_policy_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "candidate_event_focus",
+    "external_detector_support"
+  ],
+  "forward_inputs": [
+    "video",
+    "model_weights"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "candidate_event_focus_report"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "external_candidate_focus",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

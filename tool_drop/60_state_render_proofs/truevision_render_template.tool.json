@@ -1,0 +1,65 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_render_template",
+  "display_name": "TrueVision Render Template",
+  "category": "60_state_render_proofs",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_render_template.py",
+  "implementation_paths": [
+    "scripts/truevision_render_template.py",
+    "truevision_runtime/rendering/template_renderer.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "template_json",
+    "state_inputs"
+  ],
+  "output_types": [
+    "generated_proof_media",
+    "manifest"
+  ],
+  "writes": [
+    "outputs",
+    "storage/manifests"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "generated_media_write_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_render",
+    "stem_state_transform",
+    "pixel_state_transform"
+  ],
+  "forward_inputs": [
+    "template_json",
+    "state_inputs"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "manifest"
+  ],
+  "media_outputs_optional": [
+    "generated_proof_media"
+  ],
+  "behavior_family": "pixel_state_transform",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

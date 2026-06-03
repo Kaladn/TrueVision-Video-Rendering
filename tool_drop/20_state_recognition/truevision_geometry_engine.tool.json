@@ -1,0 +1,65 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_geometry_engine",
+  "display_name": "TrueVision Geometry Engine",
+  "category": "20_state_recognition",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_geometry_engine.py",
+  "implementation_paths": [
+    "scripts/truevision_geometry_engine.py",
+    "truevision_runtime/geometry_generation.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "state_bundle",
+    "capture_manifest",
+    "profile_json"
+  ],
+  "output_types": [
+    "geometry_profile",
+    "shape_library_candidate"
+  ],
+  "writes": [
+    "storage/artifacts",
+    "storage/reports"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_state_write_profile_gate",
+  "observes_state": true,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "geometry_shape",
+    "line_state",
+    "big_shape_library"
+  ],
+  "forward_inputs": [
+    "state_bundle",
+    "capture_manifest",
+    "profile_json"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "geometry_profile",
+    "shape_library_candidate"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "geometry_shape",
+  "can_witness": true,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

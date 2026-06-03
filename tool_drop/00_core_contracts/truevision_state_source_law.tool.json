@@ -1,0 +1,54 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_source_law",
+  "display_name": "TrueVision State Source Law",
+  "category": "00_core_contracts",
+  "status": "contract_reference",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "python_module",
+  "entrypoint": "truevision_runtime.state_source_law",
+  "implementation_paths": [
+    "truevision_runtime/state_source_law.py",
+    "docs/TRUEVISION_STATE_SOURCE_LAW.md"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "path",
+    "artifact_kind"
+  ],
+  "output_types": [
+    "source_truth_classification"
+  ],
+  "writes": [],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_only",
+  "observes_state": false,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_source_contract",
+    "receipt_manifest_contract"
+  ],
+  "forward_inputs": [
+    "path",
+    "artifact_kind"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "source_truth_classification"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_contract",
+  "can_witness": false,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

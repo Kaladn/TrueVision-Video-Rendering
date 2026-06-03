@@ -1,0 +1,65 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "render_trudepth_rave_laser_sample",
+  "display_name": "TruDepth Rave Laser Sample",
+  "category": "99_parked_experimental",
+  "status": "parked_experimental",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/render_trudepth_rave_laser_sample.py",
+  "implementation_paths": [
+    "scripts/render_trudepth_rave_laser_sample.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "duration",
+    "fps"
+  ],
+  "output_types": [
+    "generated_proof_media"
+  ],
+  "writes": [
+    "outputs"
+  ],
+  "calls_tools": [
+    "ffmpeg"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "parked_not_active",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "beam_transform",
+    "volumetric_light",
+    "parked_visual_experiment"
+  ],
+  "forward_inputs": [
+    "duration",
+    "fps"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "render_manifest",
+    "render_receipt"
+  ],
+  "media_outputs_optional": [
+    "generated_proof_media"
+  ],
+  "behavior_family": "directed_beam",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

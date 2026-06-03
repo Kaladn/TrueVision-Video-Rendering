@@ -1,0 +1,66 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_replay",
+  "display_name": "TrueVision State Replay",
+  "category": "50_state_replay_player",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_state_replay.py",
+  "implementation_paths": [
+    "scripts/truevision_state_replay.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "output_types": [
+    "derived_replay_media",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "outputs",
+    "storage/manifests",
+    "storage/receipts"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "generated_media_write_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_replay",
+    "audio_state_replay"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "cell_state"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [
+    "derived_replay_media"
+  ],
+  "behavior_family": "state_replay",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

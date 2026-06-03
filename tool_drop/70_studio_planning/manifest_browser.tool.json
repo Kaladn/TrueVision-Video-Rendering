@@ -1,0 +1,57 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "manifest_browser",
+  "display_name": "Manifest Browser",
+  "category": "70_studio_planning",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "av_tool_runner",
+  "entrypoint": "truevision_runtime.av_tools.av_tool_runner:run_av_tool_call",
+  "implementation_paths": [
+    "truevision_runtime/av_tools/av_tool_runner.py",
+    "truevision_runtime/studio/studio_tooling.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "storage_root",
+    "limit"
+  ],
+  "output_types": [
+    "manifest_listing"
+  ],
+  "writes": [],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "read_only",
+  "observes_state": false,
+  "abstracts_behavior": true,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_source_contract",
+    "receipt_manifest_contract"
+  ],
+  "forward_inputs": [
+    "storage_root",
+    "limit"
+  ],
+  "reverse_inputs": [
+    "desired_state_family",
+    "behavior_profile_request"
+  ],
+  "state_outputs": [
+    "manifest_listing"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_planning_surface",
+  "can_witness": false,
+  "can_profile": true,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+

@@ -1,0 +1,67 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "trueframegen_stream_rs",
+  "display_name": "TrueFrameGen Stream RS",
+  "category": "90_native_rust_power",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "rust_source",
+  "entrypoint": "native/truevision_capture_rs/src/bin/trueframegen_stream_rs.rs",
+  "implementation_paths": [
+    "native/truevision_capture_rs/Cargo.toml",
+    "native/truevision_capture_rs/src/bin/trueframegen_stream_rs.rs"
+  ],
+  "runtime": "rust",
+  "input_types": [
+    "capture_manifest",
+    "tvcells"
+  ],
+  "output_types": [
+    "generated_state_stream",
+    "manifest",
+    "receipt"
+  ],
+  "writes": [
+    "outputs",
+    "storage/manifests",
+    "storage/receipts"
+  ],
+  "calls_tools": [],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": true,
+  "safe_for_sc_call": "generated_media_write_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": true,
+  "renders_media": true,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "state_render",
+    "stem_state_transform",
+    "pixel_state_transform"
+  ],
+  "forward_inputs": [
+    "capture_manifest",
+    "tvcells"
+  ],
+  "reverse_inputs": [
+    "behavior_profile",
+    "scene_contract",
+    "desired_state_path"
+  ],
+  "state_outputs": [
+    "generated_state_stream",
+    "manifest",
+    "receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "pixel_state_transform",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": true,
+  "can_replay": true,
+  "can_surface": true,
+  "raw_media_saved": false
+}
+

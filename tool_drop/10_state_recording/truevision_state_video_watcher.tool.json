@@ -1,0 +1,73 @@
+{
+  "schema_version": "truevision_tool_manifest_v1",
+  "tool_id": "truevision_state_video_watcher",
+  "display_name": "TrueVision State Video Watcher",
+  "category": "10_state_recording",
+  "status": "active_callable",
+  "implementation_owned_by_tool_drop": false,
+  "entrypoint_type": "script_path",
+  "entrypoint": "scripts/truevision_state_video_watcher.py",
+  "implementation_paths": [
+    "scripts/truevision_state_video_watcher.py"
+  ],
+  "runtime": "python",
+  "input_types": [
+    "screen_region",
+    "playing_video_surface",
+    "operator_stop_file"
+  ],
+  "output_types": [
+    "state_capture_manifest",
+    "records_jsonl",
+    "cell_state_npz",
+    "watcher_receipt"
+  ],
+  "writes": [
+    "storage/artifacts/truevision_captures",
+    "storage/reports/state_recognition",
+    "storage/receipts/state_video_watcher"
+  ],
+  "calls_tools": [
+    "truevision_resonance_recorder",
+    "truevision_state_recognition",
+    "meter_grid_from_capture",
+    "atmosphere_profile_from_capture",
+    "element_creation_profile_from_capture"
+  ],
+  "source_truth_compliant": true,
+  "raw_video_saved": false,
+  "starts_render": false,
+  "safe_for_sc_call": "requires_state_capture_gate",
+  "observes_state": true,
+  "abstracts_behavior": false,
+  "generates_state": false,
+  "renders_media": false,
+  "copies_source_media": false,
+  "behavior_profiles_supported": [
+    "screen_state",
+    "cell_state",
+    "visual_resonance",
+    "capture_manifest"
+  ],
+  "forward_inputs": [
+    "screen_region",
+    "playing_video_surface",
+    "operator_stop_file"
+  ],
+  "reverse_inputs": [],
+  "state_outputs": [
+    "state_capture_manifest",
+    "records_jsonl",
+    "cell_state_npz",
+    "watcher_receipt"
+  ],
+  "media_outputs_optional": [],
+  "behavior_family": "state_witness",
+  "can_witness": true,
+  "can_profile": false,
+  "can_plan": false,
+  "can_replay": false,
+  "can_surface": false,
+  "raw_media_saved": false
+}
+
