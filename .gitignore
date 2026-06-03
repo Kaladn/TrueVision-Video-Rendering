@@ -42,6 +42,8 @@ storage/reports/**
 !storage/reports/.gitkeep
 storage/receipts/**
 !storage/receipts/.gitkeep
+storage/runtime/**
+!storage/runtime/.gitkeep
 storage/presets/**
 !storage/presets/.gitkeep
 storage/templates/**
