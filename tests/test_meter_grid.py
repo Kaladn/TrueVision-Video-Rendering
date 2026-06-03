@@ -125,6 +125,52 @@ def _write_meter_capture(root: Path, *, run_id: str, kind: str) -> Path:
     return manifest_path
 
 
+def _write_npz_meter_capture(root: Path, *, run_id: str, kind: str) -> Path:
+    native_manifest = _write_meter_capture(root, run_id=f"{run_id}_native_source", kind=kind)
+    native = json.loads(native_manifest.read_text(encoding="utf-8"))
+    native_chunk = Path(native["cell_state"]["chunks"][0]["path"])
+    native_cells = np.frombuffer(native_chunk.read_bytes(), dtype="<f4").reshape(
+        36,
+        8,
+        8,
+        len(FEATURE_NAMES),
+    )
+    run_dir = root / run_id
+    cell_dir = run_dir / "cell_state_npz"
+    cell_dir.mkdir(parents=True)
+    npz_path = cell_dir / f"{run_id}_cells_0000.npz"
+    np.savez_compressed(
+        npz_path,
+        cell_state=(native_cells * 255.0).astype(np.float32),
+        frame_numbers=np.arange(1, native_cells.shape[0] + 1, dtype=np.int32),
+        feature_names=np.asarray(FEATURE_NAMES),
+        grid_shape=np.asarray([8, 8], dtype=np.int32),
+    )
+    manifest = {
+        **native,
+        "run_id": run_id,
+        "cell_state": {
+            "enabled": True,
+            "format": "npz_compressed_float32",
+            "feature_names": FEATURE_NAMES,
+            "chunks": [
+                {
+                    "chunk_id": 0,
+                    "path": str(npz_path),
+                    "sha256": "test",
+                    "frame_start": 1,
+                    "frame_end": int(native_cells.shape[0]),
+                    "frame_count": int(native_cells.shape[0]),
+                    "shape": list(native_cells.shape),
+                }
+            ],
+        },
+    }
+    manifest_path = run_dir / f"{run_id}_manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest_path
+
+
 class MeterGridTests(unittest.TestCase):
     def test_meter_grid_supports_sudden_lightning_and_writes_graphs(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -180,6 +226,22 @@ class MeterGridTests(unittest.TestCase):
         self.assertIn("persistent_bright_region", reflection["event_profiles"][0]["rejection_reasons"])
         self.assertEqual(static_line["event_profiles"][0]["status"], "rejected")
         self.assertIn("no_temporal_flash", static_line["event_profiles"][0]["rejection_reasons"])
+
+    def test_meter_grid_accepts_python_npz_cell_state_capture(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            manifest = _write_npz_meter_capture(root, run_id="meter_npz_lightning", kind="lightning")
+
+            profile = build_meter_grid_profile_from_native_capture(
+                manifest,
+                section_id="npz_live_screen_capture",
+                event_type_candidate="candidate_lightning",
+            )
+
+        self.assertEqual(profile["sampled_frames"], 36)
+        self.assertLessEqual(profile["frame_meter_summaries"][10]["luma_peak"], 1.0)
+        self.assertEqual(profile["event_profiles"][0]["status"], "visually_supported")
+        self.assertGreater(profile["event_profiles"][0]["support"]["luma_delta"], 0.70)
 
     def test_metered_section_selector_ranks_long_video_probes_by_target_signature(self):
         with tempfile.TemporaryDirectory() as tmp:

@@ -7,6 +7,8 @@ import numpy as np
 
 from truevision_resonance_recorder import (
     build_record,
+    build_parser,
+    capture_stop_requested,
     parse_region,
     parse_shape_xy,
     summarize_records,
@@ -65,6 +67,17 @@ class TrueVisionResonanceRecorderTests(unittest.TestCase):
         self.assertEqual(parse_shape_xy("160x90"), (90, 160))
         self.assertEqual(parse_shape_xy("16,9"), (9, 16))
         self.assertEqual(parse_region("10,20,960,540"), (10, 20, 960, 540))
+
+    def test_stop_file_supports_operator_controlled_capture(self):
+        parser = build_parser()
+        args = parser.parse_args(["--stop-file", "STOP_TRUEVISION_CAPTURE.flag"])
+        self.assertEqual(args.stop_file, "STOP_TRUEVISION_CAPTURE.flag")
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            stop_file = Path(tmpdir) / "stop.flag"
+            self.assertFalse(capture_stop_requested(stop_file))
+            stop_file.write_text("stop\n", encoding="utf-8")
+            self.assertTrue(capture_stop_requested(stop_file))
 
     def test_write_capture_bundle_writes_records_manifest_and_summary(self):
         records = [

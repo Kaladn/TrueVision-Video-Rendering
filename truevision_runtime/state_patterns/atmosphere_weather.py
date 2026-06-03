@@ -176,6 +176,41 @@ def _mean_feature(frame: np.ndarray, feature_names: list[str], name: str, defaul
     return float(np.mean(frame[:, :, index]))
 
 
+def _normalize_python_npz_cells(cells: np.ndarray, feature_names: list[str]) -> np.ndarray:
+    """Map Python screen-capture cell features from pixel ranges into meter space.
+
+    The source NPZ keeps the original per-cell values. Derived profile tools use
+    normalized meter ranges so one logger format does not silently overpower
+    event thresholds written for native 0-1 TVCELL state.
+    """
+    normalized = np.asarray(cells, dtype=np.float32).copy()
+    scale_255_prefixes = ("rgb_mean_", "rgb_std_")
+    scale_255_names = {
+        "hsv_mean_s",
+        "hsv_mean_v",
+        "luma_mean",
+        "luma_std",
+        "saturation_mean",
+        "delta_luma_abs",
+        "texture_energy",
+        "motion_energy",
+    }
+    for index, name in enumerate(feature_names):
+        if index >= normalized.shape[-1]:
+            break
+        if name == "hsv_mean_h":
+            high = 179.0
+        elif name.startswith(scale_255_prefixes) or name in scale_255_names:
+            high = 255.0
+        elif name == "edge_density":
+            high = 255.0 if float(np.nanmax(normalized[:, :, :, index])) > 1.5 else 1.0
+        else:
+            high = 1.0
+        if high > 1.0 and float(np.nanmax(normalized[:, :, :, index])) > 1.5:
+            normalized[:, :, :, index] = np.clip(normalized[:, :, :, index] / high, 0.0, 1.0)
+    return normalized
+
+
 def _read_native_tvcells_frames(
     manifest: dict[str, Any],
     *,
@@ -183,8 +218,9 @@ def _read_native_tvcells_frames(
     sample_stride: int,
 ) -> list[dict[str, Any]]:
     cell_state = manifest.get("cell_state") or {}
-    if cell_state.get("format") != "tvcells_f32le_v1":
-        raise ValueError("capture manifest must describe tvcells_f32le_v1 cell state")
+    cell_format = str(cell_state.get("format") or "")
+    if cell_format not in {"tvcells_f32le_v1", "npz_compressed_float32"}:
+        raise ValueError("capture manifest must describe tvcells_f32le_v1 or npz_compressed_float32 cell state")
     feature_names = list(cell_state.get("feature_names") or [])
     if not feature_names:
         raise ValueError("capture manifest is missing cell feature names")
@@ -194,6 +230,27 @@ def _read_native_tvcells_frames(
         path = Path(str(chunk.get("path") or ""))
         if not path.exists():
             raise FileNotFoundError(path)
+        if cell_format == "npz_compressed_float32":
+            with np.load(path, allow_pickle=False) as data:
+                cells = np.asarray(data["cell_state"], dtype=np.float32)
+            if cells.ndim != 4:
+                raise ValueError(f"npz cell_state must be 4D: {path}")
+            cells = _normalize_python_npz_cells(cells, feature_names)
+            for local_frame_index in range(cells.shape[0]):
+                if len(frames) >= max_frames:
+                    return frames
+                should_sample = global_frame_index % max(1, sample_stride) == 0
+                if should_sample:
+                    frames.append(
+                        {
+                            "global_frame_index": global_frame_index,
+                            "chunk_id": int(chunk.get("chunk_id") or 0),
+                            "chunk_frame_index": local_frame_index,
+                            "cells": cells[local_frame_index],
+                        }
+                    )
+                global_frame_index += 1
+            continue
         chunk_frames = int(chunk.get("frames") or 0)
         rows, cols = [int(value) for value in chunk.get("grid_shape") or [0, 0]]
         feature_count = int(chunk.get("feature_count") or len(feature_names))

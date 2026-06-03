@@ -353,6 +353,13 @@ def parse_region(value: str | None) -> tuple[int, int, int, int] | None:
     return left, top, width, height
 
 
+def capture_stop_requested(stop_file: str | Path | None) -> bool:
+    """Return True when the operator-created stop file exists."""
+    if not stop_file:
+        return False
+    return Path(stop_file).exists()
+
+
 def write_cell_state_chunk(
     *,
     chunk_path: Path,
@@ -404,6 +411,7 @@ def run_capture(args: argparse.Namespace) -> dict[str, str | float | int]:
         "cell_feature_names": list(CELL_FEATURE_NAMES),
         "cell_chunk_frames": args.cell_chunk_frames,
         "start_delay_seconds": args.start_delay,
+        "operator_stop_file": str(args.stop_file) if args.stop_file else None,
     }
 
     if args.start_delay > 0:
@@ -446,6 +454,8 @@ def run_capture(args: argparse.Namespace) -> dict[str, str | float | int]:
         while True:
             elapsed = time.time() - start_wall
             if elapsed >= args.duration:
+                break
+            if capture_stop_requested(args.stop_file):
                 break
             frame_start = time.perf_counter()
             features = mapper.extract_features()
@@ -523,6 +533,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--start-delay", type=float, default=10.0)
     parser.add_argument("--include-blocks", action="store_true", default=True)
     parser.add_argument("--cell-chunk-frames", type=int, default=30)
+    parser.add_argument("--stop-file", default="", help="Stop cleanly when this file appears.")
     parser.add_argument("--no-cell-state", action="store_false", dest="save_cell_state")
     parser.set_defaults(save_cell_state=True)
     return parser
