@@ -98,8 +98,35 @@ class NativePhoenixFlatsStateRsTests(unittest.TestCase):
             self.assertFalse(manifest["boundary"]["external_visual_assets_used"])
             self.assertFalse(manifest["boundary"]["openai_generation_used"])
             self.assertFalse(manifest["boundary"]["literal_phoenix_spam"])
+            self.assertTrue(manifest["boundary"]["state_transform_arc_logged"])
+            self.assertEqual(
+                manifest["state_transform_arc"]["phase_names"],
+                [
+                    "lineart_damage_state",
+                    "witness_expansion",
+                    "dual_descent",
+                    "impact_transform",
+                    "regrowth_wave",
+                    "healed_forest_state",
+                ],
+            )
 
-            state_line = state_path.read_text(encoding="utf-8").splitlines()[0]
+            state_lines = [
+                json.loads(line)
+                for line in state_path.read_text(encoding="utf-8").splitlines()
+                if line.strip()
+            ]
+            self.assertGreaterEqual(len(state_lines), 2)
+            self.assertEqual(state_lines[0]["state_transform_arc"]["phase_name"], "lineart_damage_state")
+            self.assertEqual(state_lines[-1]["state_transform_arc"]["phase_name"], "healed_forest_state")
+            self.assertAlmostEqual(state_lines[-1]["state_transform_arc"]["healing_color_ratio"], 1.0)
+            self.assertAlmostEqual(state_lines[-1]["state_transform_arc"]["regrowth_ratio"], 1.0)
+            self.assertIn("lineart_world_mask", state_lines[0]["state_layers"])
+            self.assertIn("damaged_city_silhouette", state_lines[0]["state_layers"])
+            self.assertIn("dual_phoenix_vector_field", state_lines[-1]["state_layers"])
+            self.assertIn("forest_regrowth_mask", state_lines[-1]["state_layers"])
+            self.assertIn("clear_water_reflection_return", state_lines[-1]["state_layers"])
+            state_line = json.dumps(state_lines[0], separators=(",", ":"))
             self.assertIn('"main_gold_ember_thread"', state_line)
             self.assertIn('"answering_rose_ember_thread"', state_line)
             self.assertIn('"phoenix_heat_veil"', state_line)

@@ -58,5 +58,5 @@ def validate_tool_call(call: dict[str, Any]) -> dict[str, Any]:
         "tool": tool_name,
         "args": args,
         "human_confirmed": bool(call.get("human_confirmed", False)),
-        "requested_by": str(call.get("requested_by") or "qwen_or_operator")[:80],
+        "requested_by": str(call.get("requested_by") or "operator")[:80],
     }

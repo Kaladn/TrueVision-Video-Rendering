@@ -118,8 +118,8 @@ Instead of asking an AI to invent every frame from scratch, TrueVision keeps tra
 - Rust streaming TrueFrameGen renderer for bounded-memory high-FPS reconstruction.
 - AV-only tool bus for local audio/video template, render, and recalibration workflows.
 - TrueAudio sibling runtime for logging derived audio state from decoded PCM before playback/output.
-- Local model adapter shape for prompt-to-state translation behind schema validation.
-- TrueVision Studio control-plane tools for source snaps, existing-state animation, glow intensity animation, spectrum/city rendering, frame diff, manifest browsing, preset reuse, and local Qwen orchestration.
+- External API adapter shape for prompt-to-state translation behind schema validation.
+- TrueVision Studio control-plane tools for source snaps, existing-state animation, glow intensity animation, spectrum/city rendering, frame diff, manifest browsing, and preset reuse.
 - Document-state reader for treating page frames and glyph cells as replayable visual state.
 - Storage library support for keeping heavy runtime data outside the repository.
 
@@ -343,7 +343,7 @@ The repo-level system map, communication flow, ownership boundaries, and plain-l
 
 [docs/REPO_SYSTEM_GUIDE.md](docs/REPO_SYSTEM_GUIDE.md)
 
-Third-party tools, direct dependencies, local model notes, and credit guidance are documented here:
+Third-party tools, direct dependencies, external API notes, and credit guidance are documented here:
 
 [docs/THIRD_PARTY_NOTICES.md](docs/THIRD_PARTY_NOTICES.md)
 

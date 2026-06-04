@@ -175,21 +175,22 @@ store recalibration notes
 
 Why it exists:
 
-The local model can help plan, but it must not directly operate the system.
-The trusted boundary is validated AV tool calls, not free-form model text.
+External model assistance may help draft state, but it must not directly operate
+the system. The trusted boundary is validated AV tool calls, not free-form model
+text.
 
-### 4. LLM Adapter
+### 4. External Model Adapter
 
 Path:
 
 ```text
-truevision_runtime/llm_adapter/
+future external model adapter
 ```
 
 Purpose:
 
 ```text
-wrap a local or remote model endpoint
+wrap an approved external API session
 add project rules and schema
 ask for draft JSON state
 validate or repair the draft
@@ -200,16 +201,16 @@ Who it talks to:
 
 ```text
 Studio server
--> LLM adapter
--> local Qwen / Ollama / compatible endpoint
+-> external model adapter
+-> approved API session
 -> schema validator
 -> AV tool bus
 ```
 
 Why it exists:
 
-Qwen does not need to know TrueVision internally. The wrapper teaches it the job
-at runtime and prevents unvalidated output from driving the renderer.
+Model assistance does not need to know TrueVision internally. The wrapper teaches
+it the job at runtime and prevents unvalidated output from driving the renderer.
 
 ### 5. Studio Server And UI
 
@@ -217,26 +218,23 @@ Paths:
 
 ```text
 scripts/truevision_studio_server.py
-ui/truevision_state_media_studio.html
 truevision_runtime/studio/
 ```
 
 Purpose:
 
 ```text
-local control surface
-daily chat storage
+storage/template/tool route server
 template save/load/delete
 render preset library
-local Qwen proxy
 AV tool call endpoint
 record/render planning
 ```
 
 Current truth:
 
-The server and endpoints exist and are tested. The UI is not yet product-grade.
-It is a working control plane prototype, not a finished studio application.
+The server and endpoints exist and are tested. UI/chat/model runtime lanes are
+not installed in this repo.
 
 ### 6. Template Renderer
 
@@ -352,7 +350,6 @@ E:\TruEVision Generation
 Purpose:
 
 ```text
-runtime chats
 templates
 events
 receipts
@@ -375,7 +372,7 @@ system code, tests, docs, and small reusable samples.
 ```text
 Human direction/audio/lyrics/source notes
 -> Studio UI or CLI
--> local Qwen/Codex draft
+-> approved external API draft
 -> PromptToStateAdapter
 -> schema validator
 -> AV policy

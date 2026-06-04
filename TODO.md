@@ -154,8 +154,8 @@
 - [x] Local HTML studio exists.
 - [x] Local server exists.
 - [x] AV-only tool registry and policy layer exist.
-- [x] Local model adapter shape exists.
-- [x] Reusable Studio tool contracts exist for source snap, existing-state animation, glow intensity, spectrum city, frame diff, manifests, presets, and Qwen control.
+- [x] External API adapter shape exists.
+- [x] Reusable Studio tool contracts exist for source snap, existing-state animation, glow intensity, spectrum city, frame diff, manifests, presets, and external API draft assistance.
 - [x] Proven render lanes are represented as reusable presets, including the House Remix visual preset.
 - [ ] Remove any remaining placeholder UI language.
 - [ ] Add native capture controls to the studio server.

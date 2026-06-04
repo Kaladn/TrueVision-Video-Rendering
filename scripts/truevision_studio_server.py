@@ -10,9 +10,7 @@ from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
-from urllib.error import HTTPError, URLError
-from urllib.parse import parse_qs, urlparse
-from urllib.request import Request, urlopen
+from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
@@ -21,22 +19,19 @@ if str(ROOT) not in sys.path:
 from truevision_runtime.av_tools.av_tool_registry import list_av_tools
 from truevision_runtime.av_tools.av_tool_runner import run_av_tool_call
 from truevision_runtime.studio.studio_tooling import list_render_presets, list_studio_tools
-from truevision_region_snip import build_recorder_command
+from scripts.truevision_region_snip import build_recorder_command
 
 
-HTML_PATH = ROOT / "ui" / "truevision_state_media_studio.html"
 DEFAULT_STORAGE_ROOT = ROOT / "storage"
 STORAGE_ROOT_ENV = "TRUEVISION_STORAGE_ROOT"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
-DEFAULT_MODEL = "qwen3-coder:30b"
 STORAGE_LANES = {
     "inbox",
     "outbox",
     "events",
     "state_chunks",
     "artifacts",
-    "chats",
     "manifests",
     "library",
     "reports",
@@ -60,12 +55,17 @@ def resolve_storage_root(value: str | None = None) -> Path:
 STORAGE_ROOT = resolve_storage_root()
 
 
+def core_runtime_status() -> dict[str, Any]:
+    return {
+        "ui_runtime": "not_installed",
+        "chat_runtime": "not_installed",
+        "memory_runtime": "not_installed",
+        "future_port": True,
+    }
+
+
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-
-
-def local_day() -> str:
-    return datetime.now().date().isoformat()
 
 
 def slug(value: str) -> str:
@@ -142,55 +142,6 @@ def list_storage_files(storage_root: Path = STORAGE_ROOT) -> list[dict[str, Any]
             }
         )
     return sorted(files, key=lambda item: item["modified_at_utc"], reverse=True)
-
-
-def append_chat_message(
-    *,
-    storage_root: Path,
-    message: dict[str, Any],
-    day: str | None = None,
-) -> dict[str, Any]:
-    ensure_storage_layout(storage_root)
-    chat_day = day or local_day()
-    if not chat_day or any(char not in "0123456789-" for char in chat_day):
-        raise ValueError("day must use YYYY-MM-DD characters")
-    path = storage_root / "chats" / f"{chat_day}.jsonl"
-    entry = {
-        "written_at_utc": utc_now(),
-        "source": str(message.get("source") or "unknown")[:80],
-        "text": str(message.get("text") or ""),
-        "operator": bool(message.get("operator", False)),
-        "kind": str(message.get("kind") or "chat")[:80],
-    }
-    if message.get("meta") is not None:
-        entry["meta"] = message["meta"]
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(entry, ensure_ascii=False, allow_nan=False) + "\n")
-    return {
-        "name": path.name,
-        "path": str(path),
-        "lane": "chats",
-        "kind": "jsonl",
-        "size_bytes": path.stat().st_size,
-        "sha256": sha256_file(path),
-        "day": chat_day,
-    }
-
-
-def read_chat_log(*, storage_root: Path, day: str | None = None) -> list[dict[str, Any]]:
-    ensure_storage_layout(storage_root)
-    chat_day = day or local_day()
-    path = storage_root / "chats" / f"{chat_day}.jsonl"
-    if not path.exists():
-        return []
-    entries: list[dict[str, Any]] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
-        if not line.strip():
-            continue
-        payload = json.loads(line)
-        if isinstance(payload, dict):
-            entries.append(payload)
-    return entries
 
 
 def _template_path(storage_root: Path, name: str) -> Path:
@@ -352,7 +303,7 @@ def build_generation_template_from_request(request: dict[str, Any]) -> dict[str,
             "path_tracing": request.get("path_tracing", {}),
             "computer_vision": request.get("computer_vision", {}),
         },
-        "state_plan": request.get("qwen_state_plan") or {},
+        "state_plan": request.get("state_plan") or {},
         "boundary": {
             "synthetic_state_media": True,
             "evidence": False,
@@ -447,23 +398,18 @@ def resolve_assistant_actions(message: str, request: dict[str, Any]) -> list[str
             "walk",
         ]
     )
-    wants_compile = any(word in text for word in ["compile", "generate", "draft", "state", "qwen", "catbot", "do it"])
+    wants_compile = any(word in text for word in ["compile", "generate", "draft", "state", "catbot", "do it"])
     wants_compile = wants_compile or looks_like_visual_prompt
 
     if wants_files:
         _append_action(actions, "refresh_files")
     if wants_save or wants_record or wants_compile:
         _append_action(actions, "save_request")
-    if wants_compile and request.get("local_llm", {}).get("enabled"):
-        _append_action(actions, "qwen_compile")
     if wants_record:
         _append_action(actions, "prepare_record")
 
     if not actions:
-        if request.get("local_llm", {}).get("enabled"):
-            _append_action(actions, "qwen_chat")
-        else:
-            _append_action(actions, "save_request")
+        _append_action(actions, "save_request")
 
     return actions
 
@@ -498,14 +444,9 @@ def handle_assistant_message(
         )
     files = list_storage_files(storage_root)
 
-    pending_actions = {"qwen_chat", "qwen_compile"}
-    completed = [action for action in actions if action not in pending_actions]
-    pending = [action for action in actions if action in pending_actions]
     parts = []
-    if completed:
-        parts.append("ran " + ", ".join(completed))
-    if pending:
-        parts.append("queued " + ", ".join(pending))
+    if actions:
+        parts.append("ran " + ", ".join(actions))
     if not parts:
         parts.append("no action")
 
@@ -516,90 +457,6 @@ def handle_assistant_message(
         "results": results,
         "files": files,
     }
-
-
-def normalize_provider(provider: str | None) -> str:
-    if provider == "openai_compatible":
-        return "openai_compatible"
-    return "ollama_native"
-
-
-def validate_local_endpoint(endpoint: str) -> str:
-    parsed = urlparse(endpoint)
-    host = (parsed.hostname or "").lower()
-    if parsed.scheme != "http":
-        raise ValueError("Only local http endpoints are allowed")
-    if host not in {"127.0.0.1", "localhost", "::1"}:
-        raise ValueError("Only loopback model endpoints are allowed")
-    if not parsed.port:
-        raise ValueError("Model endpoint must include a port")
-    return endpoint
-
-
-def build_messages(system_prompt: str, request: dict[str, Any]) -> list[dict[str, str]]:
-    return [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": json.dumps(request, indent=2, sort_keys=True)},
-    ]
-
-
-def build_downstream_payload(
-    provider: str,
-    model: str,
-    system_prompt: str,
-    request: dict[str, Any],
-) -> dict[str, Any]:
-    provider = normalize_provider(provider)
-    messages = build_messages(system_prompt, request)
-    if provider == "openai_compatible":
-        return {
-            "model": model or DEFAULT_MODEL,
-            "temperature": 0.1,
-            "stream": False,
-            "messages": messages,
-        }
-    return {
-        "model": model or DEFAULT_MODEL,
-        "stream": False,
-        "messages": messages,
-        "options": {
-            "temperature": 0.1,
-        },
-    }
-
-
-def extract_model_content(payload: dict[str, Any]) -> str:
-    choices = payload.get("choices")
-    if isinstance(choices, list) and choices:
-        message = choices[0].get("message", {})
-        if isinstance(message, dict) and message.get("content"):
-            return str(message["content"])
-    message = payload.get("message")
-    if isinstance(message, dict) and message.get("content"):
-        return str(message["content"])
-    if payload.get("response"):
-        return str(payload["response"])
-    raise ValueError("Model response did not include message content")
-
-
-def fetch_json(
-    endpoint: str,
-    method: str,
-    payload: dict[str, Any] | None = None,
-    api_key: str = "",
-) -> dict[str, Any]:
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-    }
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    data = None if payload is None else json.dumps(payload).encode("utf-8")
-    request = Request(endpoint, data=data, headers=headers, method=method)
-    with urlopen(request, timeout=120) as response:
-        body = response.read().decode("utf-8")
-    return json.loads(body) if body else {}
-
 
 class StudioHandler(BaseHTTPRequestHandler):
     server_version = "TrueVisionStudio/0.1"
@@ -617,21 +474,32 @@ class StudioHandler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         if parsed.path in {"/", "/index.html"}:
-            self._send_file(HTML_PATH, "text/html; charset=utf-8")
+            self._send_json(
+                {
+                    "ok": True,
+                    "service": "truevision_studio_server",
+                    "ui_runtime": "not_installed",
+                    "chat_runtime": "not_installed",
+                    "memory_runtime": "not_installed",
+                    "future_port": True,
+                },
+                410,
+            )
             return
         if parsed.path == "/api/health":
-            self._send_json({"ok": True, "service": "truevision_studio_server"})
-            return
-        if parsed.path == "/api/local-llm/models":
-            self._handle_models(parsed.query)
+            self._send_json(
+                {
+                    "ok": True,
+                    "service": "truevision_studio_server",
+                    "ui_runtime": "not_installed",
+                    "chat_runtime": "not_installed",
+                    "memory_runtime": "not_installed",
+                    "future_port": True,
+                }
+            )
             return
         if parsed.path == "/api/files":
             self._send_json({"ok": True, "files": list_storage_files(STORAGE_ROOT)})
-            return
-        if parsed.path == "/api/chat/today":
-            values = parse_qs(parsed.query)
-            day = values.get("day", [None])[0]
-            self._send_json({"ok": True, "day": day or local_day(), "messages": read_chat_log(storage_root=STORAGE_ROOT, day=day)})
             return
         if parsed.path == "/api/templates":
             self._send_json({"ok": True, "templates": list_templates(STORAGE_ROOT)})
@@ -649,9 +517,6 @@ class StudioHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
-        if parsed.path == "/api/local-llm/chat":
-            self._handle_local_llm_chat()
-            return
         if parsed.path == "/api/state/request":
             self._handle_state_request()
             return
@@ -663,9 +528,6 @@ class StudioHandler(BaseHTTPRequestHandler):
             return
         if parsed.path == "/api/assistant/message":
             self._handle_assistant_message()
-            return
-        if parsed.path == "/api/chat/log":
-            self._handle_chat_log()
             return
         if parsed.path == "/api/templates/save":
             self._handle_template_save()
@@ -680,34 +542,6 @@ class StudioHandler(BaseHTTPRequestHandler):
             self._handle_av_tool_call()
             return
         self.send_error(404, "Not found")
-
-    def _handle_local_llm_chat(self) -> None:
-        try:
-            payload = self._read_json()
-            endpoint = validate_local_endpoint(str(payload.get("endpoint", "")))
-            provider = normalize_provider(str(payload.get("provider", "")))
-            model = str(payload.get("model") or DEFAULT_MODEL)
-            api_key = str(payload.get("api_key") or "")
-            system_prompt = str(payload.get("system_prompt") or "")
-            request_body = payload.get("request")
-            if not isinstance(request_body, dict):
-                raise ValueError("request must be an object")
-            downstream = build_downstream_payload(provider, model, system_prompt, request_body)
-            upstream = fetch_json(endpoint, "POST", downstream, api_key)
-            self._send_json(
-                {
-                    "ok": True,
-                    "provider": provider,
-                    "model": model,
-                    "content": extract_model_content(upstream),
-                    "raw": upstream,
-                }
-            )
-        except HTTPError as exc:
-            detail = exc.read().decode("utf-8", errors="replace")
-            self._send_json({"ok": False, "error": detail or str(exc), "status": exc.code}, exc.code)
-        except (URLError, TimeoutError, ValueError, json.JSONDecodeError) as exc:
-            self._send_json({"ok": False, "error": str(exc)}, 400)
 
     def _handle_state_request(self) -> None:
         try:
@@ -779,22 +613,6 @@ class StudioHandler(BaseHTTPRequestHandler):
         except (ValueError, KeyError, TypeError, json.JSONDecodeError) as exc:
             self._send_json({"ok": False, "error": str(exc)}, 400)
 
-    def _handle_chat_log(self) -> None:
-        try:
-            payload = self._read_json()
-            message = payload.get("message", payload)
-            if not isinstance(message, dict):
-                raise ValueError("message must be an object")
-            day = payload.get("day")
-            artifact = append_chat_message(
-                storage_root=STORAGE_ROOT,
-                message=message,
-                day=str(day) if day else None,
-            )
-            self._send_json({"ok": True, "artifact": artifact})
-        except (ValueError, TypeError, json.JSONDecodeError) as exc:
-            self._send_json({"ok": False, "error": str(exc)}, 400)
-
     def _handle_template_save(self) -> None:
         try:
             payload = self._read_json()
@@ -852,16 +670,6 @@ class StudioHandler(BaseHTTPRequestHandler):
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             self._send_json({"ok": False, "error": str(exc)}, 400)
 
-    def _handle_models(self, query: str) -> None:
-        values = parse_qs(query)
-        endpoint = values.get("endpoint", ["http://127.0.0.1:11434/api/tags"])[0]
-        try:
-            endpoint = validate_local_endpoint(endpoint)
-            payload = fetch_json(endpoint, "GET")
-            self._send_json({"ok": True, "raw": payload})
-        except (HTTPError, URLError, ValueError, json.JSONDecodeError) as exc:
-            self._send_json({"ok": False, "error": str(exc)}, 400)
-
     def _read_json(self) -> dict[str, Any]:
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length).decode("utf-8")
@@ -869,14 +677,6 @@ class StudioHandler(BaseHTTPRequestHandler):
         if not isinstance(payload, dict):
             raise ValueError("JSON body must be an object")
         return payload
-
-    def _send_file(self, path: Path, content_type: str) -> None:
-        data = path.read_bytes()
-        self.send_response(200)
-        self.send_header("Content-Type", content_type)
-        self.send_header("Content-Length", str(len(data)))
-        self.end_headers()
-        self.wfile.write(data)
 
     def _send_json(self, payload: dict[str, Any], status: int = 200) -> None:
         data = json.dumps(payload, indent=2).encode("utf-8")
@@ -902,13 +702,13 @@ def run(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, storage_root: str | 
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Serve TrueVision Studio with a local LLM CORS proxy.")
+    parser = argparse.ArgumentParser(description="Serve TrueVision Studio storage, template, and AV tool routes.")
     parser.add_argument("--host", default=DEFAULT_HOST)
     parser.add_argument("--port", type=int, default=DEFAULT_PORT)
     parser.add_argument(
         "--storage-root",
         default=None,
-        help=f"Runtime storage root for chats/templates/receipts/artifacts. Overrides {STORAGE_ROOT_ENV}.",
+        help=f"Runtime storage root for templates/receipts/artifacts. Overrides {STORAGE_ROOT_ENV}.",
     )
     args = parser.parse_args()
     run(args.host, args.port, args.storage_root)

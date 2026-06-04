@@ -12,7 +12,7 @@ if str(ROOT) not in sys.path:
 
 from truevision_runtime.worker_forge import (
     build_manifest_inventory,
-    chat_forge_tool_request,
+    forge_tool_request,
     choose_local_worker,
 )
 
@@ -41,10 +41,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     inventory.add_argument("--json", action="store_true")
 
-    forge = sub.add_parser("forge", help="Forge a chat-requested tool/worker manifest and append local logs.")
+    forge = sub.add_parser("forge", help="Forge a requested tool/worker manifest and append local event logs.")
     forge.add_argument("--storage-root", type=Path, default=ROOT / "storage")
     forge.add_argument("--requested-by", required=True)
-    forge.add_argument("--chat-text", required=True)
+    forge.add_argument("--request-text", required=True)
     forge.add_argument("--tool-name", required=True)
     forge.add_argument("--organ", required=True)
     forge.add_argument("--purpose", required=True)
@@ -74,10 +74,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "forge":
-        result = chat_forge_tool_request(
+        result = forge_tool_request(
             storage_root=args.storage_root,
             requested_by=args.requested_by,
-            chat_text=args.chat_text,
+            request_text=args.request_text,
             tool_name=args.tool_name,
             organ=args.organ,
             purpose=args.purpose,

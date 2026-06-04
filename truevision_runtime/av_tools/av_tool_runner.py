@@ -773,7 +773,6 @@ def _execute_validated_tool(validated: dict[str, Any], storage_root: Path) -> di
         "existing_state_animator",
         "electric_glow_intensity_animator",
         "spectrum_audio_reactive_city",
-        "local_qwen_controller",
     }:
         plan = build_studio_tool_plan(tool, args)
         if tool == "spectrum_audio_reactive_city" and args.get("promote_to_template"):

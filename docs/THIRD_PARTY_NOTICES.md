@@ -336,55 +336,12 @@ License note:
 The repo calls platform APIs available on the user's Windows system. It does
 not redistribute Windows SDK/runtime components.
 
-## Optional Local Model Stack
+## External Model Assistance
 
-The repo can talk to a local LLM through loopback endpoints. The model is a
-planner/controller only; it does not execute directly.
-
-### Ollama / OpenAI-Compatible Local Endpoint
-
-Use in this repo:
-
-```text
-local Qwen chat/proxy route
-prompt-to-state draft generation
-operator planning
-```
-
-Credit:
-
-```text
-Ollama project if used locally
-https://ollama.com/
-```
-
-License note:
-
-The repo does not vendor Ollama. If Ollama is used, follow Ollama's license and
-the license for each model pulled into the local environment.
-
-### Qwen Models
-
-Use in this repo:
-
-```text
-local model planning/controller role
-draft AV state requests
-chat about audio/video projects
-```
-
-Credit:
-
-```text
-Qwen model family by Alibaba Cloud / Qwen team
-https://qwenlm.github.io/
-```
-
-License note:
-
-Model licenses vary by model and release. The repository does not redistribute
-Qwen model weights. Check the exact local model license before any release or
-commercial use.
+The repo has no embedded model dependency or embedded model controller path.
+Future model assistance should use an explicit external API session, with
+OpenAI API as the intended route, and only after validation/gating code is
+installed.
 
 ## Optional / Environment-Only Packages
 

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from truevision_runtime.worker_forge import (
     build_manifest_inventory,
-    chat_forge_tool_request,
+    forge_tool_request,
     choose_local_worker,
     load_jsonl,
 )
@@ -66,36 +66,35 @@ class WorkerForgeTests(unittest.TestCase):
             self.assertEqual(result["worker_count"], 1)
             self.assertEqual(result["agent_candidate_count"], 1)
 
-    def test_chat_forge_appends_hash_chained_records_and_receipts(self):
+    def test_request_forge_appends_hash_chained_events_and_receipts(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             storage_root = Path(tmpdir)
 
-            first = chat_forge_tool_request(
+            first = forge_tool_request(
                 storage_root=storage_root,
                 requested_by="operator",
-                chat_text="make a glyph region worker",
+                request_text="make a glyph region worker",
                 tool_name="glyph_region_worker",
                 organ="truevision",
                 purpose="find text-like regions",
                 input_refs=["storage/manifests/source.json"],
             )
-            second = chat_forge_tool_request(
+            second = forge_tool_request(
                 storage_root=storage_root,
                 requested_by="operator",
-                chat_text="make a shape worker",
+                request_text="make a shape worker",
                 tool_name="geometry_shape_worker",
                 organ="truevision",
                 purpose="extract geometry only",
                 input_refs=[],
             )
 
-            chat_records = load_jsonl(storage_root / "chats" / "tool_forge.jsonl")
             event_records = load_jsonl(storage_root / "events" / "worker_forge.jsonl")
 
-            self.assertEqual(len(chat_records), 2)
             self.assertEqual(len(event_records), 2)
-            self.assertEqual(chat_records[0]["previous_hash"], "")
-            self.assertEqual(chat_records[1]["previous_hash"], chat_records[0]["record_hash"])
+            self.assertEqual(event_records[0]["event_type"], "tool_request_manifest_forged")
+            self.assertEqual(event_records[0]["previous_hash"], "")
+            self.assertEqual(event_records[1]["previous_hash"], event_records[0]["record_hash"])
             self.assertTrue(Path(first["manifest_json"]).exists())
             self.assertTrue(Path(first["receipt_json"]).exists())
             self.assertTrue(Path(second["manifest_json"]).exists())

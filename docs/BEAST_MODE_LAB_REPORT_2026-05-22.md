@@ -251,7 +251,7 @@ AV policy rejects unknown tools and path escapes.
 Receipts are written for tool calls.
 Studio-level tools exist.
 Render preset library exists.
-Local Qwen controller shape exists.
+Local model controller has been removed.
 ```
 
 Current Studio tool contracts:
@@ -264,12 +264,11 @@ spectrum_audio_reactive_city
 frame_diff_replay_accuracy
 manifest_browser
 render_preset_library
-local_qwen_controller
 ```
 
-### 8. Prompt-To-State Adapter Shape
+### 8. External Prompt-To-State Adapter Shape
 
-Proven by tests:
+Future adapter boundary:
 
 ```text
 Model output is draft JSON only.
@@ -278,7 +277,8 @@ Bad drafts are repaired with validation errors only.
 The model does not execute directly.
 ```
 
-This means Qwen can be used as a controller/planner without being trusted as the executor.
+This repo uses approved external API sessions for model assistance and validated
+state/tool calls.
 
 ### 9. Document-State Reader
 
@@ -588,15 +588,15 @@ Add generated-video quality metrics that do not require external services.
 2. TrueFrameGen uses SegmentField as the default reconstruction path.
 3. Renderers build state/grid/primitive plans before final rasterization.
 4. GPU is used first for encoding, then later for actual shader/raster lanes.
-5. Python remains orchestration, validation, reporting, tests, and local LLM glue.
+5. Python remains orchestration, validation, reporting, tests, and external API glue.
 ```
 
 ### Product Direction
 
 ```text
 TrueVision Studio should become an audio/video state-media lab:
-  user talks to Qwen
-  Qwen drafts AV state
+  user talks through an approved external API session
+  API response drafts AV state
   validator checks it
   tool bus executes allowlisted AV tools
   Rust/native lanes render/capture
@@ -623,7 +623,6 @@ replay state
 fill frames
 stream reconstruction
 validate tool calls
-run local model as draft controller
 render full-song hardware-assisted output
 prove runs with manifests, hashes, and state logs
 ```

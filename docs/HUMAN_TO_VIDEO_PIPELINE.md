@@ -18,7 +18,7 @@ Generated media is synthetic state media. It is not evidence.
 
 ```text
 human intent
--> Qwen/Codex draft
+-> approved external API draft
 -> PromptToStateAdapter contract
 -> schema validation
 -> AV-only tool policy
@@ -88,7 +88,6 @@ video_execute_full_render
 manifest_generate
 receipt_create
 render_preset_library
-local_qwen_controller
 ```
 
 Not allowed:

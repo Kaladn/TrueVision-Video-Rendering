@@ -69,7 +69,6 @@ AV_TOOL_LANGUAGE_OVERRIDES: dict[str, dict[str, object]] = {
     "frame_diff_replay_accuracy": {"behavior_family": "state_compare_adjust", "can_profile": True},
     "manifest_browser": {"behavior_family": "state_library", "can_profile": True},
     "render_preset_library": {"behavior_family": "state_planning_surface", "can_plan": True},
-    "local_qwen_controller": {"behavior_family": "state_planning_surface", "can_plan": True},
 }
 
 
@@ -118,7 +117,6 @@ AV_TOOLS: tuple[AVToolSpec, ...] = (
     AVToolSpec("frame_diff_replay_accuracy", "Compare source and regen manifests or state artifacts for replay drift.", 1, "medium", "accuracy report"),
     AVToolSpec("manifest_browser", "Browse AV render/capture manifests.", 1, "medium", "manifest listing"),
     AVToolSpec("render_preset_library", "List, load, save, and promote reusable render presets.", 1, "high", "preset library result"),
-    AVToolSpec("local_qwen_controller", "Describe or validate the local Qwen planner/controller contract.", 1, "high", "controller contract"),
 )
 
 

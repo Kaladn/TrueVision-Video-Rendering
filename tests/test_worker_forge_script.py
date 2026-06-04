@@ -71,7 +71,7 @@ class WorkerForgeScriptTests(unittest.TestCase):
                     str(storage),
                     "--requested-by",
                     "operator",
-                    "--chat-text",
+                    "--request-text",
                     "need a meter grid worker",
                     "--tool-name",
                     "truevision_meter_grid",

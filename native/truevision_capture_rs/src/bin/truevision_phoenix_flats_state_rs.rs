@@ -20,6 +20,14 @@ const STEMS: [(&str, &str, &str); 8] = [
     ("synth", "Synth", "phoenix_heat_veil"),
     ("other", "Other", "steel_air_texture"),
 ];
+const PHASE_NAMES: [&str; 6] = [
+    "lineart_damage_state",
+    "witness_expansion",
+    "dual_descent",
+    "impact_transform",
+    "regrowth_wave",
+    "healed_forest_state",
+];
 
 #[derive(Clone)]
 struct Args {
@@ -43,6 +51,20 @@ struct Meters {
     bass: f32,
     mid: f32,
     high: f32,
+}
+
+#[derive(Clone, Copy)]
+struct PhoenixPhase {
+    index: usize,
+    name: &'static str,
+    progress: f32,
+    lineart_ratio: f32,
+    destructive_fire_ratio: f32,
+    witness_expansion_ratio: f32,
+    dual_vector_pressure: f32,
+    impact_pressure: f32,
+    healing_color_ratio: f32,
+    regrowth_ratio: f32,
 }
 
 #[derive(Clone)]
@@ -110,7 +132,14 @@ fn run() -> Result<(), String> {
 
     for frame_index in 0..frame_count {
         let time_seconds = frame_index as f64 / args.fps as f64;
-        render_frame(&args, &tracks, frame_index, time_seconds as f32, &mut frame);
+        render_frame(
+            &args,
+            &tracks,
+            frame_index,
+            frame_count,
+            time_seconds as f32,
+            &mut frame,
+        );
         stdin
             .write_all(&frame)
             .map_err(|e| format!("ffmpeg write failed: {e}"))?;
@@ -118,7 +147,7 @@ fn run() -> Result<(), String> {
             writeln!(
                 state_file,
                 "{}",
-                frame_state_json(&tracks, frame_index, time_seconds)
+                frame_state_json(&tracks, frame_index, frame_count, time_seconds)
             )
             .map_err(|e| format!("state write failed: {e}"))?;
         }
@@ -460,7 +489,15 @@ fn scaled_meters_for(tracks: &[StemTrack], id: &str, frame_index: usize) -> Mete
     meters
 }
 
-fn render_frame(args: &Args, tracks: &[StemTrack], frame_index: usize, t: f32, frame: &mut [u8]) {
+fn render_frame(
+    args: &Args,
+    tracks: &[StemTrack],
+    frame_index: usize,
+    frame_count: usize,
+    t: f32,
+    frame: &mut [u8],
+) {
+    let phase = phoenix_phase(frame_index, frame_count);
     let lead = scaled_meters_for(tracks, "lead_vocals", frame_index);
     let backing = scaled_meters_for(tracks, "backing_vocals", frame_index);
     let drums = scaled_meters_for(tracks, "drums", frame_index);
@@ -473,6 +510,15 @@ fn render_frame(args: &Args, tracks: &[StemTrack], frame_index: usize, t: f32, f
     fill_flats_background(frame, args.width, args.height, synth, bass, t);
     draw_flats_silhouette(frame, args.width, args.height, keyboard, other, t);
     draw_river_depth_pulse(frame, args.width, args.height, bass, keyboard, t);
+    draw_lineart_world_state(
+        frame,
+        args.width,
+        args.height,
+        phase,
+        keyboard,
+        other,
+        t,
+    );
     draw_memory_lattice(frame, args.width, args.height, keyboard, t);
     draw_phoenix_heat_veil(frame, args.width, args.height, synth, lead, backing, t);
     draw_dual_ember_threads(
@@ -488,7 +534,77 @@ fn render_frame(args: &Args, tracks: &[StemTrack], frame_index: usize, t: f32, f
     draw_pressure_hits(frame, args.width, args.height, drums, bass, frame_index, t);
     draw_ash_sparks(frame, args.width, args.height, percussion, frame_index, t);
     draw_steel_air_texture(frame, args.width, args.height, other, synth, t);
+    draw_dual_descent_vectors(
+        frame,
+        args.width,
+        args.height,
+        phase,
+        lead,
+        backing,
+        drums,
+        t,
+    );
+    draw_regrowth_wave(
+        frame,
+        args.width,
+        args.height,
+        phase,
+        bass,
+        keyboard,
+        synth,
+        frame_index,
+        t,
+    );
+    apply_phoenix_phase_grade(frame, args.width, args.height, phase);
     draw_minimal_stem_meter(frame, args.width, args.height, tracks, frame_index);
+}
+
+fn phoenix_phase(frame_index: usize, frame_count: usize) -> PhoenixPhase {
+    let progress = if frame_count <= 1 {
+        1.0
+    } else {
+        frame_index as f32 / (frame_count - 1) as f32
+    }
+    .clamp(0.0, 1.0);
+    let (index, name) = if progress < 0.25 {
+        (0, "lineart_damage_state")
+    } else if progress < 0.45 {
+        (1, "witness_expansion")
+    } else if progress < 0.60 {
+        (2, "dual_descent")
+    } else if progress < 0.78 {
+        (3, "impact_transform")
+    } else if progress < 0.93 {
+        (4, "regrowth_wave")
+    } else {
+        (5, "healed_forest_state")
+    };
+    PhoenixPhase {
+        index,
+        name,
+        progress,
+        lineart_ratio: (1.0 - smoothstep(0.18, 0.64, progress)).clamp(0.0, 1.0),
+        destructive_fire_ratio: (smoothstep(0.18, 0.62, progress)
+            * (1.0 - smoothstep(0.76, 0.96, progress)))
+        .clamp(0.0, 1.0),
+        witness_expansion_ratio: smoothstep(0.22, 0.48, progress),
+        dual_vector_pressure: (smoothstep(0.44, 0.58, progress)
+            * (1.0 - smoothstep(0.70, 0.88, progress)))
+        .clamp(0.0, 1.0),
+        impact_pressure: (smoothstep(0.58, 0.68, progress)
+            * (1.0 - smoothstep(0.74, 0.86, progress)))
+        .clamp(0.0, 1.0),
+        healing_color_ratio: smoothstep(0.70, 0.98, progress),
+        regrowth_ratio: smoothstep(0.78, 0.98, progress),
+    }
+}
+
+fn smoothstep(edge0: f32, edge1: f32, value: f32) -> f32 {
+    if edge1 <= edge0 {
+        return if value >= edge1 { 1.0 } else { 0.0 };
+    }
+    let x = ((value - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    x * x * (3.0 - 2.0 * x)
 }
 
 fn fill_flats_background(
@@ -611,6 +727,157 @@ fn draw_river_depth_pulse(
                 );
             }
             prev = Some(point);
+        }
+    }
+}
+
+fn draw_lineart_world_state(
+    frame: &mut [u8],
+    width: usize,
+    height: usize,
+    phase: PhoenixPhase,
+    keyboard: Meters,
+    other: Meters,
+    t: f32,
+) {
+    let horizon = height as f32 * 0.58;
+    let line_alpha =
+        (0.10 + phase.lineart_ratio * 0.24 + phase.healing_color_ratio * 0.13 + keyboard.rms * 0.06)
+            .clamp(0.08, 0.48);
+    let city_color = Color::new(
+        112.0 + phase.healing_color_ratio * 34.0,
+        126.0 + phase.healing_color_ratio * 70.0,
+        132.0 + phase.healing_color_ratio * 42.0,
+    );
+    for index in 0..22 {
+        let n = index as f32 / 21.0;
+        let x = width as f32 * (0.045 + n * 0.91);
+        let w = width as f32 * (0.012 + ((index * 17 % 7) as f32) * 0.003);
+        let h = height as f32 * (0.055 + ((index * 29 % 11) as f32) * 0.010);
+        let y0 = horizon - h;
+        let lean = ((t * 0.10 + index as f32 * 0.61).sin() * other.rms * 5.0) as i32;
+        draw_line(
+            frame,
+            width,
+            height,
+            (x - w) as i32 + lean,
+            horizon as i32,
+            (x - w) as i32,
+            y0 as i32,
+            city_color,
+            line_alpha,
+            1,
+        );
+        draw_line(
+            frame,
+            width,
+            height,
+            (x + w) as i32 + lean,
+            horizon as i32,
+            (x + w) as i32,
+            y0 as i32,
+            city_color,
+            line_alpha,
+            1,
+        );
+        draw_line(
+            frame,
+            width,
+            height,
+            (x - w) as i32,
+            y0 as i32,
+            (x + w) as i32,
+            (y0 + ((index * 13 % 5) as f32 - 2.0)) as i32,
+            city_color,
+            line_alpha,
+            1,
+        );
+    }
+
+    let scorch = phase.destructive_fire_ratio * (1.0 - phase.regrowth_ratio * 0.80);
+    let branch_color = Color::new(
+        86.0 + phase.healing_color_ratio * 42.0 + scorch * 86.0,
+        88.0 + phase.healing_color_ratio * 126.0 + scorch * 26.0,
+        84.0 + phase.healing_color_ratio * 60.0,
+    );
+    for index in 0..34 {
+        let n = index as f32 / 33.0;
+        let x = width as f32 * (0.03 + n * 0.94);
+        let base_y = height as f32 * (0.76 + ((index * 19 % 9) as f32) * 0.017);
+        let height_scale = height as f32
+            * (0.055 + phase.regrowth_ratio * 0.105 + ((index * 31 % 5) as f32) * 0.010);
+        let sway = (t * (0.11 + phase.regrowth_ratio * 0.20) + n * 7.0).sin()
+            * (2.0 + keyboard.mid * 8.0);
+        let top_x = x + sway;
+        let top_y = base_y - height_scale;
+        draw_line(
+            frame,
+            width,
+            height,
+            x as i32,
+            base_y as i32,
+            top_x as i32,
+            top_y as i32,
+            branch_color,
+            0.09 + phase.lineart_ratio * 0.10 + phase.regrowth_ratio * 0.18,
+            1,
+        );
+        let fork = 8.0 + phase.regrowth_ratio * 14.0;
+        draw_line(
+            frame,
+            width,
+            height,
+            top_x as i32,
+            top_y as i32,
+            (top_x - fork) as i32,
+            (top_y + fork * 0.45) as i32,
+            branch_color,
+            0.06 + phase.regrowth_ratio * 0.14,
+            1,
+        );
+        draw_line(
+            frame,
+            width,
+            height,
+            top_x as i32,
+            top_y as i32,
+            (top_x + fork * 0.8) as i32,
+            (top_y + fork * 0.38) as i32,
+            branch_color,
+            0.06 + phase.regrowth_ratio * 0.14,
+            1,
+        );
+    }
+
+    if phase.regrowth_ratio > 0.72 {
+        let canopy_color = Color::new(56.0, 186.0, 116.0);
+        for row in 0..3 {
+            let y = height as f32 * (0.66 + row as f32 * 0.045);
+            let mut prev = None;
+            for step in 0..120 {
+                let n = step as f32 / 119.0;
+                let x = n * width as f32;
+                let wave = (n * 22.0 + t * 0.18 + row as f32).sin()
+                    * height as f32
+                    * 0.010
+                    * phase.regrowth_ratio;
+                let point = (x as i32, (y + wave) as i32);
+                if let Some((px, py)) = prev {
+                    draw_line(
+                        frame,
+                        width,
+                        height,
+                        px,
+                        py,
+                        point.0,
+                        point.1,
+                        canopy_color,
+                        0.030 + phase.regrowth_ratio * 0.070,
+                        1,
+                    );
+                }
+                prev = Some(point);
+            }
         }
     }
 }
@@ -844,6 +1111,201 @@ fn draw_steel_air_texture(
             1,
         );
     }
+}
+
+fn draw_dual_descent_vectors(
+    frame: &mut [u8],
+    width: usize,
+    height: usize,
+    phase: PhoenixPhase,
+    lead: Meters,
+    backing: Meters,
+    drums: Meters,
+    t: f32,
+) {
+    let pressure = (phase.dual_vector_pressure
+        * (0.58 + lead.rms * 0.28 + backing.rms * 0.24 + drums.onset * 0.22))
+    .clamp(0.0, 1.0);
+    if pressure <= 0.01 {
+        return;
+    }
+    let center_x = width as f32 * 0.5;
+    let center_y = height as f32 * (0.50 + 0.018 * (t * 0.18).sin());
+    let top_y = height as f32 * 0.08;
+    let left_x = width as f32 * (0.18 + 0.025 * (t * 0.31).sin());
+    let right_x = width as f32 * (0.82 + 0.025 * (t * 0.29).cos());
+    let descent = smoothstep(0.44, 0.68, phase.progress);
+    let left_end = (
+        lerp(left_x, center_x - width as f32 * 0.025, descent),
+        lerp(top_y, center_y, descent),
+    );
+    let right_end = (
+        lerp(right_x, center_x + width as f32 * 0.025, descent),
+        lerp(top_y, center_y, descent),
+    );
+    draw_line(
+        frame,
+        width,
+        height,
+        left_x as i32,
+        top_y as i32,
+        left_end.0 as i32,
+        left_end.1 as i32,
+        Color::new(255.0, 176.0, 72.0),
+        0.12 + pressure * 0.34,
+        2,
+    );
+    draw_line(
+        frame,
+        width,
+        height,
+        right_x as i32,
+        top_y as i32,
+        right_end.0 as i32,
+        right_end.1 as i32,
+        Color::new(246.0, 96.0, 132.0),
+        0.10 + pressure * 0.30,
+        2,
+    );
+    if phase.impact_pressure > 0.0 {
+        for ring in 0..4 {
+            let r = (width as f32
+                * (0.028 + ring as f32 * 0.020 + phase.impact_pressure * 0.070))
+                as i32;
+            let color = Color::new(
+                255.0,
+                116.0 + phase.healing_color_ratio * 118.0,
+                48.0 + phase.healing_color_ratio * 130.0,
+            );
+            draw_ellipse_outline(
+                frame,
+                width,
+                height,
+                center_x as i32,
+                center_y as i32,
+                r,
+                (r as f32 * 0.56) as i32,
+                t * 7.0 + ring as f32 * 21.0,
+                color,
+                0.07 + phase.impact_pressure * 0.13,
+            );
+        }
+    }
+}
+
+fn draw_regrowth_wave(
+    frame: &mut [u8],
+    width: usize,
+    height: usize,
+    phase: PhoenixPhase,
+    bass: Meters,
+    keyboard: Meters,
+    synth: Meters,
+    frame_index: usize,
+    t: f32,
+) {
+    if phase.regrowth_ratio <= 0.01 {
+        return;
+    }
+    let mut rng = XorShift::new(frame_index as u64 * 1709 + 4307);
+    let water_top = height as f32 * 0.62;
+    let crest_y = lerp(height as f32 * 0.92, water_top - height as f32 * 0.13, phase.regrowth_ratio);
+    let wave_color = Color::new(
+        54.0 + phase.healing_color_ratio * 74.0,
+        136.0 + phase.healing_color_ratio * 94.0,
+        92.0 + synth.mid * 46.0,
+    );
+    for branch in 0..26 {
+        let n = branch as f32 / 25.0;
+        let x = width as f32 * n;
+        let local = ((t * 0.16 + n * 5.0).sin() * 0.5 + 0.5) * keyboard.rms;
+        let stem_h = height as f32 * (0.035 + phase.regrowth_ratio * 0.16 + local * 0.045);
+        let y0 = crest_y + rng.next_f32() * height as f32 * 0.08;
+        let y1 = y0 - stem_h;
+        let sway = (t * (0.25 + bass.bass * 0.22) + n * 8.0).sin() * (3.0 + synth.rms * 9.0);
+        draw_line(
+            frame,
+            width,
+            height,
+            x as i32,
+            y0 as i32,
+            (x + sway) as i32,
+            y1 as i32,
+            wave_color,
+            0.028 + phase.regrowth_ratio * 0.15,
+            1,
+        );
+        if phase.healing_color_ratio > 0.45 {
+            let leaf_x = x + sway + (rng.next_f32() - 0.5) * 18.0;
+            let leaf_y = y1 + (rng.next_f32() - 0.4) * 16.0;
+            draw_ellipse_outline(
+                frame,
+                width,
+                height,
+                leaf_x as i32,
+                leaf_y as i32,
+                (3.0 + phase.healing_color_ratio * 5.0) as i32,
+                (2.0 + phase.healing_color_ratio * 3.0) as i32,
+                rng.next_f32() * 180.0,
+                Color::new(70.0, 190.0 + keyboard.mid * 36.0, 116.0 + synth.high * 24.0),
+                0.035 + phase.healing_color_ratio * 0.13,
+            );
+        }
+    }
+    for band in 0..5 {
+        let y = water_top + band as f32 * height as f32 * 0.036;
+        draw_line(
+            frame,
+            width,
+            height,
+            (width as f32 * 0.08) as i32,
+            (y + (t * 0.21 + band as f32).sin() * 7.0 * phase.regrowth_ratio) as i32,
+            (width as f32 * 0.92) as i32,
+            (y + (t * 0.18 + band as f32).cos() * 6.0 * phase.regrowth_ratio) as i32,
+            Color::new(54.0, 164.0 + phase.healing_color_ratio * 54.0, 172.0),
+            0.018 + phase.regrowth_ratio * 0.060,
+            1,
+        );
+    }
+}
+
+fn apply_phoenix_phase_grade(
+    frame: &mut [u8],
+    width: usize,
+    height: usize,
+    phase: PhoenixPhase,
+) {
+    for y in 0..height {
+        let yy = y as f32 / height.max(1) as f32;
+        let ground = smoothstep(0.48, 1.0, yy);
+        let sky = 1.0 - ground;
+        for x in 0..width {
+            let i = (y * width + x) * 3;
+            let r = frame[i] as f32;
+            let g = frame[i + 1] as f32;
+            let b = frame[i + 2] as f32;
+            let gray = r * 0.299 + g * 0.587 + b * 0.114;
+            let ink = phase.lineart_ratio;
+            let mut nr = lerp(r, gray * 0.82 + 5.0, ink * 0.86);
+            let mut ng = lerp(g, gray * 0.84 + 6.0, ink * 0.86);
+            let mut nb = lerp(b, gray * 0.90 + 10.0, ink * 0.86);
+            let fire = phase.destructive_fire_ratio * (0.45 + sky * 0.55);
+            nr += fire * 44.0 + phase.impact_pressure * 55.0;
+            ng += fire * 14.0 + phase.impact_pressure * 24.0;
+            nb -= fire * 16.0;
+            let heal = phase.healing_color_ratio;
+            nr += heal * (18.0 + ground * 16.0);
+            ng += heal * (22.0 + ground * 64.0 + phase.regrowth_ratio * 42.0);
+            nb += heal * (24.0 + sky * 36.0);
+            frame[i] = nr.clamp(0.0, 255.0) as u8;
+            frame[i + 1] = ng.clamp(0.0, 255.0) as u8;
+            frame[i + 2] = nb.clamp(0.0, 255.0) as u8;
+        }
+    }
+}
+
+fn lerp(a: f32, b: f32, amount: f32) -> f32 {
+    a + (b - a) * amount.clamp(0.0, 1.0)
 }
 
 fn draw_minimal_stem_meter(
@@ -1129,7 +1591,13 @@ fn build_meter_summary(args: &Args, tracks: &[StemTrack], frame_count: usize) ->
     )
 }
 
-fn frame_state_json(tracks: &[StemTrack], frame_index: usize, time_seconds: f64) -> String {
+fn frame_state_json(
+    tracks: &[StemTrack],
+    frame_index: usize,
+    frame_count: usize,
+    time_seconds: f64,
+) -> String {
+    let phase = phoenix_phase(frame_index, frame_count);
     let mut controls = Vec::new();
     for track in tracks {
         let m = track.meters.get(frame_index).copied().unwrap_or_default();
@@ -1146,10 +1614,27 @@ fn frame_state_json(tracks: &[StemTrack], frame_index: usize, time_seconds: f64)
         ));
     }
     format!(
-        "{{\"schema_version\":\"truevision_phoenix_flats_frame_state_rs_v1\",\"renderer\":\"rust\",\"preset\":\"phoenix_from_the_flats_state_v0\",\"frame_index\":{},\"time_seconds\":{:.6},\"stem_controls\":{{{}}},\"render_lanes\":{{\"lead_vocals\":\"main_gold_ember_thread\",\"backing_vocals\":\"answering_rose_ember_thread\",\"drums\":\"pressure_hits\",\"bass\":\"flats_river_depth_pulse\",\"keyboard\":\"memory_lattice\",\"percussion\":\"ash_spark_nerves\",\"synth\":\"phoenix_heat_veil\",\"other\":\"steel_air_texture\"}},\"boundary\":{{\"stems_drive_visual_lanes\":true,\"external_visual_assets_used\":false,\"openai_generation_used\":false,\"generated_media_is_evidence\":false}}}}",
+        "{{\"schema_version\":\"truevision_phoenix_flats_frame_state_rs_v1\",\"renderer\":\"rust\",\"preset\":\"phoenix_from_the_flats_state_v0\",\"frame_index\":{},\"time_seconds\":{:.6},\"state_transform_arc\":{},\"state_layers\":[\"lineart_world_mask\",\"damaged_city_silhouette\",\"flats_river_depth_pulse\",\"memory_lattice\",\"dual_phoenix_vector_field\",\"impact_to_regrowth_wave\",\"forest_regrowth_mask\",\"clear_water_reflection_return\",\"stem_meter_trace\"],\"stem_controls\":{{{}}},\"render_lanes\":{{\"lead_vocals\":\"main_gold_ember_thread\",\"backing_vocals\":\"answering_rose_ember_thread\",\"drums\":\"pressure_hits\",\"bass\":\"flats_river_depth_pulse\",\"keyboard\":\"memory_lattice\",\"percussion\":\"ash_spark_nerves\",\"synth\":\"phoenix_heat_veil\",\"other\":\"steel_air_texture\"}},\"boundary\":{{\"stems_drive_visual_lanes\":true,\"external_visual_assets_used\":false,\"openai_generation_used\":false,\"generated_media_is_evidence\":false,\"state_transform_arc_logged\":true}}}}",
         frame_index,
         time_seconds,
+        state_transform_arc_json(phase),
         controls.join(",")
+    )
+}
+
+fn state_transform_arc_json(phase: PhoenixPhase) -> String {
+    format!(
+        "{{\"phase_index\":{},\"phase_name\":\"{}\",\"progress\":{:.6},\"lineart_ratio\":{:.6},\"destructive_fire_ratio\":{:.6},\"witness_expansion_ratio\":{:.6},\"dual_vector_pressure\":{:.6},\"impact_pressure\":{:.6},\"healing_color_ratio\":{:.6},\"regrowth_ratio\":{:.6},\"state_law\":\"audio_state_drives_visual_state_transform\"}}",
+        phase.index,
+        json_escape(phase.name),
+        phase.progress,
+        phase.lineart_ratio,
+        phase.destructive_fire_ratio,
+        phase.witness_expansion_ratio,
+        phase.dual_vector_pressure,
+        phase.impact_pressure,
+        phase.healing_color_ratio,
+        phase.regrowth_ratio
     )
 }
 
@@ -1171,12 +1656,18 @@ fn manifest_json(
             json_escape(track.lane)
         ));
     }
+    let phase_names = PHASE_NAMES
+        .iter()
+        .map(|name| format!("\"{}\"", json_escape(name)))
+        .collect::<Vec<_>>()
+        .join(",");
     format!(
-        "{{\n  \"schema_version\":\"truevision_phoenix_flats_manifest_rs_v1\",\n  \"renderer\":\"rust\",\n  \"preset\":\"phoenix_from_the_flats_state_v0\",\n  \"run_id\":\"{}\",\n  \"source\":{{\"master_audio\":\"{}\",\"stems_dir\":\"{}\"}},\n  \"stem_lanes\":[{}],\n  \"output\":{{\"mp4\":\"{}\",\"frame_state_jsonl\":\"{}\",\"stem_meter_summary_json\":\"{}\",\"width\":{},\"height\":{},\"fps\":{},\"duration_seconds\":{},\"frame_count\":{},\"encoder\":\"{}\",\"wall_seconds\":{:.6}}},\n  \"boundary\":{{\"python_render_loop\":false,\"external_visual_assets_used\":false,\"openai_generation_used\":false,\"art_imports_used\":false,\"stems_drive_visual_lanes\":true,\"literal_phoenix_spam\":false,\"generated_media_is_evidence\":false}}\n}}\n",
+        "{{\n  \"schema_version\":\"truevision_phoenix_flats_manifest_rs_v1\",\n  \"renderer\":\"rust\",\n  \"preset\":\"phoenix_from_the_flats_state_v0\",\n  \"run_id\":\"{}\",\n  \"source\":{{\"master_audio\":\"{}\",\"stems_dir\":\"{}\"}},\n  \"stem_lanes\":[{}],\n  \"state_transform_arc\":{{\"phase_names\":[{}],\"phase_count\":6,\"timeline_basis\":\"normalized_frame_progress\",\"proof_law\":\"audio_state_drives_visual_state_transform\"}},\n  \"output\":{{\"mp4\":\"{}\",\"frame_state_jsonl\":\"{}\",\"stem_meter_summary_json\":\"{}\",\"width\":{},\"height\":{},\"fps\":{},\"duration_seconds\":{},\"frame_count\":{},\"encoder\":\"{}\",\"wall_seconds\":{:.6}}},\n  \"boundary\":{{\"python_render_loop\":false,\"external_visual_assets_used\":false,\"openai_generation_used\":false,\"art_imports_used\":false,\"stems_drive_visual_lanes\":true,\"literal_phoenix_spam\":false,\"generated_media_is_evidence\":false,\"state_transform_arc_logged\":true}}\n}}\n",
         json_escape(&args.run_id),
         json_escape(&args.audio.display().to_string()),
         json_escape(&args.stems_dir.display().to_string()),
         lanes.join(","),
+        phase_names,
         json_escape(&video_path.display().to_string()),
         json_escape(&state_path.display().to_string()),
         json_escape(&meter_path.display().to_string()),

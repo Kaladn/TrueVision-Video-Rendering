@@ -30,7 +30,7 @@ local state tensors
 local templates
 local captures
 local deterministic renderers
-local model adapters behind validation
+approved external API adapters behind validation
 ```
 
 ## TrueVision Mental Model

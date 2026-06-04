@@ -23,7 +23,6 @@ class TrueVisionStudioToolingTests(unittest.TestCase):
         self.assertIn("frame_diff_replay_accuracy", tools)
         self.assertIn("manifest_browser", tools)
         self.assertIn("render_preset_library", tools)
-        self.assertIn("local_qwen_controller", tools)
 
     def test_av_registry_exposes_studio_tools_as_audio_video_only(self):
         tools = {tool["name"]: tool for tool in list_av_tools()}
@@ -36,7 +35,6 @@ class TrueVisionStudioToolingTests(unittest.TestCase):
             "frame_diff_replay_accuracy",
             "manifest_browser",
             "render_preset_library",
-            "local_qwen_controller",
         ]:
             self.assertIn(name, tools)
             self.assertEqual(tools[name]["domain"], "audio_video")

@@ -9,7 +9,7 @@ from typing import Any
 
 WORKER_FORGE_SCHEMA = "truevision_worker_forge_v1"
 INVENTORY_SCHEMA = "truevision_worker_inventory_manifest_v1"
-CHAT_FORGE_SCHEMA = "truevision_chat_forged_tool_request_v1"
+TOOL_REQUEST_FORGE_SCHEMA = "truevision_tool_request_forge_v1"
 CHOICE_SCHEMA = "truevision_local_worker_choice_manifest_v1"
 
 LOCAL_WORKER_DIRS = (
@@ -311,11 +311,11 @@ def build_manifest_inventory(
     }
 
 
-def chat_forge_tool_request(
+def forge_tool_request(
     *,
     storage_root: Path,
     requested_by: str,
-    chat_text: str,
+    request_text: str,
     tool_name: str,
     organ: str,
     purpose: str,
@@ -324,11 +324,11 @@ def chat_forge_tool_request(
     storage_root = storage_root.resolve()
     run_id = f"{utc_now().replace(':', '').replace('.', '_')}_{safe_slug(tool_name)}"
     manifest = {
-        "schema_version": CHAT_FORGE_SCHEMA,
+        "schema_version": TOOL_REQUEST_FORGE_SCHEMA,
         "run_id": run_id,
         "written_at_utc": utc_now(),
         "requested_by": requested_by,
-        "chat_text": chat_text,
+        "request_text": request_text,
         "tool_name": tool_name,
         "organ": organ,
         "purpose": purpose,
@@ -337,44 +337,33 @@ def chat_forge_tool_request(
         "execution_allowed": False,
         "policy": {
             "local_mini_securecore": True,
-            "chat_forged": True,
+            "request_forged": True,
             "selection_only": True,
             "no_execution": True,
             "workers_remain_local": True,
         },
     }
     manifest["manifest_hash"] = stable_hash(manifest)
-    manifest_path = storage_root / "manifests" / "worker_forge" / "chat_forged_tools" / f"{run_id}.json"
+    manifest_path = storage_root / "manifests" / "worker_forge" / "request_forged_tools" / f"{run_id}.json"
     write_json(manifest_path, manifest)
-    chat_record = append_hash_chained_jsonl(
-        storage_root / "chats" / "tool_forge.jsonl",
-        {
-            "event_type": "chat_tool_request",
-            "run_id": run_id,
-            "requested_by": requested_by,
-            "chat_text": chat_text,
-            "tool_name": tool_name,
-            "manifest_json": str(manifest_path),
-        },
-    )
     event_record = append_hash_chained_jsonl(
         storage_root / "events" / "worker_forge.jsonl",
         {
-            "event_type": "tool_manifest_forged",
+            "event_type": "tool_request_manifest_forged",
             "run_id": run_id,
             "tool_name": tool_name,
             "organ": organ,
+            "requested_by": requested_by,
+            "request_text": request_text,
             "manifest_json": str(manifest_path),
-            "chat_record_hash": chat_record["record_hash"],
         },
     )
     receipt_path = write_receipt(
         storage_root,
-        action="chat_forged_tool_request",
+        action="tool_request_forged",
         status="forged_manifest_only",
         result={
             "manifest_json": str(manifest_path),
-            "chat_record_hash": chat_record["record_hash"],
             "event_record_hash": event_record["record_hash"],
         },
     )
@@ -382,7 +371,6 @@ def chat_forge_tool_request(
         "status": "forged_manifest_only",
         "manifest_json": str(manifest_path),
         "receipt_json": str(receipt_path),
-        "chat_record_hash": chat_record["record_hash"],
         "event_record_hash": event_record["record_hash"],
     }
 

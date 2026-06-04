@@ -8,7 +8,6 @@ from typing import Any
 
 STORAGE_LANES = [
     "artifacts",
-    "chats",
     "events",
     "inbox",
     "library",

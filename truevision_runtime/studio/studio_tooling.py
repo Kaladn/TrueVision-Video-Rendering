@@ -88,13 +88,6 @@ STUDIO_TOOLS: tuple[StudioTool, ...] = (
         ("storage/presets", "storage/templates"),
         "studio_index",
     ),
-    StudioTool(
-        "local_qwen_controller",
-        "Local Qwen Controller",
-        "Keep Qwen as a validated AV-state planner that requests tools instead of executing directly.",
-        ("storage/chats", "storage/outbox", "storage/receipts"),
-        "loopback_llm_adapter",
-    ),
 )
 
 
@@ -843,11 +836,4 @@ def build_studio_tool_plan(tool_id: str, args: dict[str, Any] | None = None) -> 
         return {"tool_id": tool_id, "lanes": ["storage/manifests", "outputs/*/*_manifest.json"], "mode": "read_only_index"}
     if tool_id == "render_preset_library":
         return {"tool_id": tool_id, "presets": list_render_presets(), "mode": "list_load_save_promote"}
-    if tool_id == "local_qwen_controller":
-        return {
-            "tool_id": tool_id,
-            "role": "planner_only",
-            "endpoint_policy": "loopback_only",
-            "trust_boundary": "validated_state_json_and_av_tool_receipts",
-        }
     raise AssertionError(tool_id)

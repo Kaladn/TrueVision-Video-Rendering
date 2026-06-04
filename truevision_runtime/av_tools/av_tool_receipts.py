@@ -45,7 +45,7 @@ def write_tool_receipt(
         "error": error,
         "boundary": {
             "domain": "audio_video",
-            "qwen_requested_only": True,
+            "requested_only": True,
             "server_validated": True,
         },
     }

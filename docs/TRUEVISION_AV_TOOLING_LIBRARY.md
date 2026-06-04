@@ -294,7 +294,6 @@ element_creation_profile_from_capture
 frame_diff_replay_accuracy
 manifest_browser
 render_preset_library
-local_qwen_controller
 ```
 
 ## TrueVision Studio Tool Set
@@ -318,7 +317,7 @@ throwaway scripts.
 | Frame Diff / Replay Accuracy Tool | Measures source-vs-regenerated drift through manifests, state, or frame artifacts. |
 | Manifest Browser | Reads render/capture manifests through the Studio instead of manual folder digging. |
 | Render Preset Library | Promotes successful render lanes into reusable presets and templates. |
-| Local Qwen Controller | Lets Qwen plan AV state and request tools through validation and receipts. |
+| External API Draft Adapter | Lets an approved external API draft AV state and request tools through validation and receipts. |
 
 Current reusable presets:
 
