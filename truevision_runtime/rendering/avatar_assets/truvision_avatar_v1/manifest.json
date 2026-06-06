@@ -1,0 +1,25 @@
+{
+  "schema": "truevision_avatar_asset_manifest_v1",
+  "avatar_id": "truvision_avatar_v1",
+  "retention": "preserve avatar identity across future TrueVision films",
+  "asset_scope": "avatar_only",
+  "pose_dir": "poses",
+  "poses": [
+    "01_neutral_forward.png",
+    "02_eyes_shift_right.png",
+    "03_head_turns_slightly.png",
+    "04_reading_line_1.png",
+    "05_reading_core_systems.png",
+    "06_reading_details.png",
+    "07_processing.png",
+    "08_continuing_right.png",
+    "09_engaged.png",
+    "10_deep_focus.png",
+    "11_near_right_edge.png",
+    "12_final_position.png"
+  ],
+  "notes": [
+    "This folder intentionally stores only the persistent TrueVision avatar pose assets.",
+    "Presentation frames, narration, stems, slide labels, and film-specific system labels belong in a project JSON."
+  ]
+}

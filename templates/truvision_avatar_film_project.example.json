@@ -1,0 +1,47 @@
+{
+  "schema": "truevision_avatar_film_project_v1",
+  "film_title": "Example TrueVision Avatar Film",
+  "production_card_title": "A FULL TRUEVISION PRODUCTION",
+  "production_lab": "TrueVision Generation Lab",
+  "footer_credit": "FULL TRUEVISION PRODUCTION",
+  "avatar_label": "TRUVISION AVATAR",
+  "avatar_pose_dir": "D:/TrueVision_Generation_Lab/truevision_runtime/rendering/avatar_assets/truvision_avatar_v1/poses",
+  "output_dir": "D:/TrueVision_Generation_Lab/outputs/example_truvision_avatar_film",
+  "output_name": "example_truvision_avatar_film.mp4",
+  "resolution": [1920, 1080],
+  "fps": 24,
+  "duration_seconds": 30.0,
+  "direction_mode": "segment_alternate",
+  "motion_caption": "80% stillness / 20% intentional motion",
+  "show_production_card": true,
+  "slides": [
+    "D:/TrueVision_Generation_Lab/outputs/example_frames/frame_00.png",
+    "D:/TrueVision_Generation_Lab/outputs/example_frames/frame_01.png"
+  ],
+  "audio": {
+    "vocal": "D:/path/to/0 Lead Vocals.wav",
+    "instrumental": "D:/path/to/1 Instrumental.wav",
+    "vocal_volume": 1.0,
+    "instrumental_volume": 0.48
+  },
+  "segments": [
+    {
+      "start": 0,
+      "end": 15,
+      "title": "Opening Surface",
+      "pose_sequence": ["01_neutral_forward.png", "02_eyes_shift_right.png"],
+      "slide_indices": [0],
+      "motion": 0.1,
+      "system_labels": ["surface", "receipt", "state", "proof"]
+    },
+    {
+      "start": 15,
+      "end": 30,
+      "title": "System Turn",
+      "pose_sequence": ["04_reading_line_1.png", "07_processing.png"],
+      "slide_indices": [1],
+      "motion": 0.18,
+      "system_labels": ["route", "map", "count", "review"]
+    }
+  ]
+}
