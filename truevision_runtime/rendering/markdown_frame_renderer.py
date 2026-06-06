@@ -300,17 +300,39 @@ def draw_graph(draw: ImageDraw.ImageDraw, code: str, box: tuple[int, int, int, i
         ]
         draw.polygon(arrow, fill=LINE)
     for index, (node_id, (cx, cy)) in enumerate(positions.items()):
-        label = nodes[node_id]
-        box_w = min(190, max(120, int((x1 - x0) * 0.19)))
-        box_h = 64
+        label = display_label_for_graph_node(nodes[node_id])
+        box_w = min(220, max(140, int((x1 - x0) * 0.22)))
+        label_font = fonts.tiny_bold if needs_compact_graph_label(label) else fonts.small_bold
+        lines = wrap_text(draw, label, label_font, box_w - 24)[:3]
+        box_h = max(64, 24 + len(lines) * int(fonts.tiny_size * 1.25))
         fill = PALETTE[index % len(PALETTE)]
         rounded(draw, (cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2), 8, fill=fill, outline=(255, 255, 255), width=2)
-        lines = wrap_text(draw, label, fonts.small_bold, box_w - 22)[:2]
-        ty = cy - (len(lines) * 20) / 2
+        ty = cy - (len(lines) * int(fonts.tiny_size * 1.25)) / 2
         for line in lines:
-            tw = text_width(draw, line, fonts.small_bold)
-            draw.text((cx - tw / 2, ty), line, font=fonts.small_bold, fill=(255, 255, 250))
-            ty += 22
+            tw = text_width(draw, line, label_font)
+            draw.text((cx - tw / 2, ty), line, font=label_font, fill=(255, 255, 250))
+            ty += int(fonts.tiny_size * 1.35)
+
+
+def display_label_for_graph_node(label: str) -> str:
+    exact = {
+        "POST /api/lexicon/intake/map": "POST intake/map",
+        "POST /api/lexicon/mapping/run": "POST mapping/run",
+        "preview_document_intake": "Preview",
+        "build_intake_mapping facade": "Intake facade",
+        "map_intake_content_to_user_counts_native": "Native inline map",
+        "build_observed_map": "Observed map",
+        "observed/symbolic map artifacts": "Observed map",
+    }
+    if label in exact:
+        return exact[label]
+    if label.startswith("POST /api/lexicon/"):
+        return "POST " + label.removeprefix("POST /api/lexicon/")
+    return label
+
+
+def needs_compact_graph_label(label: str) -> bool:
+    return len(label) > 18 or "/" in label or "_" in label
 
 
 def parse_mermaid_graph(code: str) -> tuple[dict[str, str], list[tuple[str, str]]]:
@@ -413,13 +435,77 @@ def draw_code_panel(draw: ImageDraw.ImageDraw, title: str, blocks: list[str], bo
     rounded(draw, box, 10, fill=(30, 36, 42), outline=(73, 82, 91), width=2)
     draw.text((x0 + 24, y0 + 18), title, font=fonts.small_bold, fill=(242, 225, 166))
     y = y0 + 54
-    text = "\n\n".join(block.strip() for block in blocks[:2])
+    panel_lines = prepare_code_panel_lines(blocks)
     max_chars = max(30, int((x1 - x0) / max(8, fonts.mono_size * 0.58)))
-    for raw in text.splitlines():
-        draw.text((x0 + 24, y), raw[:max_chars], font=fonts.mono, fill=(231, 235, 230))
-        y += int(fonts.mono_size * 1.35)
-        if y > y1 - 28:
-            break
+    for raw in panel_lines:
+        for line in wrap_monospace_line(raw, max_chars=max_chars):
+            if y + int(fonts.mono_size * 1.35) > y1 - 24:
+                return
+            draw.text((x0 + 24, y), line, font=fonts.mono, fill=(231, 235, 230))
+            y += int(fonts.mono_size * 1.35)
+        if not raw.strip():
+            y += int(fonts.mono_size * 0.6)
+
+
+def prepare_code_panel_lines(blocks: list[str]) -> list[str]:
+    raw_lines = "\n\n".join(block.strip() for block in blocks[:2]).splitlines()
+    expanded = expand_code_panel_lines(raw_lines)
+    if "Not reached by:" not in expanded:
+        return expanded
+
+    path_lines: list[str] = []
+    route_lines: list[str] = []
+    detail_lines: list[str] = []
+    for line in expanded:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith("src/") and len(path_lines) < 1:
+            path_lines.append(line)
+        elif stripped.startswith("build_intake_mapping"):
+            detail_lines.append(line)
+        elif stripped.startswith("build_observed_map"):
+            detail_lines.append(line)
+        elif stripped == "Not reached by:":
+            route_lines.append(line)
+        elif stripped.startswith("/api/lexicon/intake/map") or stripped.startswith("/intake-map"):
+            route_lines.append(line)
+    selected = path_lines[:1] + route_lines + detail_lines
+    return selected or expanded
+
+
+def expand_code_panel_lines(lines: list[str]) -> list[str]:
+    expanded: list[str] = []
+    not_reached_re = re.compile(r"^\s*Not reached by (?P<first>/\S+) or (?P<second>/\S+)(?P<rest>.*)$")
+    for line in lines:
+        match = not_reached_re.match(line)
+        if not match:
+            expanded.append(line)
+            continue
+        rest = match.group("rest").strip()
+        expanded.extend(["Not reached by:", f"  {match.group('first')}", f"  {match.group('second')}"])
+        if rest:
+            expanded.append(f"  {rest}")
+    return expanded
+
+
+def wrap_monospace_line(line: str, *, max_chars: int) -> list[str]:
+    stripped = line.strip()
+    if len(stripped) <= max_chars:
+        return [stripped]
+    chunks: list[str] = []
+    current = ""
+    for word in stripped.split():
+        trial = word if not current else current + " " + word
+        if len(trial) <= max_chars:
+            current = trial
+            continue
+        if current:
+            chunks.append(current)
+        current = word
+    if current:
+        chunks.append(current)
+    return chunks or [stripped[:max_chars]]
 
 
 def wrap_text(draw: ImageDraw.ImageDraw, text: str, font_obj: ImageFont.ImageFont, max_width: int | float) -> list[str]:
@@ -486,7 +572,9 @@ class FontSet:
         self.body_bold = load_font("segoeuib.ttf", self.body_size)
         self.small = load_font("segoeui.ttf", max(10, int(18 * scale)))
         self.small_bold = load_font("segoeuib.ttf", max(10, int(18 * scale)))
-        self.mono_size = max(10, int(18 * scale))
+        self.tiny_size = max(9, int(16 * scale))
+        self.tiny_bold = load_font("segoeuib.ttf", self.tiny_size)
+        self.mono_size = max(9, int(15 * scale))
         self.mono = load_font("consola.ttf", self.mono_size)
 
     @classmethod
