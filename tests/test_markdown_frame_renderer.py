@@ -5,6 +5,8 @@ from pathlib import Path
 
 from truevision_runtime.rendering.markdown_frame_renderer import (
     display_label_for_graph_node,
+    graph_layout_boxes,
+    parse_mermaid_graph,
     prepare_code_panel_lines,
     wrap_monospace_line,
     parse_markdown_sections,
@@ -116,6 +118,65 @@ pixels last
         self.assertIn("  /intake-map", lines)
         stripped = [line.strip() for line in lines]
         self.assertLess(stripped.index("Not reached by:"), stripped.index("build_intake_mapping is now a compatibility facade into native inline-content mapping."))
+
+    def test_graph_layout_staggers_dense_nodes_without_box_overlap(self):
+        mermaid = """flowchart TD
+    Canonical["Canonical/*.json"] --> LexiconMixin["LexiconMixin"]
+    UserLex["State/user/user_lexicon/anchors.json"] --> LexiconMixin
+    LexiconMixin --> Known["_all_known_anchors"]
+    LexiconMixin --> Symbols["_canonical_symbol_by_anchor"]
+    LexiconMixin --> Authority["_symbol_authority_by_anchor"]
+    Authority --> Snapshot["authority_snapshot.json"]
+    Snapshot --> NativeIntake["C++ intake-text"]
+"""
+        nodes, edges = parse_mermaid_graph(mermaid)
+        boxes = graph_layout_boxes(nodes, edges, (72, 154, 1018, 806), frame_scale=1.0)
+
+        self.assertEqual(set(boxes), set(nodes))
+        for left_id, left in boxes.items():
+            for right_id, right in boxes.items():
+                if left_id >= right_id:
+                    continue
+                overlaps = not (
+                    left["x1"] + 18 <= right["x0"]
+                    or right["x1"] + 18 <= left["x0"]
+                    or left["y1"] + 18 <= right["y0"]
+                    or right["y1"] + 18 <= left["y0"]
+                )
+                self.assertFalse(overlaps, f"{left_id} overlaps {right_id}")
+
+    def test_graph_layout_handles_store_spine_dense_column(self):
+        mermaid = """flowchart TD
+    Store["store.py: LexiconStore facade"] --> Runtime["store_runtime mixins"]
+    Runtime --> State["state.py"]
+    Runtime --> Lexicon["lexicon.py"]
+    Runtime --> Intake["intake.py"]
+    Runtime --> Counts["counts.py"]
+    Runtime --> Inventory["inventory.py"]
+    Runtime --> VisualFlat["visual_flat.py"]
+    Store --> Powers["store_modules powers"]
+    Powers --> Admin["admin.py"]
+    Powers --> Authority["authority.py"]
+    Powers --> Evidence["evidence.py"]
+    Powers --> Memory["memory.py reserved"]
+    Powers --> IntakePower["intake.py reserved/light wrapper"]
+    Powers --> Visual["visual.py"]
+    Runtime --> Support["store_support.py shared imports/helpers"]
+"""
+        nodes, edges = parse_mermaid_graph(mermaid)
+        boxes = graph_layout_boxes(nodes, edges, (72, 154, 1018, 806), frame_scale=1.0)
+
+        for left_id, left in boxes.items():
+            for right_id, right in boxes.items():
+                if left_id >= right_id:
+                    continue
+                overlaps = not (
+                    left["x1"] + 10 <= right["x0"]
+                    or right["x1"] + 10 <= left["x0"]
+                    or left["y1"] + 10 <= right["y0"]
+                    or right["y1"] + 10 <= left["y0"]
+                )
+                self.assertFalse(overlaps, f"{left_id} overlaps {right_id}")
 
 
 if __name__ == "__main__":

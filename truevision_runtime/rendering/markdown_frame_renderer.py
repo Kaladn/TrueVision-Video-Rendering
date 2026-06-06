@@ -19,16 +19,18 @@ SCHEMA_VERSION = "truevision_markdown_frame_set@1"
 DEFAULT_FRAME_SIZE = (1600, 1000)
 DEFAULT_GRID_SHAPE = (100, 160)
 
-BG = (246, 244, 238)
-INK = (29, 34, 40)
-MUTED = (91, 99, 110)
+BG = (12, 18, 25)
+INK = (235, 241, 244)
+MUTED = (156, 169, 177)
 BLUE = (32, 83, 117)
 TEAL = (33, 126, 111)
 GOLD = (183, 132, 47)
 RED = (148, 63, 69)
-CARD = (255, 255, 250)
-LINE = (168, 175, 178)
+CARD = (18, 26, 34)
+LINE = (86, 105, 116)
 DARK = (22, 28, 34)
+PANEL = (15, 22, 30)
+PANEL_ALT = (18, 27, 36)
 PALETTE = [BLUE, TEAL, GOLD, RED, (89, 78, 133), (75, 119, 64)]
 
 
@@ -271,7 +273,7 @@ def draw_footer(draw: ImageDraw.ImageDraw, section_name: str, fonts: "FontSet", 
     width, height = frame_size
     margin = int(width * 0.045)
     y = height - int(height * 0.058)
-    draw.line((margin, y, width - margin, y), fill=(214, 212, 202), width=2)
+    draw.line((margin, y, width - margin, y), fill=(51, 66, 76), width=2)
     draw.text((margin, y + 14), "TrueVision markdown frame set", font=fonts.small, fill=MUTED)
     text_w = text_width(draw, section_name, fonts.small)
     draw.text((width - margin - text_w, y + 14), section_name, font=fonts.small, fill=MUTED)
@@ -280,38 +282,43 @@ def draw_footer(draw: ImageDraw.ImageDraw, section_name: str, fonts: "FontSet", 
 def draw_graph(draw: ImageDraw.ImageDraw, code: str, box: tuple[int, int, int, int], fonts: "FontSet") -> None:
     x0, y0, x1, y1 = box
     nodes, edges = parse_mermaid_graph(code)
-    rounded(draw, box, 10, fill=(250, 250, 244), outline=(205, 207, 198), width=2)
+    rounded(draw, box, 10, fill=PANEL, outline=(58, 73, 84), width=2)
     if not nodes:
         draw.text((x0 + 24, y0 + 24), "No supported graph structure found.", font=fonts.body, fill=MUTED)
         return
-    positions = graph_positions(nodes, edges, box)
+    layout = graph_layout_boxes(nodes, edges, box, frame_scale=fonts.scale)
     for left, right in edges:
-        if left not in positions or right not in positions:
+        if left not in layout or right not in layout:
             continue
-        ax, ay = positions[left]
-        bx, by = positions[right]
-        draw.line((ax + 70, ay, bx - 70, by), fill=LINE, width=3)
-        angle = math.atan2(by - ay, bx - ax)
-        end = (bx - 72, by)
-        arrow = [
-            end,
-            (end[0] - 12 * math.cos(angle - 0.45), end[1] - 12 * math.sin(angle - 0.45)),
-            (end[0] - 12 * math.cos(angle + 0.45), end[1] - 12 * math.sin(angle + 0.45)),
-        ]
-        draw.polygon(arrow, fill=LINE)
-    for index, (node_id, (cx, cy)) in enumerate(positions.items()):
-        label = display_label_for_graph_node(nodes[node_id])
-        box_w = min(220, max(140, int((x1 - x0) * 0.22)))
-        label_font = fonts.tiny_bold if needs_compact_graph_label(label) else fonts.small_bold
-        lines = wrap_text(draw, label, label_font, box_w - 24)[:3]
-        box_h = max(64, 24 + len(lines) * int(fonts.tiny_size * 1.25))
+        draw_connector(draw, layout[left], layout[right])
+    for index, node_id in enumerate(layout):
+        item = layout[node_id]
         fill = PALETTE[index % len(PALETTE)]
-        rounded(draw, (cx - box_w / 2, cy - box_h / 2, cx + box_w / 2, cy + box_h / 2), 8, fill=fill, outline=(255, 255, 255), width=2)
-        ty = cy - (len(lines) * int(fonts.tiny_size * 1.25)) / 2
-        for line in lines:
+        rounded(draw, (item["x0"], item["y0"], item["x1"], item["y1"]), 8, fill=(18, 26, 34), outline=fill, width=3)
+        ty = item["y0"] + (item["height"] - len(item["lines"]) * int(fonts.tiny_size * 1.25)) / 2
+        for line in item["lines"]:
+            label_font = fonts.tiny_bold if item["compact"] else fonts.small_bold
             tw = text_width(draw, line, label_font)
-            draw.text((cx - tw / 2, ty), line, font=label_font, fill=(255, 255, 250))
+            draw.text((item["cx"] - tw / 2, ty), line, font=label_font, fill=(244, 248, 250))
             ty += int(fonts.tiny_size * 1.35)
+
+
+def draw_connector(draw: ImageDraw.ImageDraw, source: dict[str, Any], target: dict[str, Any]) -> None:
+    start = (source["x1"] + 8, source["cy"])
+    end = (target["x0"] - 8, target["cy"])
+    if end[0] <= start[0]:
+        start = (source["cx"], source["y1"] + 8)
+        end = (target["cx"], target["y0"] - 8)
+    mid_x = (start[0] + end[0]) / 2
+    points = [start, (mid_x, start[1]), (mid_x, end[1]), end]
+    draw.line(points, fill=LINE, width=2, joint="curve")
+    angle = math.atan2(end[1] - points[-2][1], end[0] - points[-2][0])
+    arrow = [
+        end,
+        (end[0] - 10 * math.cos(angle - 0.45), end[1] - 10 * math.sin(angle - 0.45)),
+        (end[0] - 10 * math.cos(angle + 0.45), end[1] - 10 * math.sin(angle + 0.45)),
+    ]
+    draw.polygon(arrow, fill=LINE)
 
 
 def display_label_for_graph_node(label: str) -> str:
@@ -323,6 +330,19 @@ def display_label_for_graph_node(label: str) -> str:
         "map_intake_content_to_user_counts_native": "Native inline map",
         "build_observed_map": "Observed map",
         "observed/symbolic map artifacts": "Observed map",
+        "store.py: LexiconStore facade": "LexiconStore",
+        "store_runtime mixins": "Runtime",
+        "store_modules powers": "Powers",
+        "store_support.py shared imports/helpers": "Support hub",
+        "intake.py reserved/light wrapper": "intake reserved",
+        "visual_flat.py": "visual flat",
+        "State/user/user_lexicon/anchors.json": "User lexicon",
+        "Canonical/*.json": "Canonical JSON",
+        "_all_known_anchors": "Known anchors",
+        "_canonical_symbol_by_anchor": "Canonical symbol",
+        "_symbol_authority_by_anchor": "Authority lookup",
+        "authority_snapshot.json": "Authority snapshot",
+        "ConversationEngine": "Conversation Engine",
     }
     if label in exact:
         return exact[label]
@@ -332,7 +352,7 @@ def display_label_for_graph_node(label: str) -> str:
 
 
 def needs_compact_graph_label(label: str) -> bool:
-    return len(label) > 18 or "/" in label or "_" in label
+    return len(label) > 12 or "/" in label or "_" in label
 
 
 def parse_mermaid_graph(code: str) -> tuple[dict[str, str], list[tuple[str, str]]]:
@@ -358,6 +378,17 @@ def parse_mermaid_graph(code: str) -> tuple[dict[str, str], list[tuple[str, str]
 
 
 def graph_positions(nodes: dict[str, str], edges: list[tuple[str, str]], box: tuple[int, int, int, int]) -> dict[str, tuple[float, float]]:
+    layout = graph_layout_boxes(nodes, edges, box, frame_scale=1.0)
+    return {node_id: (item["cx"], item["cy"]) for node_id, item in layout.items()}
+
+
+def graph_layout_boxes(
+    nodes: dict[str, str],
+    edges: list[tuple[str, str]],
+    box: tuple[int, int, int, int],
+    *,
+    frame_scale: float,
+) -> dict[str, dict[str, Any]]:
     x0, y0, x1, y1 = box
     incoming = {node_id: 0 for node_id in nodes}
     outgoing: dict[str, list[str]] = {node_id: [] for node_id in nodes}
@@ -379,13 +410,123 @@ def graph_positions(nodes: dict[str, str], edges: list[tuple[str, str]], box: tu
     columns: list[list[str]] = [[] for _ in range(max_depth + 1)]
     for node_id, depth in sorted(depths.items(), key=lambda item: (item[1], item[0])):
         columns[depth].append(node_id)
-    positions: dict[str, tuple[float, float]] = {}
-    col_w = (x1 - x0 - 72) / max(1, len(columns))
+    columns = split_dense_columns(columns, max_nodes_per_column=7)
+    layout: dict[str, dict[str, Any]] = {}
+    pad_x = 72 * frame_scale
+    pad_y = 72 * frame_scale
+    usable_w = x1 - x0 - pad_x * 2
+    usable_h = y1 - y0 - pad_y * 2
+    col_w = usable_w / max(1, len(columns))
     for col_index, column in enumerate(columns):
-        row_gap = (y1 - y0 - 90) / max(1, len(column))
+        if not column:
+            continue
+        dense = len(column) > 6
+        node_w = min((182 if dense else 210) * frame_scale, max((142 if dense else 128) * frame_scale, col_w * (0.52 if dense else 0.58)))
+        row_gap = usable_h / max(1, len(column))
+        stagger = (row_gap * 0.28) if col_index % 2 else 0
         for row_index, node_id in enumerate(column):
-            positions[node_id] = (x0 + 36 + col_w * col_index + col_w / 2, y0 + 50 + row_gap * row_index + row_gap / 2)
-    return positions
+            label = display_label_for_graph_node(nodes[node_id])
+            compact = dense or needs_compact_graph_label(label)
+            char_limit = max(10, int(node_w / (8.5 * frame_scale)))
+            lines = wrap_label_to_chars(label, char_limit)[:3]
+            line_height = (16 if dense else 20) * frame_scale if compact else 22 * frame_scale
+            node_h = max((42 if dense else 58) * frame_scale, (14 if dense else 22) * frame_scale + len(lines) * line_height)
+            fish_scale = ((row_index % 2) - 0.5) * min(44 * frame_scale, col_w * 0.18) if dense else 0
+            cx = x0 + pad_x + col_w * col_index + col_w / 2 + fish_scale
+            cy = y0 + pad_y + row_gap * row_index + row_gap / 2 + stagger
+            cy = min(y1 - pad_y - node_h / 2, max(y0 + pad_y + node_h / 2, cy))
+            layout[node_id] = {
+                "cx": cx,
+                "cy": cy,
+                "x0": cx - node_w / 2,
+                "y0": cy - node_h / 2,
+                "x1": cx + node_w / 2,
+                "y1": cy + node_h / 2,
+                "width": node_w,
+                "height": node_h,
+                "lines": lines,
+                "compact": compact,
+            }
+    return avoid_layout_collisions(layout, (x0 + pad_x, y0 + pad_y, x1 - pad_x, y1 - pad_y), min_gap=18 * frame_scale)
+
+
+def split_dense_columns(columns: list[list[str]], *, max_nodes_per_column: int) -> list[list[str]]:
+    expanded: list[list[str]] = []
+    for column in columns:
+        if len(column) <= max_nodes_per_column:
+            expanded.append(column)
+            continue
+        lane_count = math.ceil(len(column) / max_nodes_per_column)
+        lanes = [[] for _ in range(lane_count)]
+        for index, node_id in enumerate(column):
+            lanes[index % lane_count].append(node_id)
+        expanded.extend(lanes)
+    return expanded
+
+
+def wrap_label_to_chars(label: str, max_chars: int) -> list[str]:
+    words = str(label).split()
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        if len(word) > max_chars and not current:
+            lines.append(word[:max_chars])
+            remainder = word[max_chars:]
+            if remainder:
+                current = remainder
+            continue
+        trial = word if not current else current + " " + word
+        if len(trial) <= max_chars:
+            current = trial
+        else:
+            lines.append(current)
+            current = word
+    if current:
+        lines.append(current)
+    return lines or [label]
+
+
+def avoid_layout_collisions(
+    layout: dict[str, dict[str, Any]],
+    bounds: tuple[float, float, float, float],
+    *,
+    min_gap: float,
+) -> dict[str, dict[str, Any]]:
+    _left, top, _right, bottom = bounds
+    ordered = sorted(layout, key=lambda node_id: (layout[node_id]["x0"], layout[node_id]["y0"]))
+    for _pass in range(6):
+        moved = False
+        for index, node_id in enumerate(ordered):
+            node = layout[node_id]
+            for other_id in ordered[:index]:
+                other = layout[other_id]
+                if boxes_overlap(node, other, min_gap):
+                    shift = other["y1"] + min_gap - node["y0"]
+                    move_box(node, 0, shift)
+                    moved = True
+            if node["y1"] > bottom:
+                move_box(node, 0, bottom - node["y1"])
+            if node["y0"] < top:
+                move_box(node, 0, top - node["y0"])
+        if not moved:
+            break
+    return layout
+
+
+def boxes_overlap(left: dict[str, Any], right: dict[str, Any], gap: float) -> bool:
+    return not (
+        left["x1"] + gap <= right["x0"]
+        or right["x1"] + gap <= left["x0"]
+        or left["y1"] + gap <= right["y0"]
+        or right["y1"] + gap <= left["y0"]
+    )
+
+
+def move_box(box: dict[str, Any], dx: float, dy: float) -> None:
+    for key in ("x0", "x1", "cx"):
+        box[key] += dx
+    for key in ("y0", "y1", "cy"):
+        box[key] += dy
 
 
 def draw_bullet_panel(
@@ -398,7 +539,7 @@ def draw_bullet_panel(
     accent: tuple[int, int, int] = BLUE,
 ) -> None:
     x0, y0, x1, y1 = box
-    rounded(draw, box, 10, fill=CARD, outline=(207, 205, 194), width=2)
+    rounded(draw, box, 10, fill=PANEL_ALT, outline=(60, 76, 88), width=2)
     draw.text((x0 + 24, y0 + 22), title, font=fonts.subheading, fill=accent)
     y = y0 + 68
     line_step = int(fonts.body_size * 1.32)
@@ -418,7 +559,7 @@ def draw_bullet_panel(
 
 def draw_text_panel(draw: ImageDraw.ImageDraw, title: str, lines: list[str], box: tuple[int, int, int, int], fonts: "FontSet") -> None:
     x0, y0, x1, y1 = box
-    rounded(draw, box, 10, fill=(250, 250, 244), outline=(205, 207, 198), width=2)
+    rounded(draw, box, 10, fill=PANEL, outline=(58, 73, 84), width=2)
     draw.text((x0 + 28, y0 + 24), title, font=fonts.subheading, fill=BLUE)
     y = y0 + 78
     for paragraph in lines:
@@ -432,7 +573,7 @@ def draw_text_panel(draw: ImageDraw.ImageDraw, title: str, lines: list[str], box
 
 def draw_code_panel(draw: ImageDraw.ImageDraw, title: str, blocks: list[str], box: tuple[int, int, int, int], fonts: "FontSet") -> None:
     x0, y0, x1, y1 = box
-    rounded(draw, box, 10, fill=(30, 36, 42), outline=(73, 82, 91), width=2)
+    rounded(draw, box, 10, fill=(18, 25, 32), outline=(73, 91, 104), width=2)
     draw.text((x0 + 24, y0 + 18), title, font=fonts.small_bold, fill=(242, 225, 166))
     y = y0 + 54
     panel_lines = prepare_code_panel_lines(blocks)
@@ -564,6 +705,7 @@ def _frame_row(index: int, title: str, path: Path) -> dict[str, Any]:
 
 class FontSet:
     def __init__(self, *, scale: float) -> None:
+        self.scale = scale
         self.title = load_font("segoeuib.ttf", int(56 * scale))
         self.heading = load_font("segoeuib.ttf", int(42 * scale))
         self.subheading = load_font("segoeuib.ttf", int(27 * scale))
