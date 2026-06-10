@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import zipfile
 
@@ -14,6 +15,7 @@ from truevision_runtime.rendering.seven_sector_rave import (
     map_stem_name_to_role,
     normalize_audio,
     render_frame,
+    render_seven_sector_rave,
 )
 
 
@@ -132,8 +134,72 @@ def test_build_manifest_records_contract():
         height=720,
         stem_mapping={"vocal": "Lead Vocals.wav"},
         fallbacks=["synth"],
+        sector_drivers={
+            "vocal": {"source_type": "stem", "source_path": "Lead Vocals.wav"},
+            "synth": {"source_type": "master_mix_fallback", "source_path": "song.wav"},
+        },
     )
     assert manifest["kind"] == "truevision_seven_sector_rave_reactor_manifest"
     assert manifest["run_id"] == "demo"
     assert manifest["sector_law"]["center"] == "vocal exact waveform"
     assert manifest["fallbacks"] == ["synth"]
+    assert manifest["sector_drivers"]["synth"]["source_type"] == "master_mix_fallback"
+
+
+def test_render_seven_sector_rave_writes_truthful_receipts(tmp_path, monkeypatch):
+    master_path = tmp_path / "master.wav"
+    stems_zip = tmp_path / "stems.zip"
+    master_path.write_bytes(b"master")
+    stems_zip.write_bytes(b"stems")
+    vocal_path = tmp_path / "Lead Vocals.wav"
+    vocal_path.write_bytes(b"vocal")
+
+    monkeypatch.setattr(rave, "extract_stems", lambda stems, work, seconds: [vocal_path])
+
+    def fake_read_wav_mono(path):
+        if Path(path) == vocal_path:
+            return np.linspace(-0.5, 0.5, 20, dtype=np.float32), 10
+        return np.ones(20, dtype=np.float32) * 0.25, 10
+
+    monkeypatch.setattr(rave, "read_wav_mono", fake_read_wav_mono)
+
+    class FakeVideoWriter:
+        def __init__(self, *args):
+            self.frames = []
+
+        def isOpened(self):
+            return True
+
+        def write(self, frame):
+            self.frames.append(frame)
+
+        def release(self):
+            pass
+
+    monkeypatch.setattr(rave.cv2, "VideoWriter", FakeVideoWriter)
+    monkeypatch.setattr(rave.subprocess, "run", lambda *args, **kwargs: None)
+
+    manifest = render_seven_sector_rave(
+        audio_path=master_path,
+        stems_zip=stems_zip,
+        output_root=tmp_path / "out",
+        run_id="demo",
+        seconds=1.0,
+        fps=2,
+        width=64,
+        height=36,
+    )
+
+    manifest_path = Path(manifest["manifest_path"])
+    state_trace_path = Path(manifest["state_trace_path"])
+    assert manifest["frame_count"] == 2
+    assert manifest["sector_drivers"]["vocal"]["source_type"] == "stem"
+    assert manifest["sector_drivers"]["synth"]["source_type"] == "master_mix_fallback"
+    assert manifest_path.exists()
+    assert state_trace_path.exists()
+
+    written_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    trace_lines = [json.loads(line) for line in state_trace_path.read_text(encoding="utf-8").splitlines()]
+    assert written_manifest["state_trace_path"] == str(state_trace_path)
+    assert [line["frame"] for line in trace_lines] == [0, 1]
+    assert all("vocal" in line["sectors"] for line in trace_lines)

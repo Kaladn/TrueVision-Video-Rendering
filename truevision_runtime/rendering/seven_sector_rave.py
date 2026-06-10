@@ -184,8 +184,10 @@ def build_manifest(
     height: int,
     stem_mapping: dict[str, str],
     fallbacks: list[str],
+    sector_drivers: dict[str, dict[str, str]] | None = None,
     frame_count: int | None = None,
     manifest_path: str | None = None,
+    state_trace_path: str | None = None,
     state_sample: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     manifest: dict[str, Any] = {
@@ -212,11 +214,14 @@ def build_manifest(
         },
         "stem_mapping": dict(stem_mapping),
         "fallbacks": list(fallbacks),
+        "sector_drivers": dict(sector_drivers or {}),
     }
     if frame_count is not None:
         manifest["frame_count"] = frame_count
     if manifest_path is not None:
         manifest["manifest_path"] = manifest_path
+    if state_trace_path is not None:
+        manifest["state_trace_path"] = state_trace_path
     if state_sample is not None:
         manifest["state_sample"] = state_sample
     return manifest
@@ -227,6 +232,24 @@ def _state_sample(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return []
     indexes = sorted({0, len(states) // 2, len(states) - 1})
     return [states[index] for index in indexes]
+
+
+def _build_sector_drivers(stem_mapping: dict[str, Path], audio_path: Path) -> dict[str, dict[str, str]]:
+    drivers: dict[str, dict[str, str]] = {}
+    for role in SECTOR_ROLES:
+        stem_path = stem_mapping.get(role)
+        if stem_path is None:
+            drivers[role] = {"source_type": "master_mix_fallback", "source_path": str(audio_path)}
+        else:
+            drivers[role] = {"source_type": "stem", "source_path": str(stem_path)}
+    return drivers
+
+
+def _write_state_trace(states: list[dict[str, Any]], state_trace_path: Path) -> None:
+    with state_trace_path.open("w", encoding="utf-8") as trace_file:
+        for state in states:
+            trace_file.write(json.dumps(state, separators=(",", ":")))
+            trace_file.write("\n")
 
 
 def render_seven_sector_rave(
@@ -251,16 +274,17 @@ def render_seven_sector_rave(
 
     decoded_stems = extract_stems(stems_zip, work_dir, seconds)
     stem_mapping, fallbacks = assign_stem_paths(decoded_stems)
+    sector_drivers = _build_sector_drivers(stem_mapping, audio_path)
 
     master_samples, master_sample_rate = read_wav_mono(audio_path)
     envelopes: dict[str, list[float]] = {}
     for role in SECTOR_ROLES:
-        stem_path = stem_mapping.get(role)
-        if stem_path is None:
+        driver = sector_drivers[role]
+        if driver["source_type"] == "master_mix_fallback":
             samples = master_samples
             sample_rate = master_sample_rate
         else:
-            samples, sample_rate = read_wav_mono(stem_path)
+            samples, sample_rate = read_wav_mono(Path(driver["source_path"]))
         envelopes[role] = build_envelope(samples, sample_rate=sample_rate, fps=fps, duration_seconds=seconds)
 
     states = build_sector_states(envelopes, fps=fps, duration_seconds=seconds)
@@ -278,6 +302,7 @@ def render_seven_sector_rave(
     silent_video = work_dir / f"{run_id}_silent.mp4"
     output_video = output_root / f"{run_id}.mp4"
     manifest_path = output_root / f"{run_id}_manifest.json"
+    state_trace_path = output_root / f"{run_id}_state_trace.jsonl"
 
     writer = cv2.VideoWriter(
         str(silent_video),
@@ -321,6 +346,7 @@ def render_seven_sector_rave(
         text=True,
     )
 
+    _write_state_trace(states, state_trace_path)
     manifest = build_manifest(
         run_id=run_id,
         audio_path=str(audio_path),
@@ -332,8 +358,10 @@ def render_seven_sector_rave(
         height=height,
         stem_mapping={role: str(path) for role, path in stem_mapping.items()},
         fallbacks=fallbacks,
+        sector_drivers=sector_drivers,
         frame_count=frame_count,
         manifest_path=str(manifest_path),
+        state_trace_path=str(state_trace_path),
         state_sample=_state_sample(states),
     )
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
