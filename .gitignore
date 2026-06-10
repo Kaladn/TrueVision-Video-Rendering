@@ -5,6 +5,7 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .test_tmp/
+.worktrees/
 
 artifact_index/**
 historical_securecore_data/**
