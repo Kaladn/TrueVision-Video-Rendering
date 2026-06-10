@@ -31,6 +31,7 @@ KALEIDOSCOPE_COLORS = (
     (210, 60, 145),
     (210, 150, 55),
 )
+KALEIDOSCOPE_INTENSITY_GAIN = 1.15
 CENTER_VOCAL_COLORS = {
     "core": (255, 185, 55),
     "hot": (255, 78, 42),
@@ -243,6 +244,7 @@ def build_manifest(
         "kaleidoscope": {
             "palette_size": len(KALEIDOSCOPE_COLORS),
             "intensity": "low",
+            "intensity_gain": KALEIDOSCOPE_INTENSITY_GAIN,
             "palette_rgb": [list(color) for color in KALEIDOSCOPE_COLORS],
         },
         "center_sector": {
@@ -478,11 +480,11 @@ def _draw_wave_kaleidoscope(
             y = int(center[1] + math.sin(theta) * local_y)
             points.append((x, y))
         for a, b in zip(points, points[1:]):
-            cv2.line(overlay, a, b, _bgr(color, 0.10 + master_energy * 0.18), 1, cv2.LINE_AA)
+            cv2.line(overlay, a, b, _bgr(color, (0.10 + master_energy * 0.18) * KALEIDOSCOPE_INTENSITY_GAIN), 1, cv2.LINE_AA)
         mirror_points = [(2 * center[0] - x, y) for x, y in points]
         for a, b in zip(mirror_points, mirror_points[1:]):
-            cv2.line(overlay, a, b, _bgr(color, 0.07 + master_energy * 0.12), 1, cv2.LINE_AA)
-    cv2.addWeighted(overlay, 0.46, frame, 1.0, 0, dst=frame)
+            cv2.line(overlay, a, b, _bgr(color, (0.07 + master_energy * 0.12) * KALEIDOSCOPE_INTENSITY_GAIN), 1, cv2.LINE_AA)
+    cv2.addWeighted(overlay, 0.46 * KALEIDOSCOPE_INTENSITY_GAIN, frame, 1.0, 0, dst=frame)
 
 
 def render_frame(

@@ -146,6 +146,7 @@ def test_build_manifest_records_contract():
     assert manifest["sector_drivers"]["synth"]["source_type"] == "master_mix_fallback"
     assert manifest["kaleidoscope"]["palette_size"] == 6
     assert manifest["kaleidoscope"]["intensity"] == "low"
+    assert manifest["kaleidoscope"]["intensity_gain"] == 1.15
     assert manifest["center_sector"]["role"] == "vocal"
     assert manifest["center_sector"]["palette_name"] == "heat_orange_red"
 
@@ -153,6 +154,7 @@ def test_build_manifest_records_contract():
 def test_kaleidoscope_palette_is_six_low_intensity_colors():
     assert len(rave.KALEIDOSCOPE_COLORS) == 6
     assert all(max(color) <= 210 for color in rave.KALEIDOSCOPE_COLORS)
+    assert rave.KALEIDOSCOPE_INTENSITY_GAIN == 1.15
 
 
 def test_center_vocal_palette_is_heat_colored_without_flame_effect():
