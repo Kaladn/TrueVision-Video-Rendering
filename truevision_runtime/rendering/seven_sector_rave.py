@@ -136,3 +136,23 @@ def build_envelope(samples: np.ndarray, sample_rate: int, fps: int, duration_sec
     if peak <= 1e-9:
         return [0.0 for _ in values]
     return [min(1.0, value / peak) for value in values]
+
+
+def build_sector_states(envelopes: dict[str, list[float]], fps: int, duration_seconds: float) -> list[dict[str, Any]]:
+    frame_count = max(1, int(round(duration_seconds * fps)))
+    states: list[dict[str, Any]] = []
+    for frame_index in range(frame_count):
+        t = frame_index / fps
+        sectors: dict[str, dict[str, float]] = {}
+        for role in SECTOR_ROLES:
+            envelope = envelopes.get(role, [0.0] * frame_count)
+            energy = float(envelope[min(frame_index, len(envelope) - 1)]) if envelope else 0.0
+            previous = float(envelope[max(0, min(frame_index - 1, len(envelope) - 1))]) if envelope else 0.0
+            transient = max(0.0, energy - previous)
+            sectors[role] = {
+                "energy": round(energy, 5),
+                "transient": round(transient, 5),
+                "phase": round((t * (0.35 + energy)) % 1.0, 5),
+            }
+        states.append({"frame": frame_index, "time": round(t, 5), "sectors": sectors})
+    return states
