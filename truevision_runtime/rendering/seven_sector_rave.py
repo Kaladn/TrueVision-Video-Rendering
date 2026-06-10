@@ -23,6 +23,20 @@ ROLE_COLORS = {
     "keys": (120, 220, 255),
     "other": (180, 90, 210),
 }
+KALEIDOSCOPE_COLORS = (
+    (60, 190, 210),
+    (50, 110, 210),
+    (125, 70, 205),
+    (190, 55, 190),
+    (210, 60, 145),
+    (210, 150, 55),
+)
+CENTER_VOCAL_COLORS = {
+    "core": (255, 185, 55),
+    "hot": (255, 78, 42),
+    "wave": (255, 220, 145),
+    "effect": "reactor_waveform_not_flame",
+}
 MAX_STEM_MEMBER_BYTES = 512 * 1024 * 1024
 MAX_STEM_ZIP_BYTES = 2 * 1024 * 1024 * 1024
 STEM_COPY_CHUNK_BYTES = 1024 * 1024
@@ -226,6 +240,21 @@ def build_manifest(
         "stem_mapping": dict(stem_mapping),
         "fallbacks": list(fallbacks),
         "sector_drivers": dict(sector_drivers or {}),
+        "kaleidoscope": {
+            "palette_size": len(KALEIDOSCOPE_COLORS),
+            "intensity": "low",
+            "palette_rgb": [list(color) for color in KALEIDOSCOPE_COLORS],
+        },
+        "center_sector": {
+            "role": "vocal",
+            "palette_name": "heat_orange_red",
+            "effect": CENTER_VOCAL_COLORS["effect"],
+            "palette_rgb": {
+                "core": list(CENTER_VOCAL_COLORS["core"]),
+                "hot": list(CENTER_VOCAL_COLORS["hot"]),
+                "wave": list(CENTER_VOCAL_COLORS["wave"]),
+            },
+        },
     }
     if bpm is not None:
         manifest["bpm"] = bpm
@@ -436,7 +465,7 @@ def _draw_wave_kaleidoscope(
     arms = 12
     for arm in range(arms):
         angle = (math.tau / arms) * arm
-        color = ROLE_COLORS[SECTOR_ROLES[arm % len(SECTOR_ROLES)]]
+        color = KALEIDOSCOPE_COLORS[arm % len(KALEIDOSCOPE_COLORS)]
         points = []
         for index, value in enumerate(samples[:: max(1, len(samples) // 180)]):
             p = index / 179.0
@@ -449,11 +478,11 @@ def _draw_wave_kaleidoscope(
             y = int(center[1] + math.sin(theta) * local_y)
             points.append((x, y))
         for a, b in zip(points, points[1:]):
-            cv2.line(overlay, a, b, _bgr(color, 0.16 + master_energy * 0.28), 1, cv2.LINE_AA)
+            cv2.line(overlay, a, b, _bgr(color, 0.10 + master_energy * 0.18), 1, cv2.LINE_AA)
         mirror_points = [(2 * center[0] - x, y) for x, y in points]
         for a, b in zip(mirror_points, mirror_points[1:]):
-            cv2.line(overlay, a, b, _bgr(color, 0.10 + master_energy * 0.18), 1, cv2.LINE_AA)
-    cv2.addWeighted(overlay, 0.72, frame, 1.0, 0, dst=frame)
+            cv2.line(overlay, a, b, _bgr(color, 0.07 + master_energy * 0.12), 1, cv2.LINE_AA)
+    cv2.addWeighted(overlay, 0.46, frame, 1.0, 0, dst=frame)
 
 
 def render_frame(
@@ -546,14 +575,29 @@ def render_frame(
     vocal_energy, vocal_transient, _ = _sector_values(state, "vocal")
     vocal_beat = _sector_beat(state, "vocal")
     glow = 0.35 + vocal_energy * 0.85
-    cv2.circle(frame, center, int(radius * (1.02 + vocal_energy * 0.12 + vocal_beat * 0.03)), _bgr(ROLE_COLORS["vocal"], glow), 2 + int(3 * vocal_transient), cv2.LINE_AA)
+    cv2.circle(
+        frame,
+        center,
+        int(radius * (1.02 + vocal_energy * 0.12 + vocal_beat * 0.03)),
+        _bgr(CENTER_VOCAL_COLORS["hot"], 0.35 + glow * 0.55),
+        2 + int(3 * vocal_transient),
+        cv2.LINE_AA,
+    )
+    cv2.circle(
+        frame,
+        center,
+        int(radius * (0.72 + vocal_energy * 0.08)),
+        _bgr(CENTER_VOCAL_COLORS["core"], 0.24 + vocal_energy * 0.35),
+        1,
+        cv2.LINE_AA,
+    )
     cv2.putText(
         frame,
         "VOCAL WAVE",
         (center[0] - int(radius * 0.46), center[1] + int(radius * 0.82)),
         cv2.FONT_HERSHEY_SIMPLEX,
         0.34,
-        (190, 205, 220),
+        _bgr(CENTER_VOCAL_COLORS["core"], 0.82),
         1,
         cv2.LINE_AA,
     )
@@ -565,6 +609,6 @@ def render_frame(
             y = int(center[1] + float(value) * radius * 0.52)
             points.append((x, y))
         for a, b in zip(points, points[1:]):
-            cv2.line(frame, a, b, (255, 250, 245), 1 + int(vocal_energy * 2), cv2.LINE_AA)
+            cv2.line(frame, a, b, _bgr(CENTER_VOCAL_COLORS["wave"], 0.74 + vocal_energy * 0.22), 1 + int(vocal_energy * 2), cv2.LINE_AA)
 
     return cv2.GaussianBlur(frame, (0, 0), 0.35)

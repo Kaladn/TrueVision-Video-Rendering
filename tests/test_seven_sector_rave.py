@@ -144,6 +144,21 @@ def test_build_manifest_records_contract():
     assert manifest["sector_law"]["center"] == "vocal exact waveform"
     assert manifest["fallbacks"] == ["synth"]
     assert manifest["sector_drivers"]["synth"]["source_type"] == "master_mix_fallback"
+    assert manifest["kaleidoscope"]["palette_size"] == 6
+    assert manifest["kaleidoscope"]["intensity"] == "low"
+    assert manifest["center_sector"]["role"] == "vocal"
+    assert manifest["center_sector"]["palette_name"] == "heat_orange_red"
+
+
+def test_kaleidoscope_palette_is_six_low_intensity_colors():
+    assert len(rave.KALEIDOSCOPE_COLORS) == 6
+    assert all(max(color) <= 210 for color in rave.KALEIDOSCOPE_COLORS)
+
+
+def test_center_vocal_palette_is_heat_colored_without_flame_effect():
+    assert rave.CENTER_VOCAL_COLORS["core"] == (255, 185, 55)
+    assert rave.CENTER_VOCAL_COLORS["hot"] == (255, 78, 42)
+    assert rave.CENTER_VOCAL_COLORS["effect"] == "reactor_waveform_not_flame"
 
 
 def test_render_seven_sector_rave_writes_truthful_receipts(tmp_path, monkeypatch):
