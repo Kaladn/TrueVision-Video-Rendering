@@ -148,11 +148,20 @@ def build_envelope(samples: np.ndarray, sample_rate: int, fps: int, duration_sec
     return [min(1.0, value / peak) for value in values]
 
 
-def build_sector_states(envelopes: dict[str, list[float]], fps: int, duration_seconds: float) -> list[dict[str, Any]]:
+def build_sector_states(
+    envelopes: dict[str, list[float]],
+    fps: int,
+    duration_seconds: float,
+    bpm: float = 86.0,
+) -> list[dict[str, Any]]:
     frame_count = max(1, int(round(duration_seconds * fps)))
+    beat_seconds = 60.0 / max(1.0, bpm)
     states: list[dict[str, Any]] = []
     for frame_index in range(frame_count):
         t = frame_index / fps
+        beat_position = t / beat_seconds
+        beat_phase = beat_position % 1.0
+        beat_pulse = max(0.0, 1.0 - beat_phase * 4.5)
         sectors: dict[str, dict[str, float]] = {}
         for role in SECTOR_ROLES:
             envelope = envelopes.get(role)
@@ -166,7 +175,8 @@ def build_sector_states(envelopes: dict[str, list[float]], fps: int, duration_se
             sectors[role] = {
                 "energy": round(energy, 5),
                 "transient": round(transient, 5),
-                "phase": round((t * (0.35 + energy)) % 1.0, 5),
+                "phase": round((beat_phase + energy * 0.18) % 1.0, 5),
+                "beat_pulse": round(beat_pulse, 5),
             }
         states.append({"frame": frame_index, "time": round(t, 5), "sectors": sectors})
     return states
@@ -189,6 +199,7 @@ def build_manifest(
     manifest_path: str | None = None,
     state_trace_path: str | None = None,
     state_sample: list[dict[str, Any]] | None = None,
+    bpm: float | None = None,
 ) -> dict[str, Any]:
     manifest: dict[str, Any] = {
         "kind": "truevision_seven_sector_rave_reactor_manifest",
@@ -216,6 +227,8 @@ def build_manifest(
         "fallbacks": list(fallbacks),
         "sector_drivers": dict(sector_drivers or {}),
     }
+    if bpm is not None:
+        manifest["bpm"] = bpm
     if frame_count is not None:
         manifest["frame_count"] = frame_count
     if manifest_path is not None:
@@ -262,6 +275,7 @@ def render_seven_sector_rave(
     fps: int = 30,
     width: int = 1280,
     height: int = 720,
+    bpm: float = 86.0,
 ) -> dict[str, Any]:
     audio_path = Path(audio_path)
     stems_zip = Path(stems_zip)
@@ -287,7 +301,7 @@ def render_seven_sector_rave(
             samples, sample_rate = read_wav_mono(Path(driver["source_path"]))
         envelopes[role] = build_envelope(samples, sample_rate=sample_rate, fps=fps, duration_seconds=seconds)
 
-    states = build_sector_states(envelopes, fps=fps, duration_seconds=seconds)
+    states = build_sector_states(envelopes, fps=fps, duration_seconds=seconds, bpm=bpm)
     frame_count = len(states)
 
     vocal_path = stem_mapping.get("vocal")
@@ -298,6 +312,8 @@ def render_seven_sector_rave(
         vocal_samples, vocal_sample_rate = read_wav_mono(vocal_path)
     vocal_limit = min(len(vocal_samples), int(seconds * vocal_sample_rate))
     vocal_waveform = normalize_audio(vocal_samples[:vocal_limit].tolist())
+    master_limit = min(len(master_samples), int(seconds * master_sample_rate))
+    master_waveform = normalize_audio(master_samples[:master_limit].tolist())
 
     silent_video = work_dir / f"{run_id}_silent.mp4"
     output_video = output_root / f"{run_id}.mp4"
@@ -316,7 +332,17 @@ def render_seven_sector_rave(
         for frame_index, state in enumerate(states):
             vocal_end = min(len(vocal_waveform), int((frame_index + 1) / fps * vocal_sample_rate))
             waveform_slice = vocal_waveform[:vocal_end]
-            writer.write(render_frame(state, width=width, height=height, waveform=waveform_slice))
+            master_end = min(len(master_waveform), int((frame_index + 1) / fps * master_sample_rate))
+            master_slice = master_waveform[:master_end]
+            writer.write(
+                render_frame(
+                    state,
+                    width=width,
+                    height=height,
+                    waveform=waveform_slice,
+                    background_waveform=master_slice,
+                )
+            )
     finally:
         writer.release()
 
@@ -363,6 +389,7 @@ def render_seven_sector_rave(
         manifest_path=str(manifest_path),
         state_trace_path=str(state_trace_path),
         state_sample=_state_sample(states),
+        bpm=bpm,
     )
     manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
     return manifest
@@ -386,41 +413,121 @@ def _sector_values(state: dict[str, Any], role: str) -> tuple[float, float, floa
     )
 
 
-def render_frame(state: dict[str, Any], width: int, height: int, waveform: list[float]) -> np.ndarray:
+def _sector_beat(state: dict[str, Any], role: str) -> float:
+    return float(state.get("sectors", {}).get(role, {}).get("beat_pulse", 0.0))
+
+
+def _draw_wave_kaleidoscope(
+    frame: np.ndarray,
+    waveform: list[float],
+    center: tuple[int, int],
+    width: int,
+    height: int,
+    master_energy: float,
+    radius_x: int,
+    radius_y: int,
+) -> None:
+    if not waveform:
+        return
+    samples = waveform[-720:]
+    if len(samples) < 8:
+        return
+    overlay = np.zeros_like(frame)
+    arms = 12
+    for arm in range(arms):
+        angle = (math.tau / arms) * arm
+        color = ROLE_COLORS[SECTOR_ROLES[arm % len(SECTOR_ROLES)]]
+        points = []
+        for index, value in enumerate(samples[:: max(1, len(samples) // 180)]):
+            p = index / 179.0
+            wave = float(value)
+            local_x = int(radius_x * (0.20 + p * 0.88 + abs(wave) * 0.10))
+            local_y = int(radius_y * (0.20 + p * 0.88 + abs(wave) * 0.10))
+            wobble = wave * (0.55 + master_energy * 0.45)
+            theta = angle + wobble + math.sin(p * math.tau * 3.0 + master_energy) * 0.045
+            x = int(center[0] + math.cos(theta) * local_x)
+            y = int(center[1] + math.sin(theta) * local_y)
+            points.append((x, y))
+        for a, b in zip(points, points[1:]):
+            cv2.line(overlay, a, b, _bgr(color, 0.16 + master_energy * 0.28), 1, cv2.LINE_AA)
+        mirror_points = [(2 * center[0] - x, y) for x, y in points]
+        for a, b in zip(mirror_points, mirror_points[1:]):
+            cv2.line(overlay, a, b, _bgr(color, 0.10 + master_energy * 0.18), 1, cv2.LINE_AA)
+    cv2.addWeighted(overlay, 0.72, frame, 1.0, 0, dst=frame)
+
+
+def render_frame(
+    state: dict[str, Any],
+    width: int,
+    height: int,
+    waveform: list[float],
+    background_waveform: list[float] | None = None,
+) -> np.ndarray:
     frame = np.zeros((height, width, 3), dtype=np.uint8)
-    frame[:] = (8, 6, 12)
+    frame[:] = (3, 2, 5)
 
     center = (width // 2, height // 2)
     radius = int(min(width, height) * 0.16)
-    outer_radius = int(min(width, height) * 0.39)
-    cv2.circle(frame, center, outer_radius + 26, (20, 18, 28), 2, cv2.LINE_AA)
+    if height > width:
+        outer_radius_x = int(width * 0.38)
+        outer_radius_y = int(height * 0.36)
+        kaleido_radius_x = int(width * 0.48)
+        kaleido_radius_y = int(height * 0.44)
+    else:
+        outer_radius_x = int(min(width, height) * 0.39)
+        outer_radius_y = outer_radius_x
+        kaleido_radius_x = int(min(width, height) * 0.48)
+        kaleido_radius_y = kaleido_radius_x
+    master_energy = max(float(state["sectors"][role]["energy"]) for role in SECTOR_ROLES)
+    _draw_wave_kaleidoscope(
+        frame,
+        background_waveform or waveform,
+        center,
+        width,
+        height,
+        master_energy,
+        kaleido_radius_x,
+        kaleido_radius_y,
+    )
+    cv2.ellipse(frame, center, (outer_radius_x + 26, outer_radius_y + 26), 0, 0, 360, (34, 30, 45), 2, cv2.LINE_AA)
     cv2.circle(frame, center, radius, (42, 52, 64), 2, cv2.LINE_AA)
 
     roles = ["synth", "guitar", "keys", "other", "bass", "drums"]
     angles = [-90, -30, 30, 90, 150, 210]
     for role, angle in zip(roles, angles):
         energy, transient, phase = _sector_values(state, role)
+        beat = _sector_beat(state, role)
         theta = math.radians(angle)
-        sx = int(center[0] + math.cos(theta) * outer_radius)
-        sy = int(center[1] + math.sin(theta) * outer_radius)
+        sx = int(center[0] + math.cos(theta) * outer_radius_x)
+        sy = int(center[1] + math.sin(theta) * outer_radius_y)
         color = ROLE_COLORS[role]
 
-        cv2.circle(frame, (sx, sy), int(radius * 0.78), _bgr(color, 0.18 + 0.75 * energy), 2 + int(4 * transient), cv2.LINE_AA)
-        cv2.line(frame, center, (sx, sy), _bgr(color, 0.18 + 0.55 * energy), 1 + int(3 * energy), cv2.LINE_AA)
+        cv2.circle(frame, (sx, sy), int(radius * 0.78), _bgr(color, 0.22 + 0.65 * energy + 0.20 * beat), 2 + int(4 * transient), cv2.LINE_AA)
+        cv2.line(frame, center, (sx, sy), _bgr(color, 0.20 + 0.45 * energy + 0.16 * beat), 1 + int(3 * energy), cv2.LINE_AA)
+        cv2.putText(
+            frame,
+            role.upper(),
+            (sx - int(radius * 0.32), sy + int(radius * 0.96)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.34,
+            _bgr(color, 0.58 + 0.30 * energy),
+            1,
+            cv2.LINE_AA,
+        )
 
         if role == "drums":
             for ring in range(3):
-                rr = int(radius * (0.35 + ring * 0.22 + transient * 0.5))
-                cv2.circle(frame, (sx, sy), rr, _bgr(color, 0.25 + transient), 1, cv2.LINE_AA)
+                rr = int(radius * (0.35 + ring * 0.22 + transient * 0.5 + beat * 0.18))
+                cv2.circle(frame, (sx, sy), rr, _bgr(color, 0.25 + transient + beat * 0.45), 1, cv2.LINE_AA)
         elif role == "bass":
             for ring in range(5):
-                rr = int(radius * (0.22 + ring * 0.16 + energy * 0.20))
-                cv2.ellipse(frame, (sx, sy), (rr, max(3, rr // 3)), 0, 0, 360, _bgr(color, 0.22 + energy * 0.7), 1, cv2.LINE_AA)
+                rr = int(radius * (0.22 + ring * 0.16 + energy * 0.20 + beat * 0.12))
+                cv2.ellipse(frame, (sx, sy), (rr, max(3, rr // 3)), 0, 0, 360, _bgr(color, 0.22 + energy * 0.55 + beat * 0.25), 1, cv2.LINE_AA)
         elif role == "synth":
             blade_angle = math.radians(angle + phase * 360.0)
             ex = int(sx + math.cos(blade_angle) * radius * 0.86)
             ey = int(sy + math.sin(blade_angle) * radius * 0.86)
-            cv2.line(frame, (sx, sy), (ex, ey), _bgr(color, 0.55 + energy), 3, cv2.LINE_AA)
+            cv2.line(frame, (sx, sy), (ex, ey), _bgr(color, 0.55 + energy + beat * 0.25), 3, cv2.LINE_AA)
         elif role == "guitar":
             for shard in range(5):
                 dx = int(math.cos(theta + shard) * radius * energy)
@@ -437,8 +544,19 @@ def render_frame(state: dict[str, Any], width: int, height: int, waveform: list[
                 cv2.circle(frame, (px, py), 1 + int(2 * energy), _bgr(color, 0.20 + energy * 0.5), -1, cv2.LINE_AA)
 
     vocal_energy, vocal_transient, _ = _sector_values(state, "vocal")
+    vocal_beat = _sector_beat(state, "vocal")
     glow = 0.35 + vocal_energy * 0.85
-    cv2.circle(frame, center, int(radius * (1.02 + vocal_energy * 0.12)), _bgr(ROLE_COLORS["vocal"], glow), 2 + int(3 * vocal_transient), cv2.LINE_AA)
+    cv2.circle(frame, center, int(radius * (1.02 + vocal_energy * 0.12 + vocal_beat * 0.03)), _bgr(ROLE_COLORS["vocal"], glow), 2 + int(3 * vocal_transient), cv2.LINE_AA)
+    cv2.putText(
+        frame,
+        "VOCAL WAVE",
+        (center[0] - int(radius * 0.46), center[1] + int(radius * 0.82)),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.34,
+        (190, 205, 220),
+        1,
+        cv2.LINE_AA,
+    )
     if waveform:
         points = []
         samples = waveform[-160:]

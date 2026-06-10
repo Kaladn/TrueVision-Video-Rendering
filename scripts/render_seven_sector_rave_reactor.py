@@ -30,6 +30,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--fps", type=int, default=30)
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
+    parser.add_argument("--bpm", type=float, default=86.0)
     return parser.parse_args()
 
 
@@ -44,6 +45,7 @@ def main() -> None:
         fps=args.fps,
         width=args.width,
         height=args.height,
+        bpm=args.bpm,
     )
     print(manifest["output_video"])
 
