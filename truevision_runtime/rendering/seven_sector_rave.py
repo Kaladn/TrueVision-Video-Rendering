@@ -145,9 +145,13 @@ def build_sector_states(envelopes: dict[str, list[float]], fps: int, duration_se
         t = frame_index / fps
         sectors: dict[str, dict[str, float]] = {}
         for role in SECTOR_ROLES:
-            envelope = envelopes.get(role, [0.0] * frame_count)
-            energy = float(envelope[min(frame_index, len(envelope) - 1)]) if envelope else 0.0
-            previous = float(envelope[max(0, min(frame_index - 1, len(envelope) - 1))]) if envelope else 0.0
+            envelope = envelopes.get(role)
+            if envelope:
+                energy = float(envelope[min(frame_index, len(envelope) - 1)])
+                previous = float(envelope[max(0, min(frame_index - 1, len(envelope) - 1))])
+            else:
+                energy = 0.0
+                previous = 0.0
             transient = max(0.0, energy - previous)
             sectors[role] = {
                 "energy": round(energy, 5),

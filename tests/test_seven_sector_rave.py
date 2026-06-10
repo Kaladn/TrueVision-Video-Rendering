@@ -8,6 +8,7 @@ import truevision_runtime.rendering.seven_sector_rave as rave
 from truevision_runtime.rendering.seven_sector_rave import (
     assign_stem_paths,
     build_envelope,
+    build_sector_states,
     extract_stems,
     map_stem_name_to_role,
     normalize_audio,
@@ -97,10 +98,6 @@ def test_extract_stems_uses_unique_names_and_decodes_wavs(tmp_path, monkeypatch)
     assert [path.name for path in decoded] == ["000_Lead_Vocals.wav", "001_Lead_Vocals.wav"]
     assert [command[3] for command in commands] == ["2.500", "2.500"]
     assert all(command[4] == "-i" for command in commands)
-
-
-from truevision_runtime.rendering.seven_sector_rave import build_sector_states
-
 
 def test_build_sector_states_contains_all_roles():
     envelopes = {role: [0.0, 0.5, 1.0] for role in ["vocal", "drums", "bass", "synth", "guitar", "keys", "other"]}
