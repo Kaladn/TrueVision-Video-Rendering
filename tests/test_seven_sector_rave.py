@@ -12,6 +12,7 @@ from truevision_runtime.rendering.seven_sector_rave import (
     extract_stems,
     map_stem_name_to_role,
     normalize_audio,
+    render_frame,
 )
 
 
@@ -105,3 +106,14 @@ def test_build_sector_states_contains_all_roles():
     assert len(states) == 3
     assert set(states[0]["sectors"]) == {"vocal", "drums", "bass", "synth", "guitar", "keys", "other"}
     assert states[2]["sectors"]["vocal"]["energy"] == 1.0
+
+
+def test_render_frame_is_nonblank():
+    state = {
+        "frame": 0,
+        "time": 0.0,
+        "sectors": {role: {"energy": 0.8, "transient": 0.3, "phase": 0.2} for role in ["vocal", "drums", "bass", "synth", "guitar", "keys", "other"]},
+    }
+    frame = render_frame(state, width=640, height=360, waveform=[0.0, 0.5, -0.5, 0.0])
+    assert frame.shape == (360, 640, 3)
+    assert int(frame.max()) > 20
