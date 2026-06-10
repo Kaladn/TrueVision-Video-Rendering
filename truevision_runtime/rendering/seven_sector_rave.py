@@ -13,6 +13,9 @@ import numpy as np
 
 
 SECTOR_ROLES = ["vocal", "drums", "bass", "synth", "guitar", "keys", "other"]
+MAX_STEM_MEMBER_BYTES = 512 * 1024 * 1024
+MAX_STEM_ZIP_BYTES = 2 * 1024 * 1024 * 1024
+STEM_COPY_CHUNK_BYTES = 1024 * 1024
 
 
 def map_stem_name_to_role(name: str) -> str:
@@ -47,28 +50,45 @@ def assign_stem_paths(paths: list[Path]) -> tuple[dict[str, Path], list[str]]:
     return mapping, fallbacks
 
 
+def _safe_stem_filename(filename: str) -> str:
+    basename = Path(filename).name
+    safe = "".join(char if char.isalnum() or char in ".-_" else "_" for char in basename).strip("._")
+    return safe or "stem"
+
+
 def extract_stems(stems_zip: Path, work_dir: Path, seconds: float) -> list[Path]:
     raw_dir = work_dir / "raw_stems"
     wav_dir = work_dir / "wav_stems"
     raw_dir.mkdir(parents=True, exist_ok=True)
     wav_dir.mkdir(parents=True, exist_ok=True)
     decoded: list[Path] = []
+    total_uncompressed = 0
     with zipfile.ZipFile(stems_zip, "r") as archive:
         for entry in archive.infolist():
             if entry.is_dir() or not entry.filename.lower().endswith((".wav", ".mp3", ".flac", ".m4a")):
                 continue
-            raw_path = raw_dir / Path(entry.filename).name
-            raw_path.write_bytes(archive.read(entry))
+            if entry.file_size > MAX_STEM_MEMBER_BYTES:
+                raise ValueError(f"Stem ZIP member exceeds size limit: {entry.filename}")
+            total_uncompressed += entry.file_size
+            if total_uncompressed > MAX_STEM_ZIP_BYTES:
+                raise ValueError("Stem ZIP exceeds total uncompressed size limit")
+
+            safe_name = _safe_stem_filename(entry.filename)
+            indexed_name = f"{len(decoded):03d}_{safe_name}"
+            raw_path = raw_dir / indexed_name
             wav_path = wav_dir / f"{raw_path.stem}.wav"
-            if raw_path.suffix.lower() == ".wav":
-                wav_path.write_bytes(raw_path.read_bytes())
-            else:
-                subprocess.run(
-                    ["ffmpeg", "-y", "-t", f"{seconds:.3f}", "-i", str(raw_path), str(wav_path)],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
+            with archive.open(entry, "r") as source, raw_path.open("wb") as target:
+                while True:
+                    chunk = source.read(STEM_COPY_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    target.write(chunk)
+            subprocess.run(
+                ["ffmpeg", "-y", "-t", f"{seconds:.3f}", "-i", str(raw_path), str(wav_path)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             decoded.append(wav_path)
     return decoded
 

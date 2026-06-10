@@ -1,10 +1,14 @@
 from pathlib import Path
+import zipfile
 
 import numpy as np
+import pytest
 
+import truevision_runtime.rendering.seven_sector_rave as rave
 from truevision_runtime.rendering.seven_sector_rave import (
     assign_stem_paths,
     build_envelope,
+    extract_stems,
     map_stem_name_to_role,
     normalize_audio,
 )
@@ -61,3 +65,35 @@ def test_assign_stem_paths_records_fallbacks():
     assert "synth" in fallbacks
     assert "guitar" in fallbacks
     assert "keys" in fallbacks
+
+
+def test_extract_stems_rejects_oversized_zip_members(tmp_path, monkeypatch):
+    stems_zip = tmp_path / "stems.zip"
+    with zipfile.ZipFile(stems_zip, "w") as archive:
+        archive.writestr("Lead Vocals.wav", b"abcd")
+
+    monkeypatch.setattr(rave, "MAX_STEM_MEMBER_BYTES", 3, raising=False)
+
+    with pytest.raises(ValueError, match="exceeds"):
+        extract_stems(stems_zip, tmp_path / "work", seconds=1.0)
+
+
+def test_extract_stems_uses_unique_names_and_decodes_wavs(tmp_path, monkeypatch):
+    stems_zip = tmp_path / "stems.zip"
+    with zipfile.ZipFile(stems_zip, "w") as archive:
+        archive.writestr("first/Lead Vocals.wav", b"first")
+        archive.writestr("second/Lead Vocals.wav", b"second")
+
+    commands = []
+
+    def fake_run(command, check, capture_output, text):
+        commands.append(command)
+        Path(command[-1]).write_bytes(b"decoded")
+
+    monkeypatch.setattr(rave.subprocess, "run", fake_run)
+
+    decoded = extract_stems(stems_zip, tmp_path / "work", seconds=2.5)
+
+    assert [path.name for path in decoded] == ["000_Lead_Vocals.wav", "001_Lead_Vocals.wav"]
+    assert [command[3] for command in commands] == ["2.500", "2.500"]
+    assert all(command[4] == "-i" for command in commands)
