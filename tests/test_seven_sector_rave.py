@@ -8,6 +8,7 @@ import truevision_runtime.rendering.seven_sector_rave as rave
 from truevision_runtime.rendering.seven_sector_rave import (
     assign_stem_paths,
     build_envelope,
+    build_manifest,
     build_sector_states,
     extract_stems,
     map_stem_name_to_role,
@@ -117,3 +118,22 @@ def test_render_frame_is_nonblank():
     frame = render_frame(state, width=640, height=360, waveform=[0.0, 0.5, -0.5, 0.0])
     assert frame.shape == (360, 640, 3)
     assert int(frame.max()) > 20
+
+
+def test_build_manifest_records_contract():
+    manifest = build_manifest(
+        run_id="demo",
+        audio_path="song.wav",
+        stems_zip="stems.zip",
+        output_video="out.mp4",
+        fps=30,
+        seconds=30.0,
+        width=1280,
+        height=720,
+        stem_mapping={"vocal": "Lead Vocals.wav"},
+        fallbacks=["synth"],
+    )
+    assert manifest["kind"] == "truevision_seven_sector_rave_reactor_manifest"
+    assert manifest["run_id"] == "demo"
+    assert manifest["sector_law"]["center"] == "vocal exact waveform"
+    assert manifest["fallbacks"] == ["synth"]

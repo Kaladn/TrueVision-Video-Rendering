@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import math
 import subprocess
 import wave
@@ -169,6 +170,174 @@ def build_sector_states(envelopes: dict[str, list[float]], fps: int, duration_se
             }
         states.append({"frame": frame_index, "time": round(t, 5), "sectors": sectors})
     return states
+
+
+def build_manifest(
+    *,
+    run_id: str,
+    audio_path: str,
+    stems_zip: str,
+    output_video: str,
+    fps: int,
+    seconds: float,
+    width: int,
+    height: int,
+    stem_mapping: dict[str, str],
+    fallbacks: list[str],
+    frame_count: int | None = None,
+    manifest_path: str | None = None,
+    state_sample: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    manifest: dict[str, Any] = {
+        "kind": "truevision_seven_sector_rave_reactor_manifest",
+        "run_id": run_id,
+        "audio_path": audio_path,
+        "stems_zip": stems_zip,
+        "output_video": output_video,
+        "fps": fps,
+        "seconds": seconds,
+        "width": width,
+        "height": height,
+        "sector_roles": list(SECTOR_ROLES),
+        "sector_law": {
+            "center": "vocal exact waveform",
+            "outer": {
+                "drums": "impact strobes",
+                "bass": "pressure tunnel rings",
+                "synth": "rotating blade beam",
+                "guitar": "jagged shard cuts",
+                "keys": "harmonic glass arcs",
+                "other": "fog sparks atmosphere",
+            },
+        },
+        "stem_mapping": dict(stem_mapping),
+        "fallbacks": list(fallbacks),
+    }
+    if frame_count is not None:
+        manifest["frame_count"] = frame_count
+    if manifest_path is not None:
+        manifest["manifest_path"] = manifest_path
+    if state_sample is not None:
+        manifest["state_sample"] = state_sample
+    return manifest
+
+
+def _state_sample(states: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    if not states:
+        return []
+    indexes = sorted({0, len(states) // 2, len(states) - 1})
+    return [states[index] for index in indexes]
+
+
+def render_seven_sector_rave(
+    *,
+    audio_path: str | Path,
+    stems_zip: str | Path,
+    output_root: str | Path,
+    run_id: str,
+    seconds: float = 30.0,
+    fps: int = 30,
+    width: int = 1280,
+    height: int = 720,
+) -> dict[str, Any]:
+    audio_path = Path(audio_path)
+    stems_zip = Path(stems_zip)
+    output_root = Path(output_root)
+    work_dir = output_root / "work"
+    frame_dir = work_dir / "frames"
+    output_root.mkdir(parents=True, exist_ok=True)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    frame_dir.mkdir(parents=True, exist_ok=True)
+
+    decoded_stems = extract_stems(stems_zip, work_dir, seconds)
+    stem_mapping, fallbacks = assign_stem_paths(decoded_stems)
+
+    master_samples, master_sample_rate = read_wav_mono(audio_path)
+    envelopes: dict[str, list[float]] = {}
+    for role in SECTOR_ROLES:
+        stem_path = stem_mapping.get(role)
+        if stem_path is None:
+            samples = master_samples
+            sample_rate = master_sample_rate
+        else:
+            samples, sample_rate = read_wav_mono(stem_path)
+        envelopes[role] = build_envelope(samples, sample_rate=sample_rate, fps=fps, duration_seconds=seconds)
+
+    states = build_sector_states(envelopes, fps=fps, duration_seconds=seconds)
+    frame_count = len(states)
+
+    vocal_path = stem_mapping.get("vocal")
+    if vocal_path is None:
+        vocal_samples = master_samples
+        vocal_sample_rate = master_sample_rate
+    else:
+        vocal_samples, vocal_sample_rate = read_wav_mono(vocal_path)
+    vocal_limit = min(len(vocal_samples), int(seconds * vocal_sample_rate))
+    vocal_waveform = normalize_audio(vocal_samples[:vocal_limit].tolist())
+
+    silent_video = work_dir / f"{run_id}_silent.mp4"
+    output_video = output_root / f"{run_id}.mp4"
+    manifest_path = output_root / f"{run_id}_manifest.json"
+
+    writer = cv2.VideoWriter(
+        str(silent_video),
+        cv2.VideoWriter_fourcc(*"mp4v"),
+        float(fps),
+        (width, height),
+    )
+    if not writer.isOpened():
+        raise RuntimeError(f"Could not open video writer for {silent_video}")
+    try:
+        for frame_index, state in enumerate(states):
+            vocal_end = min(len(vocal_waveform), int((frame_index + 1) / fps * vocal_sample_rate))
+            waveform_slice = vocal_waveform[:vocal_end]
+            writer.write(render_frame(state, width=width, height=height, waveform=waveform_slice))
+    finally:
+        writer.release()
+
+    subprocess.run(
+        [
+            "ffmpeg",
+            "-y",
+            "-i",
+            str(silent_video),
+            "-t",
+            f"{seconds:.3f}",
+            "-i",
+            str(audio_path),
+            "-map",
+            "0:v:0",
+            "-map",
+            "1:a:0",
+            "-c:v",
+            "copy",
+            "-c:a",
+            "aac",
+            "-shortest",
+            str(output_video),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    manifest = build_manifest(
+        run_id=run_id,
+        audio_path=str(audio_path),
+        stems_zip=str(stems_zip),
+        output_video=str(output_video),
+        fps=fps,
+        seconds=seconds,
+        width=width,
+        height=height,
+        stem_mapping={role: str(path) for role, path in stem_mapping.items()},
+        fallbacks=fallbacks,
+        frame_count=frame_count,
+        manifest_path=str(manifest_path),
+        state_sample=_state_sample(states),
+    )
+    manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    return manifest
 
 
 def _bgr(color: tuple[int, int, int], scale: float = 1.0) -> tuple[int, int, int]:
