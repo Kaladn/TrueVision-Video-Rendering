@@ -32,6 +32,47 @@ def map_stem_name_to_role(name: str) -> str:
     return "other"
 
 
+def assign_stem_paths(paths: list[Path]) -> tuple[dict[str, Path], list[str]]:
+    mapping: dict[str, Path] = {}
+    for path in paths:
+        role = map_stem_name_to_role(path.name)
+        mapping.setdefault(role, path)
+    fallbacks = [role for role in SECTOR_ROLES if role not in mapping]
+    if "other" not in mapping and paths:
+        used = set(mapping.values())
+        extra = next((path for path in paths if path not in used), paths[-1])
+        mapping["other"] = extra
+        if "other" in fallbacks:
+            fallbacks.remove("other")
+    return mapping, fallbacks
+
+
+def extract_stems(stems_zip: Path, work_dir: Path, seconds: float) -> list[Path]:
+    raw_dir = work_dir / "raw_stems"
+    wav_dir = work_dir / "wav_stems"
+    raw_dir.mkdir(parents=True, exist_ok=True)
+    wav_dir.mkdir(parents=True, exist_ok=True)
+    decoded: list[Path] = []
+    with zipfile.ZipFile(stems_zip, "r") as archive:
+        for entry in archive.infolist():
+            if entry.is_dir() or not entry.filename.lower().endswith((".wav", ".mp3", ".flac", ".m4a")):
+                continue
+            raw_path = raw_dir / Path(entry.filename).name
+            raw_path.write_bytes(archive.read(entry))
+            wav_path = wav_dir / f"{raw_path.stem}.wav"
+            if raw_path.suffix.lower() == ".wav":
+                wav_path.write_bytes(raw_path.read_bytes())
+            else:
+                subprocess.run(
+                    ["ffmpeg", "-y", "-t", f"{seconds:.3f}", "-i", str(raw_path), str(wav_path)],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+            decoded.append(wav_path)
+    return decoded
+
+
 def normalize_audio(samples: Iterable[float]) -> list[float]:
     values = [float(sample) for sample in samples]
     peak = max((abs(value) for value in values), default=0.0)

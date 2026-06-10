@@ -1,6 +1,13 @@
+from pathlib import Path
+
 import numpy as np
 
-from truevision_runtime.rendering.seven_sector_rave import build_envelope, map_stem_name_to_role, normalize_audio
+from truevision_runtime.rendering.seven_sector_rave import (
+    assign_stem_paths,
+    build_envelope,
+    map_stem_name_to_role,
+    normalize_audio,
+)
 
 
 def test_map_stem_name_to_role_prefers_explicit_names():
@@ -37,3 +44,20 @@ def test_build_envelope_tracks_quiet_and_loud_regions():
     envelope = build_envelope(samples, sample_rate=48000, fps=10, duration_seconds=1.0)
     assert max(envelope[:5]) == 0.0
     assert min(envelope[5:]) > 0.9
+
+
+def test_assign_stem_paths_records_fallbacks():
+    paths = [
+        Path("Lead Vocals.wav"),
+        Path("Drums.wav"),
+        Path("Bass.wav"),
+        Path("Mystery.wav"),
+    ]
+    mapping, fallbacks = assign_stem_paths(paths)
+    assert mapping["vocal"].name == "Lead Vocals.wav"
+    assert mapping["drums"].name == "Drums.wav"
+    assert mapping["bass"].name == "Bass.wav"
+    assert mapping["other"].name == "Mystery.wav"
+    assert "synth" in fallbacks
+    assert "guitar" in fallbacks
+    assert "keys" in fallbacks
