@@ -1,0 +1,16 @@
+{
+  "dataset_id": "magicr/phyworld",
+  "priority": "high",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2411.02385",
+    "GitHub: https://github.com/phyworld/phyworld",
+    "Website: https://phyworld.github.io/",
+    "Dataset: https://huggingface.co/datasets/magicr/phyworld"
+  ],
+  "tags": [
+    "physics_state",
+    "post_training_alignment"
+  ],
+  "title": "PhyWorld",
+  "truevision_use": "state/physics verification; post-training or reward alignment"
+}

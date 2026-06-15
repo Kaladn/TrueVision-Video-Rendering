@@ -1,0 +1,14 @@
+{
+  "dataset_id": "anonymousdb/AIGVE-60K",
+  "priority": "low",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2505.12098",
+    "GitHub: https://github.com/IntMeGroup/LOVE",
+    "Dataset: https://huggingface.co/datasets/anonymousdb/AIGVE-60K"
+  ],
+  "tags": [
+    "evaluation"
+  ],
+  "title": "AIGVE-60K",
+  "truevision_use": "benchmarking generated clips"
+}

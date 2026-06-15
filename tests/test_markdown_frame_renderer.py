@@ -116,8 +116,9 @@ pixels last
         self.assertIn("Not reached by:", lines)
         self.assertIn("  /api/lexicon/intake/map", lines)
         self.assertIn("  /intake-map", lines)
-        stripped = [line.strip() for line in lines]
-        self.assertLess(stripped.index("Not reached by:"), stripped.index("build_intake_mapping is now a compatibility facade into native inline-content mapping."))
+        self.assertIn("build_intake_mapping -> native facade", lines)
+        self.assertIn("build_observed_map -> legacy artifacts", lines)
+        self.assertNotIn("build_intake_mapping is now a compatibility facade into native inline-content mapping.", lines)
 
     def test_graph_layout_staggers_dense_nodes_without_box_overlap(self):
         mermaid = """flowchart TD

@@ -1,0 +1,14 @@
+{
+  "dataset_id": "Ethan2k04/GB3DV-25k",
+  "priority": "medium",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2603.16271",
+    "Website: https://vigor-geometry-reward.com/",
+    "Dataset: https://huggingface.co/datasets/Ethan2k04/GB3DV-25k"
+  ],
+  "tags": [
+    "physics_state"
+  ],
+  "title": "GB3DV-25k",
+  "truevision_use": "state/physics verification"
+}

@@ -1,0 +1,39 @@
+{
+  "global_index": 2049,
+  "category": "dynamic_indoor",
+  "scene_type": "dynamic_indoor",
+  "caption": "A cozy bedroom with hardwood floors, a patterned bedspread, and two windows with blinds. Adjacent is a bathroom with dark tile, a wooden vanity, and a mirror. The camera follows a white towel in a long tracking shot, weaving through the doorway and across the floor toward the bed. The towel glides past the dresser, revealing the room’s calm, tidy layout. Soft light filters through the blinds, casting gentle shadows as the towel moves.",
+  "camera_movement": "Tracking shot",
+  "camera_movement_type": "Tracking shot",
+  "file_path": "caption/input/real-estate-10k-mini/videos/dbb340f63c6ae50b.mp4",
+  "dataset": "realestate10k",
+  "is_video": true,
+  "samples_generated": 10,
+  "total_samples": 10,
+  "success_rate": 1.0,
+  "seeds_used": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "video_files": [
+    "seed00.mp4",
+    "seed01.mp4",
+    "seed02.mp4",
+    "seed03.mp4",
+    "seed04.mp4",
+    "seed05.mp4",
+    "seed06.mp4",
+    "seed07.mp4",
+    "seed08.mp4",
+    "seed09.mp4"
+  ],
+  "timestamp": "2026-02-09T00:46:37.019745"
+}

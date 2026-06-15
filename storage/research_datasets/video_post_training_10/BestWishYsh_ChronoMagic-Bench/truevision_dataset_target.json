@@ -1,0 +1,15 @@
+{
+  "dataset_id": "BestWishYsh/ChronoMagic-Bench",
+  "priority": "low",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2406.18522",
+    "GitHub: https://github.com/PKU-YuanGroup/ChronoMagic-Bench",
+    "Website: https://pku-yuangroup.github.io/ChronoMagic-Bench/",
+    "Dataset: https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Bench"
+  ],
+  "tags": [
+    "evaluation"
+  ],
+  "title": "ChronoMagic-Bench",
+  "truevision_use": "benchmarking generated clips"
+}

@@ -1,0 +1,16 @@
+{
+  "dataset_id": "KlingTeam/VideoGen-RewardBench",
+  "priority": "medium",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2501.13918",
+    "GitHub: https://github.com/KlingTeam/VideoAlign",
+    "Website: https://gongyeliu.github.io/videoalign/",
+    "Dataset: https://huggingface.co/datasets/KlingTeam/VideoGen-RewardBench"
+  ],
+  "tags": [
+    "post_training_alignment",
+    "evaluation"
+  ],
+  "title": "VideoGen-RewardBench",
+  "truevision_use": "post-training or reward alignment; benchmarking generated clips"
+}

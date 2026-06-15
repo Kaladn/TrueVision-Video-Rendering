@@ -1,0 +1,16 @@
+{
+  "dataset_id": "phyworldbench/phyworldbench",
+  "priority": "high",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2507.13428",
+    "GitHub: https://github.com/g-jing/phy-world-bench",
+    "Dataset: https://huggingface.co/datasets/phyworldbench/phyworldbench"
+  ],
+  "tags": [
+    "physics_state",
+    "post_training_alignment",
+    "evaluation"
+  ],
+  "title": "PhyWorldBench",
+  "truevision_use": "state/physics verification; post-training or reward alignment; benchmarking generated clips"
+}

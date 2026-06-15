@@ -1,0 +1,60 @@
+{
+  "@context": {
+    "@vocab": "https://mlcommons.org/croissant/",
+    "schema": "https://schema.org/",
+    "name": "schema:name",
+    "description": "schema:description",
+    "identifier": "schema:identifier",
+    "license": "schema:license",
+    "creator": "schema:creator",
+    "affiliation": "schema:affiliation",
+    "recordSets": "recordSets",
+    "fields": "fields",
+    "dataType": "dataType"
+  },
+  "@type": "schema:Dataset",
+  "name": "worldmodelbench",
+  "description": "A benchmark for evaluating world modeling ability in video generation models.",
+  "identifier": "https://huggingface.co/datasets/Efficient-Large-Model/worldmodelbench",
+  "license": "CC BY 4.0",
+  "creators": [
+    {
+      "name": "World Model Bench Team",
+      "affiliation": "Nvidia, MIT, UC Berkeley, UC San Diego"
+    }
+  ],
+  "recordSets": [
+    {
+      "name": "benchmark_instances",
+      "description": "Each record includes a text instruction, an initial video frame, and associated metadata for evaluation.",
+      "fields": [
+        {
+          "name": "text_instruction",
+          "description": "The instruction provided for the video generation task.",
+          "dataType": "https://schema.org/Text"
+        },
+        {
+          "name": "text_first_frame",
+          "description": "Description of the initial video frame.",
+          "dataType": "https://schema.org/Text"
+        },
+        {
+          "name": "first_frame",
+          "description": "Filename of the initial video frame image.",
+          "dataType": "https://schema.org/Text"
+        },
+        {
+          "name": "domain",
+          "description": "The application domain of the prompt (e.g., Robotics, Driving).",
+          "dataType": "https://schema.org/Text"
+        },
+        {
+          "name": "subdomain",
+          "description": "The specific subdomain within the application domain.",
+          "dataType": "https://schema.org/Text"
+        }
+      ]
+    }
+  ]
+}
+

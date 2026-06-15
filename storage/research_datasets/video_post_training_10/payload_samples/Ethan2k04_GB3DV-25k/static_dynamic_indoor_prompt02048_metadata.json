@@ -1,0 +1,39 @@
+{
+  "global_index": 2048,
+  "category": "dynamic_indoor",
+  "scene_type": "dynamic_indoor",
+  "caption": "A warm-toned kitchen with wooden cabinets, granite countertops, and a central island. Sunlight streams through large windows, illuminating tiled floors and a dining nook with dark chairs. A ceiling fan rotates gently overhead. The camera follows a rolling chair in a long tracking shot, weaving through the kitchen, past the island, around the dining table, and toward the living room. The chair glides smoothly, revealing a cozy fireplace and staircase in the background.",
+  "camera_movement": "Tracking shot",
+  "camera_movement_type": "Tracking shot",
+  "file_path": "caption/input/real-estate-10k-mini/videos/28a5318660ab60ba.mp4",
+  "dataset": "realestate10k",
+  "is_video": true,
+  "samples_generated": 10,
+  "total_samples": 10,
+  "success_rate": 1.0,
+  "seeds_used": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "video_files": [
+    "seed00.mp4",
+    "seed01.mp4",
+    "seed02.mp4",
+    "seed03.mp4",
+    "seed04.mp4",
+    "seed05.mp4",
+    "seed06.mp4",
+    "seed07.mp4",
+    "seed08.mp4",
+    "seed09.mp4"
+  ],
+  "timestamp": "2026-02-09T00:43:04.221369"
+}

@@ -604,9 +604,9 @@ def prepare_code_panel_lines(blocks: list[str]) -> list[str]:
         if stripped.startswith("src/") and len(path_lines) < 1:
             path_lines.append(line)
         elif stripped.startswith("build_intake_mapping"):
-            detail_lines.append(line)
+            detail_lines.append("build_intake_mapping -> native facade")
         elif stripped.startswith("build_observed_map"):
-            detail_lines.append(line)
+            detail_lines.append("build_observed_map -> legacy artifacts")
         elif stripped == "Not reached by:":
             route_lines.append(line)
         elif stripped.startswith("/api/lexicon/intake/map") or stripped.startswith("/intake-map"):

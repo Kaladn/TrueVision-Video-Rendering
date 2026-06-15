@@ -1,0 +1,13 @@
+{
+  "dataset_id": "BestWishYsh/ChronoMagic-Pro",
+  "priority": "low",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2406.18522",
+    "GitHub: https://github.com/PKU-YuanGroup/ChronoMagic-Bench",
+    "Website: https://pku-yuangroup.github.io/ChronoMagic-Bench/",
+    "Dataset: https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Pro"
+  ],
+  "tags": [],
+  "title": "ChronoMagic-Pro",
+  "truevision_use": "background reference"
+}

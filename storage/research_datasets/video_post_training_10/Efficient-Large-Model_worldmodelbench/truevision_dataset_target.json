@@ -1,0 +1,17 @@
+{
+  "dataset_id": "Efficient-Large-Model/worldmodelbench",
+  "priority": "high",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2502.20694",
+    "GitHub: https://github.com/WorldModelBench-Team/WorldModelBench/tree/main?tab=readme-ov-file#evaluation",
+    "Website: https://worldmodelbench-team.github.io/",
+    "Dataset: https://huggingface.co/datasets/Efficient-Large-Model/worldmodelbench"
+  ],
+  "tags": [
+    "physics_state",
+    "post_training_alignment",
+    "evaluation"
+  ],
+  "title": "WorldModelBench",
+  "truevision_use": "state/physics verification; post-training or reward alignment; benchmarking generated clips"
+}

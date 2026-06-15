@@ -1,0 +1,141 @@
+{
+  "crawl_receipt": "storage\\research_datasets\\video_post_training_10\\crawl_receipt.json",
+  "downloaded_bytes": 66038937,
+  "kind": "truevision_dataset_payload_sample_receipt",
+  "law": [
+    "Only public Hugging Face dataset files are sampled.",
+    "Large or unknown-size files are skipped unless the caller raises the budget/policy.",
+    "This is a payload sampler, not a license bypasser."
+  ],
+  "max_files_per_dataset": 2,
+  "max_total_bytes": 67108864,
+  "remaining_bytes": 1069927,
+  "sampled": [
+    {
+      "bytes_written": 249627,
+      "content_length": 249627,
+      "dataset_id": "phyworldbench/phyworldbench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\phyworldbench_phyworldbench\\data_train-00000-of-00001.parquet",
+      "rfilename": "data/train-00000-of-00001.parquet",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/phyworldbench/phyworldbench/resolve/main/data/train-00000-of-00001.parquet"
+    },
+    {
+      "bytes_written": 197958,
+      "content_length": 197958,
+      "dataset_id": "phyworldbench/phyworldbench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\phyworldbench_phyworldbench\\prompt_index_to_prompt.json",
+      "rfilename": "prompt_index_to_prompt.json",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/phyworldbench/phyworldbench/resolve/main/prompt_index_to_prompt.json"
+    },
+    {
+      "bytes_written": 1951,
+      "content_length": 1951,
+      "dataset_id": "Efficient-Large-Model/worldmodelbench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\Efficient-Large-Model_worldmodelbench\\croissant.json",
+      "rfilename": "croissant.json",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/Efficient-Large-Model/worldmodelbench/resolve/main/croissant.json"
+    },
+    {
+      "bytes_written": 165774,
+      "content_length": 165774,
+      "dataset_id": "Efficient-Large-Model/worldmodelbench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\Efficient-Large-Model_worldmodelbench\\worldmodelbench.json",
+      "rfilename": "worldmodelbench.json",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/Efficient-Large-Model/worldmodelbench/resolve/main/worldmodelbench.json"
+    },
+    {
+      "bytes_written": 1206,
+      "content_length": 1206,
+      "dataset_id": "Ethan2k04/GB3DV-25k",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\Ethan2k04_GB3DV-25k\\static_dynamic_indoor_prompt02048_metadata.json",
+      "rfilename": "static_dynamic_indoor/prompt02048/metadata.json",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/Ethan2k04/GB3DV-25k/resolve/main/static_dynamic_indoor/prompt02048/metadata.json"
+    },
+    {
+      "bytes_written": 1174,
+      "content_length": 1174,
+      "dataset_id": "Ethan2k04/GB3DV-25k",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\Ethan2k04_GB3DV-25k\\static_dynamic_indoor_prompt02049_metadata.json",
+      "rfilename": "static_dynamic_indoor/prompt02049/metadata.json",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/Ethan2k04/GB3DV-25k/resolve/main/static_dynamic_indoor/prompt02049/metadata.json"
+    },
+    {
+      "bytes_written": 8127072,
+      "content_length": 8127072,
+      "dataset_id": "KlingTeam/VideoGen-RewardBench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\KlingTeam_VideoGen-RewardBench\\videogen-rewardbench.csv",
+      "rfilename": "videogen-rewardbench.csv",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/KlingTeam/VideoGen-RewardBench/resolve/main/videogen-rewardbench.csv"
+    },
+    {
+      "bytes_written": 466484,
+      "content_length": 466484,
+      "dataset_id": "anonymousdb/AIGVE-60K",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\anonymousdb_AIGVE-60K\\prompt_video3050.jsonl",
+      "rfilename": "prompt_video3050.jsonl",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/anonymousdb/AIGVE-60K/resolve/main/prompt_video3050.jsonl"
+    },
+    {
+      "bytes_written": 50101,
+      "content_length": 50101,
+      "dataset_id": "BestWishYsh/ChronoMagic-Bench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\BestWishYsh_ChronoMagic-Bench\\Captions_ChronoMagic-Bench-150.csv",
+      "rfilename": "Captions/ChronoMagic-Bench-150.csv",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Bench/resolve/main/Captions/ChronoMagic-Bench-150.csv"
+    },
+    {
+      "bytes_written": 538760,
+      "content_length": 538760,
+      "dataset_id": "BestWishYsh/ChronoMagic-Bench",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\BestWishYsh_ChronoMagic-Bench\\Captions_ChronoMagic-Bench.csv",
+      "rfilename": "Captions/ChronoMagic-Bench.csv",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Bench/resolve/main/Captions/ChronoMagic-Bench.csv"
+    },
+    {
+      "content_length": 845596845,
+      "dataset_id": "BestWishYsh/ChronoMagic-Pro",
+      "head_status": 200,
+      "rfilename": "Captions/ChronoMagic-Pro.csv",
+      "status": "skipped_over_remaining_budget",
+      "url": "https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Pro/resolve/main/Captions/ChronoMagic-Pro.csv"
+    },
+    {
+      "bytes_written": 56238830,
+      "content_length": 56238830,
+      "dataset_id": "BAAI/CI-VID",
+      "head_status": 200,
+      "path": "storage\\research_datasets\\video_post_training_10\\payload_samples\\BAAI_CI-VID\\CI-VID_test_samples.jsonl",
+      "rfilename": "CI-VID_test_samples.jsonl",
+      "status": "downloaded",
+      "url": "https://huggingface.co/datasets/BAAI/CI-VID/resolve/main/CI-VID_test_samples.jsonl"
+    },
+    {
+      "content_length": 2543090209,
+      "dataset_id": "BAAI/CI-VID",
+      "head_status": 200,
+      "rfilename": "CI-VID_train_samples.jsonl",
+      "status": "skipped_over_remaining_budget",
+      "url": "https://huggingface.co/datasets/BAAI/CI-VID/resolve/main/CI-VID_train_samples.jsonl"
+    }
+  ]
+}

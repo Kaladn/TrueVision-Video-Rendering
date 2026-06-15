@@ -1,0 +1,12 @@
+{
+  "dataset_id": "BAAI/CI-VID",
+  "priority": "low",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2505.18078",
+    "GitHub: https://github.com/ymju-BAAI/CI-VID",
+    "Dataset: https://huggingface.co/datasets/BAAI/CI-VID"
+  ],
+  "tags": [],
+  "title": "CI-VID",
+  "truevision_use": "background reference"
+}

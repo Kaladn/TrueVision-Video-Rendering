@@ -1,0 +1,15 @@
+{
+  "dataset_id": "ZiqiaoPeng/AIGC_LipSync_Benchmark",
+  "priority": "low",
+  "source_links": [
+    "Paper: https://arxiv.org/abs/2505.21448",
+    "Website: https://ziqiaopeng.github.io/OmniSync/",
+    "Dataset: https://huggingface.co/datasets/ZiqiaoPeng/AIGC_LipSync_Benchmark"
+  ],
+  "tags": [
+    "audio_video",
+    "evaluation"
+  ],
+  "title": "AIGC-LipSync",
+  "truevision_use": "audio/video synchronization; benchmarking generated clips"
+}

@@ -1,0 +1,378 @@
+{
+  "catalog": "external_research\\truevision_video_post_training_catalog.jsonl",
+  "download_scope": "metadata_and_dataset_cards_only",
+  "full_payload_note": "Use dataset licenses and storage budget checks before downloading full video payloads.",
+  "kind": "truevision_public_dataset_metadata_crawl_receipt",
+  "limit": 10,
+  "receipts": [
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\magicr_phyworld\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/magicr/phyworld",
+      "crawl_time_unix": 1781051770.8386662,
+      "dataset_id": "magicr/phyworld",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 23,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\magicr_phyworld",
+      "priority": "high",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\magicr_phyworld\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/magicr/phyworld/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "physics_state",
+        "post_training_alignment"
+      ],
+      "title": "PhyWorld",
+      "truevision_use": "state/physics verification; post-training or reward alignment"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\phyworldbench_phyworldbench\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/phyworldbench/phyworldbench",
+      "crawl_time_unix": 1781051771.5642233,
+      "dataset_id": "phyworldbench/phyworldbench",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 5,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\phyworldbench_phyworldbench",
+      "priority": "high",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\phyworldbench_phyworldbench\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/phyworldbench/phyworldbench/raw/main/README.md",
+      "size_categories": [
+        "features",
+        "splits",
+        "download_size",
+        "dataset_size"
+      ],
+      "tags": [
+        "physics_state",
+        "post_training_alignment",
+        "evaluation"
+      ],
+      "title": "PhyWorldBench",
+      "truevision_use": "state/physics verification; post-training or reward alignment; benchmarking generated clips"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\Efficient-Large-Model_worldmodelbench\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/Efficient-Large-Model/worldmodelbench",
+      "crawl_time_unix": 1781051772.194908,
+      "dataset_id": "Efficient-Large-Model/worldmodelbench",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 354,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\Efficient-Large-Model_worldmodelbench",
+      "priority": "high",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\Efficient-Large-Model_worldmodelbench\\README.md",
+      "readme_status": 404,
+      "readme_url": "https://huggingface.co/datasets/Efficient-Large-Model/worldmodelbench/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "physics_state",
+        "post_training_alignment",
+        "evaluation"
+      ],
+      "title": "WorldModelBench",
+      "truevision_use": "state/physics verification; post-training or reward alignment; benchmarking generated clips"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\Ethan2k04_GB3DV-25k\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/Ethan2k04/GB3DV-25k",
+      "crawl_time_unix": 1781051773.08813,
+      "dataset_id": "Ethan2k04/GB3DV-25k",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 28162,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\Ethan2k04_GB3DV-25k",
+      "priority": "medium",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\Ethan2k04_GB3DV-25k\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/Ethan2k04/GB3DV-25k/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "physics_state"
+      ],
+      "title": "GB3DV-25k",
+      "truevision_use": "state/physics verification"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\KlingTeam_VideoGen-RewardBench\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/KlingTeam/VideoGen-RewardBench",
+      "crawl_time_unix": 1781051773.6393638,
+      "dataset_id": "KlingTeam/VideoGen-RewardBench",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 4,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\KlingTeam_VideoGen-RewardBench",
+      "priority": "medium",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\KlingTeam_VideoGen-RewardBench\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/KlingTeam/VideoGen-RewardBench/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "post_training_alignment",
+        "evaluation"
+      ],
+      "title": "VideoGen-RewardBench",
+      "truevision_use": "post-training or reward alignment; benchmarking generated clips"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\ZiqiaoPeng_AIGC_LipSync_Benchmark\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/ZiqiaoPeng/AIGC_LipSync_Benchmark",
+      "crawl_time_unix": 1781051774.181505,
+      "dataset_id": "ZiqiaoPeng/AIGC_LipSync_Benchmark",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 617,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\ZiqiaoPeng_AIGC_LipSync_Benchmark",
+      "priority": "low",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\ZiqiaoPeng_AIGC_LipSync_Benchmark\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/ZiqiaoPeng/AIGC_LipSync_Benchmark/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "audio_video",
+        "evaluation"
+      ],
+      "title": "AIGC-LipSync",
+      "truevision_use": "audio/video synchronization; benchmarking generated clips"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\anonymousdb_AIGVE-60K\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/anonymousdb/AIGVE-60K",
+      "crawl_time_unix": 1781051774.7719388,
+      "dataset_id": "anonymousdb/AIGVE-60K",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 7,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\anonymousdb_AIGVE-60K",
+      "priority": "low",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\anonymousdb_AIGVE-60K\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/anonymousdb/AIGVE-60K/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "evaluation"
+      ],
+      "title": "AIGVE-60K",
+      "truevision_use": "benchmarking generated clips"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\BestWishYsh_ChronoMagic-Bench\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/BestWishYsh/ChronoMagic-Bench",
+      "crawl_time_unix": 1781051775.3568766,
+      "dataset_id": "BestWishYsh/ChronoMagic-Bench",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 26,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\BestWishYsh_ChronoMagic-Bench",
+      "priority": "low",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\BestWishYsh_ChronoMagic-Bench\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Bench/raw/main/README.md",
+      "size_categories": [],
+      "tags": [
+        "evaluation"
+      ],
+      "title": "ChronoMagic-Bench",
+      "truevision_use": "benchmarking generated clips"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\BestWishYsh_ChronoMagic-Pro\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/BestWishYsh/ChronoMagic-Pro",
+      "crawl_time_unix": 1781051775.9550266,
+      "dataset_id": "BestWishYsh/ChronoMagic-Pro",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 67,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\BestWishYsh_ChronoMagic-Pro",
+      "priority": "low",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\BestWishYsh_ChronoMagic-Pro\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Pro/raw/main/README.md",
+      "size_categories": [],
+      "tags": [],
+      "title": "ChronoMagic-Pro",
+      "truevision_use": "background reference"
+    },
+    {
+      "api_path": "storage\\research_datasets\\video_post_training_10\\BAAI_CI-VID\\hf_api.json",
+      "api_status": 200,
+      "api_url": "https://huggingface.co/api/datasets/BAAI/CI-VID",
+      "crawl_time_unix": 1781051776.6042995,
+      "dataset_id": "BAAI/CI-VID",
+      "download_scope": "metadata_and_dataset_card",
+      "file_count": 265,
+      "gated": false,
+      "local_dir": "storage\\research_datasets\\video_post_training_10\\BAAI_CI-VID",
+      "priority": "low",
+      "readme_path": "storage\\research_datasets\\video_post_training_10\\BAAI_CI-VID\\README.md",
+      "readme_status": 200,
+      "readme_url": "https://huggingface.co/datasets/BAAI/CI-VID/raw/main/README.md",
+      "size_categories": [],
+      "tags": [],
+      "title": "CI-VID",
+      "truevision_use": "background reference"
+    }
+  ],
+  "target_count": 10,
+  "targets": [
+    {
+      "dataset_id": "magicr/phyworld",
+      "priority": "high",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2411.02385",
+        "GitHub: https://github.com/phyworld/phyworld",
+        "Website: https://phyworld.github.io/",
+        "Dataset: https://huggingface.co/datasets/magicr/phyworld"
+      ],
+      "tags": [
+        "physics_state",
+        "post_training_alignment"
+      ],
+      "title": "PhyWorld",
+      "truevision_use": "state/physics verification; post-training or reward alignment"
+    },
+    {
+      "dataset_id": "phyworldbench/phyworldbench",
+      "priority": "high",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2507.13428",
+        "GitHub: https://github.com/g-jing/phy-world-bench",
+        "Dataset: https://huggingface.co/datasets/phyworldbench/phyworldbench"
+      ],
+      "tags": [
+        "physics_state",
+        "post_training_alignment",
+        "evaluation"
+      ],
+      "title": "PhyWorldBench",
+      "truevision_use": "state/physics verification; post-training or reward alignment; benchmarking generated clips"
+    },
+    {
+      "dataset_id": "Efficient-Large-Model/worldmodelbench",
+      "priority": "high",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2502.20694",
+        "GitHub: https://github.com/WorldModelBench-Team/WorldModelBench/tree/main?tab=readme-ov-file#evaluation",
+        "Website: https://worldmodelbench-team.github.io/",
+        "Dataset: https://huggingface.co/datasets/Efficient-Large-Model/worldmodelbench"
+      ],
+      "tags": [
+        "physics_state",
+        "post_training_alignment",
+        "evaluation"
+      ],
+      "title": "WorldModelBench",
+      "truevision_use": "state/physics verification; post-training or reward alignment; benchmarking generated clips"
+    },
+    {
+      "dataset_id": "Ethan2k04/GB3DV-25k",
+      "priority": "medium",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2603.16271",
+        "Website: https://vigor-geometry-reward.com/",
+        "Dataset: https://huggingface.co/datasets/Ethan2k04/GB3DV-25k"
+      ],
+      "tags": [
+        "physics_state"
+      ],
+      "title": "GB3DV-25k",
+      "truevision_use": "state/physics verification"
+    },
+    {
+      "dataset_id": "KlingTeam/VideoGen-RewardBench",
+      "priority": "medium",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2501.13918",
+        "GitHub: https://github.com/KlingTeam/VideoAlign",
+        "Website: https://gongyeliu.github.io/videoalign/",
+        "Dataset: https://huggingface.co/datasets/KlingTeam/VideoGen-RewardBench"
+      ],
+      "tags": [
+        "post_training_alignment",
+        "evaluation"
+      ],
+      "title": "VideoGen-RewardBench",
+      "truevision_use": "post-training or reward alignment; benchmarking generated clips"
+    },
+    {
+      "dataset_id": "ZiqiaoPeng/AIGC_LipSync_Benchmark",
+      "priority": "low",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2505.21448",
+        "Website: https://ziqiaopeng.github.io/OmniSync/",
+        "Dataset: https://huggingface.co/datasets/ZiqiaoPeng/AIGC_LipSync_Benchmark"
+      ],
+      "tags": [
+        "audio_video",
+        "evaluation"
+      ],
+      "title": "AIGC-LipSync",
+      "truevision_use": "audio/video synchronization; benchmarking generated clips"
+    },
+    {
+      "dataset_id": "anonymousdb/AIGVE-60K",
+      "priority": "low",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2505.12098",
+        "GitHub: https://github.com/IntMeGroup/LOVE",
+        "Dataset: https://huggingface.co/datasets/anonymousdb/AIGVE-60K"
+      ],
+      "tags": [
+        "evaluation"
+      ],
+      "title": "AIGVE-60K",
+      "truevision_use": "benchmarking generated clips"
+    },
+    {
+      "dataset_id": "BestWishYsh/ChronoMagic-Bench",
+      "priority": "low",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2406.18522",
+        "GitHub: https://github.com/PKU-YuanGroup/ChronoMagic-Bench",
+        "Website: https://pku-yuangroup.github.io/ChronoMagic-Bench/",
+        "Dataset: https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Bench"
+      ],
+      "tags": [
+        "evaluation"
+      ],
+      "title": "ChronoMagic-Bench",
+      "truevision_use": "benchmarking generated clips"
+    },
+    {
+      "dataset_id": "BestWishYsh/ChronoMagic-Pro",
+      "priority": "low",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2406.18522",
+        "GitHub: https://github.com/PKU-YuanGroup/ChronoMagic-Bench",
+        "Website: https://pku-yuangroup.github.io/ChronoMagic-Bench/",
+        "Dataset: https://huggingface.co/datasets/BestWishYsh/ChronoMagic-Pro"
+      ],
+      "tags": [],
+      "title": "ChronoMagic-Pro",
+      "truevision_use": "background reference"
+    },
+    {
+      "dataset_id": "BAAI/CI-VID",
+      "priority": "low",
+      "source_links": [
+        "Paper: https://arxiv.org/abs/2505.18078",
+        "GitHub: https://github.com/ymju-BAAI/CI-VID",
+        "Dataset: https://huggingface.co/datasets/BAAI/CI-VID"
+      ],
+      "tags": [],
+      "title": "CI-VID",
+      "truevision_use": "background reference"
+    }
+  ]
+}
